@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_password
+      POSTGRES_DB: erp_ccg
+    ports:
+      - "5433:5432"
+    volumes:
+      - erp_ccg_pg_data:/var/lib/postgresql/data
+
+volumes:
+  erp_ccg_pg_data:
