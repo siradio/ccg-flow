@@ -1,0 +1,187 @@
+import { useEffect, useState } from 'react';
+import client from '../../api/client';
+import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
+
+const CONTRAT_COLOR = '#1d4ed8';
+const STATUT_LABELS_RH = { actif: 'Actif', inactif: 'Inactif', sorti: 'Sorti' };
+const STATUT_COLORS_RH = {
+  actif: { bg: '#dcfce7', fg: '#166534' },
+  inactif: { bg: '#f3f4f6', fg: '#374151' },
+  sorti: { bg: '#fee2e2', fg: '#991b1b' },
+};
+
+function BarList({ entries, max, colorFor }) {
+  const safeMax = Math.max(1, max ?? Math.max(...entries.map(e => e.count), 1));
+  if (entries.length === 0) return <p className="empty-row">Aucune donnée.</p>;
+  return (
+    <div>
+      {entries.map(e => (
+        <div key={e.label} className="bar-row">
+          <span className="bar-label">{e.label}</span>
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: `${(e.count / safeMax) * 100}%`, background: colorFor ? colorFor(e.label) : 'var(--color-primary)' }} />
+          </div>
+          <span className="bar-count">{e.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function objectToEntries(obj) {
+  return Object.entries(obj || {}).map(([label, count]) => ({ label, count }));
+}
+
+function AchatsKpi({ data }) {
+  const statusEntries = STATUS_ORDER
+    .filter(s => data.prByStatus[s])
+    .map(s => ({ label: STATUS_LABELS[s] || s, count: data.prByStatus[s], code: s }));
+
+  return (
+    <>
+      <div className="kpi-grid">
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.tauxRefus.taux != null ? `${Math.round(data.tauxRefus.taux * 100)}%` : '—'}</div>
+          <div className="kpi-label">Taux de demandes refusées au moins une fois</div>
+        </div>
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.delaiMoyenJours != null ? data.delaiMoyenJours.toFixed(1) : '—'}</div>
+          <div className="kpi-label">Jours moyens jusqu'au bon de commande</div>
+        </div>
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.tauxRefus.totalSoumises}</div>
+          <div className="kpi-label">Demandes soumises au total</div>
+        </div>
+      </div>
+
+      <div className="dashboard-columns">
+        <section className="card">
+          <h2>Demandes par statut</h2>
+          <BarList
+            entries={statusEntries}
+            colorFor={label => {
+              const entry = statusEntries.find(e => e.label === label);
+              return (STATUS_COLORS[entry?.code] || STATUS_COLORS.brouillon).fg;
+            }}
+          />
+        </section>
+
+        <section className="card">
+          <h2>Par entité</h2>
+          <BarList entries={data.prByEntity.map(e => ({ label: e.entity_code, count: e.count }))} />
+
+          {data.montantParDevise.length > 0 && (
+            <>
+              <div className="dashboard-section-title">Montant des bons de commande générés</div>
+              {data.montantParDevise.map(m => (
+                <p key={m.devise} style={{ margin: '4px 0' }}>
+                  <strong>{m.total.toLocaleString('fr-FR')}</strong> {m.devise}
+                </p>
+              ))}
+            </>
+          )}
+        </section>
+      </div>
+
+      <section className="card">
+        <h2>Top fournisseurs (par montant de bons de commande)</h2>
+        {data.topFournisseurs.length === 0 ? <p className="empty-row">Aucun bon de commande généré.</p> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Fournisseur</th><th>Montant</th><th>Devise</th></tr></thead>
+              <tbody>
+                {data.topFournisseurs.map((f, i) => (
+                  <tr key={i}>
+                    <td>{f.supplier_nom}</td>
+                    <td>{f.total.toLocaleString('fr-FR')}</td>
+                    <td>{f.devise}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function RhKpi({ data }) {
+  const statutEntries = ['actif', 'inactif', 'sorti']
+    .filter(s => data.effectifParStatut[s])
+    .map(s => ({ label: STATUT_LABELS_RH[s], count: data.effectifParStatut[s], code: s }));
+
+  return (
+    <>
+      <div className="kpi-grid">
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.effectifParStatut.actif || 0}</div>
+          <div className="kpi-label">Employés actifs</div>
+        </div>
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.ancienneteMoyenne != null ? data.ancienneteMoyenne.toFixed(1) : '—'}</div>
+          <div className="kpi-label">Ancienneté moyenne (années)</div>
+        </div>
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.effectifParStatut.sorti || 0}</div>
+          <div className="kpi-label">Sortis</div>
+        </div>
+      </div>
+
+      <div className="dashboard-columns">
+        <section className="card">
+          <h2>Effectif actif par Business Unit</h2>
+          <BarList entries={data.effectifParBusinessUnit.map(e => ({ label: e.business_unit, count: e.count }))} />
+        </section>
+
+        <section className="card">
+          <h2>Effectif actif par entité</h2>
+          <BarList entries={data.effectifParEntite.map(e => ({ label: e.entity_code, count: e.count }))} />
+        </section>
+      </div>
+
+      <div className="dashboard-columns">
+        <section className="card">
+          <h2>Par statut</h2>
+          <BarList
+            entries={statutEntries}
+            colorFor={label => {
+              const entry = statutEntries.find(e => e.label === label);
+              return (STATUT_COLORS_RH[entry?.code] || STATUT_COLORS_RH.actif).fg;
+            }}
+          />
+        </section>
+
+        <section className="card">
+          <h2>Effectif actif par type de contrat</h2>
+          <BarList entries={objectToEntries(data.effectifParContrat)} colorFor={() => CONTRAT_COLOR} />
+        </section>
+      </div>
+    </>
+  );
+}
+
+export default function KpiPage() {
+  const [tab, setTab] = useState('achats');
+  const [achats, setAchats] = useState(null);
+  const [rh, setRh] = useState(null);
+
+  useEffect(() => {
+    client.get('/kpi/achats').then(res => setAchats(res.data));
+    client.get('/kpi/rh').then(res => setRh(res.data));
+  }, []);
+
+  return (
+    <div>
+      <h1 className="page-title" style={{ marginBottom: 20 }}>KPI</h1>
+
+      <nav className="subnav">
+        <a className={tab === 'achats' ? 'active' : undefined} onClick={() => setTab('achats')} style={{ cursor: 'pointer' }}>Achats</a>
+        <a className={tab === 'rh' ? 'active' : undefined} onClick={() => setTab('rh')} style={{ cursor: 'pointer' }}>RH</a>
+      </nav>
+
+      {tab === 'achats' && (achats ? <AchatsKpi data={achats} /> : <p>Chargement…</p>)}
+      {tab === 'rh' && (rh ? <RhKpi data={rh} /> : <p>Chargement…</p>)}
+    </div>
+  );
+}

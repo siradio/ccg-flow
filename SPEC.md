@@ -70,7 +70,12 @@ business_units                             -- configurable par l'admin : BU Lait
 
 products (produits / articles)
   id, code, designation, category_id (FK -> product_categories), business_unit_id (FK -> business_units, nullable),
-  unite, actif
+  unite, actif, seuil_alerte_stock (nullable — voir §3.5, seuil configurable par produit)
+  -- Colonnes "produit fini" (référentiel PILCO importé pour le module Stock du Jour, réutilisable
+  -- par d'autres modules futurs) : conditionnement (texte libre, ex. "Sachet", "Carton"),
+  -- format_taille (numérique, ex. 0.2 pour "200g"), contenu_par_carton, kg_equivalent_carton,
+  -- prix_suggere_gnf. Toutes nullable — un produit d'un autre référentiel (ex. fourniture de bureau)
+  -- n'a pas besoin de les renseigner.
 
 product_entities                           -- junction : quelles entités peuvent utiliser ce produit
   product_id (FK), entity_id (FK)
@@ -201,7 +206,8 @@ Catalogue des `module_key` (`backend/src/config/modules.js`) :
 |---|---|
 | `achats` | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
 | `rh` | RH (Employés) |
-| `stock` | Stock — réservé pour le futur module, aucune route réelle pour l'instant |
+| `kpi` | KPI (Achats + RH) — agrégats en lecture seule, voir §3.4 ; indépendant de `achats`/`rh` : donne les statistiques consolidées sans donner accès aux fiches individuelles |
+| `stock` | Stock du Jour — saisie/historique de stock quotidien par Business Unit, voir §3.5 et §2.4 pour la restriction fine d'écriture par BU |
 | `ref_entities`, `ref_sites`, `ref_warehouses`, `ref_machines`, `ref_products`, `ref_product_categories`, `ref_business_units`, `ref_suppliers` | Un par onglet du référentiel — accès fin, pas tout-ou-rien |
 
 Règles :
@@ -210,6 +216,32 @@ Règles :
 - Avoir le module d'un référentiel (ex. `ref_products`) donne aussi le **droit d'écriture** dessus (créer/éditer/supprimer), pas seulement la lecture — un gestionnaire de stock avec `ref_products` peut gérer le catalogue produits, pas juste le consulter.
 - **Ce qui reste volontairement en lecture ouverte à tout utilisateur authentifié**, même sans le module du référentiel correspondant : les listes `GET` d'entités/sites/produits/fournisseurs, parce qu'elles servent de données de référence ailleurs dans l'app (ex. choisir un site sur la fiche employé, ou un produit sur une ligne de demande d'achat) indépendamment du module. Seule l'**écriture** sur ces référentiels est gated par module ; la lecture de `/api/employees` et de tout le domaine `/api/purchase-requests`, elle, est entièrement gated (y compris en lecture), car ce sont des données métier sensibles propres à leur module.
 - Contrôle appliqué **à la fois** côté backend (`requireModule()`, source de vérité) et côté frontend (navigation masquée + garde de route `RequireModule`, juste pour l'UX).
+
+### 2.4 Accès par Business Unit (restriction fine, module `stock` uniquement)
+
+Troisième couche de permission, **indépendante** des deux précédentes (rôles workflow, modules) :
+gère non pas *quel module* un utilisateur voit, mais *sur quelle(s) Business Unit(s) il peut
+écrire* à l'intérieur du module Stock du Jour.
+
+```
+user_business_unit_access
+  id, user_id (FK), business_unit_id (FK), created_at, UNIQUE(user_id, business_unit_id)
+```
+
+Règles :
+- **super_admin bypass**, comme les deux autres couches.
+- Un utilisateur avec le module `stock` mais **aucune** ligne dans `user_business_unit_access` a un
+  accès **lecture seule sur toutes les BU** (voir toute l'historique, ne peut rien saisir) — c'est
+  le cas par défaut pour Direction/Finance qui veulent juste consulter.
+- Un utilisateur avec **au moins une** ligne devient restreint à ces BU précises : il ne peut écrire
+  que sur les produits de ces BU (`canWriteBusinessUnit`), et la liste/l'historique qu'il voit sont
+  filtrés à ces mêmes BU (`visibleBusinessUnitIds` retourne `null` = pas de restriction, ou un
+  tableau = restriction stricte).
+- Un utilisateur peut avoir accès à **plusieurs** BU (ex. un gestionnaire couvrant Yaourt + Mayo).
+- Table dédiée plutôt que réutiliser `user_module_access`, pour garder chaque couche de permission
+  simple à raisonner indépendamment (même pattern que le choix module vs rôle).
+- Gérée via **Admin → Utilisateurs → "Accès Business Units (Stock du Jour)"** (octroi/révocation),
+  `POST/DELETE /api/users/:id/business-units`.
 
 ---
 
@@ -264,6 +296,66 @@ app_settings
 | `min_suppliers_devis` | `2` | Nombre minimum de fournisseurs à sélectionner avant de pouvoir lancer une demande de devis (§3.1 étape `devis`). Mettre à `1` désactive de fait la contrainte — utile si un référentiel fournisseurs d'une entité n'est pas encore complet. |
 
 Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key`.
+
+### 3.4 Module KPI
+
+Photo instantanée (pas de filtre de période dans cette v1), en lecture seule, sur deux domaines :
+
+- **Achats** : demandes par statut, par entité, montant des bons de commande générés (par
+  devise), taux de demandes ayant subi au moins un refus (pas seulement le statut final
+  `rejetee`, qui ne survient qu'en cas de `comportement_si_refus = 'annulation'` — voir §3.1),
+  délai moyen entre création et génération du bon de commande, top fournisseurs par montant.
+- **RH** : effectif actif par Business Unit / entité / statut / type de contrat, ancienneté moyenne.
+
+Accès via le module `kpi` — **volontairement indépendant** des modules `achats`/`rh` : un
+utilisateur Direction/Finance peut voir les agrégats consolidés sans avoir accès aux fiches
+individuelles (ni à la liste des employés, ni à l'écran de validation d'une demande). Point de
+départ pour un futur vrai module de reporting multi-modules (avec filtre de période et export),
+volontairement laissé simple pour cette v1.
+
+### 3.5 Module Stock du Jour (module `stock`)
+
+Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, Tomate, Yaourt,
+Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
+BU — livré ; (2) intégration KPI ; (3) graphiques Recharts ; (4) tableau de bord exécutif DG.
+
+```
+stock_entries
+  id, date_stock (DATE), product_id (FK -> products), quantite (NUMERIC), unite (texte),
+  commentaire (texte, nullable), created_by (FK -> users), updated_by (FK -> users, nullable),
+  created_at, updated_at
+  UNIQUE(date_stock, product_id)
+```
+
+Décisions de conception :
+- **La Business Unit n'est jamais stockée directement sur `stock_entries`** — elle est toujours
+  dérivée de `products.business_unit_id` (source unique de vérité), pour éviter qu'une saisie de
+  stock puisse un jour désynchroniser de la vraie BU de son produit.
+- **Unicité `(date_stock, product_id)`, pas `(date_stock, product_id, business_unit_id)`** — même
+  raison : la BU est déjà déterminée par le produit, l'ajouter à la contrainte serait redondant.
+- Une nouvelle saisie sur un couple (date, produit) déjà existant fait un **upsert** (met à jour la
+  ligne existante, incrémente `updated_by`/`updated_at`) plutôt que de créer un doublon — cohérent
+  avec le besoin réel : "corriger la saisie du jour", pas cumuler plusieurs relevés par jour.
+- Seuil d'alerte configurable **par produit** (`products.seuil_alerte_stock`, §1.1), pas un
+  paramètre global dans `app_settings` — chaque produit a un volume d'écoulement différent.
+- Écriture restreinte par Business Unit via la couche §2.4 ; lecture soumise aux mêmes BU visibles
+  pour un utilisateur restreint, ouverte à toutes pour un utilisateur non restreint (mais toujours
+  gated par le module `stock` lui-même — pas d'accès du tout sans le module).
+
+### 3.6 Référentiel produits "produit fini" (import PILCO)
+
+Le référentiel produits des 4 Business Units de production (Lait, Tomate, Yaourt, Mayo/Margarine)
+a été importé depuis 4 fichiers Excel PILCO fournis (un par BU, onglet "Produits"), 23 produits au
+total, rattachés à l'entité Soguipal. Ce référentiel est volontairement enrichi au-delà du strict
+nécessaire pour Stock du Jour (conditionnement, format, contenu par carton, kg équivalent, prix
+suggéré — §1.1) car il est **destiné à être réutilisé par d'autres modules futurs** (ex. un futur
+module de production ou de tarification), pas seulement par la saisie de stock.
+
+À noter : le référentiel fourni est très inégal selon les BU — **BU Lait et BU Tomate n'ont
+chacune qu'un seul produit** dans les fichiers source, contre 6 pour Mayo/Margarine et 15 pour
+Yaourt. Ce n'est pas un défaut d'import (vérifié ligne à ligne), mais un vrai manque de complétude
+du référentiel source côté métier pour ces deux BU — à signaler si la saisie de stock quotidien
+doit couvrir plus de produits sur Lait/Tomate.
 
 ---
 
@@ -364,6 +456,29 @@ GET    /api/dashboard        page d'accueil de l'application, contenu adapté au
                                 (employés, produits, fournisseurs, sites, entrepôts, machines, utilisateurs),
                                 demandes par statut (toutes entités), par entité, montant des bons de
                                 commande générés (sommé par devise, jamais mélangé)
+```
+
+### 4.8 KPI (module `kpi`, indépendant de `achats`/`rh`)
+```
+GET    /api/kpi/achats       demandes par statut/entité, montants par devise, taux de refus,
+                              délai moyen jusqu'au bon de commande, top fournisseurs
+GET    /api/kpi/rh           effectif actif par BU/entité/statut/contrat, ancienneté moyenne
+```
+
+### 4.9 Stock du Jour (module `stock`)
+```
+GET    /api/stock/business-units      BU visibles pour l'utilisateur (toutes si non restreint,
+                                       sinon seulement celles accordées via §2.4)
+GET    /api/stock/day                 ?date=&business_unit_id= -> grille de saisie du jour :
+                                       tous les produits actifs de la BU + leur éventuelle saisie
+                                       existante pour cette date, + canWrite (accès en écriture ?)
+GET    /api/stock/entries             ?date=&date_from=&date_to=&business_unit_id=&product_id=
+                                       -> historique filtrable, restreint aux BU visibles
+GET    /api/stock/entries/:id
+POST   /api/stock/entries             { date, productId, quantite, unite, commentaire } -> upsert
+                                       (date_stock, product_id) ; 403 si pas d'accès écriture sur
+                                       la BU du produit
+DELETE /api/stock/entries/:id
 ```
 
 ---

@@ -26,6 +26,8 @@ app.use('/api/attachments', require('./modules/attachments/attachments.routes'))
 app.use('/api/notifications', require('./modules/notifications/notifications.routes'));
 app.use('/api/dashboard', require('./modules/dashboard/dashboard.routes'));
 app.use('/api/settings', require('./modules/settings/settings.routes'));
+app.use('/api/kpi', require('./modules/kpi/kpi.routes'));
+app.use('/api/stock', require('./modules/stock/stock.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

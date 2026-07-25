@@ -1,11 +1,10 @@
 // Catalogue des modules/fonctionnalités auxquels un utilisateur peut se voir accorder
 // l'accès (couche indépendante des rôles métier du workflow Achat — voir SPEC.md §2.3).
-// "stock" est réservé pour le futur module de gestion des stocks : la clé existe déjà
-// pour ne pas retoucher l'architecture d'accès quand ce module sera construit.
 const MODULES = [
   { key: 'achats', label: "Demandes d'achat" },
   { key: 'rh', label: 'RH (Employés)' },
-  { key: 'stock', label: 'Stock (à venir)' },
+  { key: 'kpi', label: 'KPI (Achats + RH)' },
+  { key: 'stock', label: 'Stock du Jour' },
   { key: 'ref_entities', label: 'Référentiel : Entités' },
   { key: 'ref_sites', label: 'Référentiel : Sites' },
   { key: 'ref_warehouses', label: 'Référentiel : Entrepôts' },

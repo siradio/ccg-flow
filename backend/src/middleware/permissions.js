@@ -73,6 +73,26 @@ function requireModule(moduleKey) {
   };
 }
 
+// Accès par Business Unit (module Stock du Jour) — couche encore plus fine que hasModule('stock') :
+// un "Gestionnaire de Stock" ne doit voir/saisir que la ou les BU qui lui sont accordées.
+// req.user.businessUnits est embarqué dans le JWT (voir auth.routes.js) = tableau d'ids de BU.
+//
+// - Sans AUCUN octroi de BU (tableau vide) : accès en LECTURE SEULE à toutes les BU (cf. §7 du
+//   cahier des charges : "les autres utilisateurs disposent uniquement d'un accès en lecture").
+// - Avec au moins un octroi : restreint à CES BU précises, en lecture ET en écriture.
+function canWriteBusinessUnit(user, businessUnitId) {
+  if (isSuperAdmin(user)) return true;
+  return (user.businessUnits || []).map(Number).includes(Number(businessUnitId));
+}
+
+// Retourne null si aucune restriction de lecture ne s'applique (super_admin, ou lecteur sans
+// octroi BU précis), sinon le tableau des ids de BU auxquels se limiter.
+function visibleBusinessUnitIds(user) {
+  if (isSuperAdmin(user)) return null;
+  const granted = (user.businessUnits || []).map(Number);
+  return granted.length > 0 ? granted : null;
+}
+
 module.exports = {
   PERMS,
   isSuperAdmin,
@@ -81,6 +101,8 @@ module.exports = {
   hasPerm,
   hasPermAnywhere,
   hasModule,
+  canWriteBusinessUnit,
+  visibleBusinessUnitIds,
   requireSuperAdmin,
   requireRoleOnEntity,
   requireModule,

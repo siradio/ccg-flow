@@ -94,6 +94,12 @@ async function seed({ closePool = true } = {}) {
     [stockUser.id]
   );
 
+  const directionUser = await one(
+    "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Camara', 'Fatoumata', 'direction@test', $1) RETURNING id",
+    [hash]
+  );
+  await run("INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'kpi')", [directionUser.id]);
+
   const supplier1 = await one(
     "INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ('Fournisseur Atlantique', 'M. Keita', 'contact@atlantique-gn.test', '+224 620 000 001') RETURNING id"
   );
@@ -117,6 +123,7 @@ async function seed({ closePool = true } = {}) {
   console.log('  - admin@test  — rôle: super_admin (tous modules)');
   console.log('  - rh.sog@test  — module: rh (aucun rôle workflow achat)');
   console.log('  - stock.sog@test  — modules: stock, ref_products (aucun rôle workflow achat)');
+  console.log('  - direction@test  — module: kpi (aucun rôle workflow achat)');
 
   if (closePool) await pool.end();
   return { entities: { ccg, soguipal, pbic }, supplierIds: [supplier1.id, supplier2.id], productId: product.id, password };

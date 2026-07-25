@@ -12,6 +12,9 @@ import Users from './pages/Admin/Users';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
+import KpiPage from './pages/Kpi/KpiPage';
+import StockEntryPage from './pages/Stock/EntryPage';
+import StockHistoryPage from './pages/Stock/HistoryPage';
 
 export default function App() {
   return (
@@ -25,6 +28,9 @@ export default function App() {
         <Route path="employees" element={<RequireModule module="rh"><EmployeesListPage /></RequireModule>} />
         <Route path="employees/new" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
         <Route path="employees/:id" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
+        <Route path="kpi" element={<RequireModule module="kpi"><KpiPage /></RequireModule>} />
+        <Route path="stock/saisie" element={<RequireModule module="stock"><StockEntryPage /></RequireModule>} />
+        <Route path="stock/historique" element={<RequireModule module="stock"><StockHistoryPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />

@@ -7,9 +7,11 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [entities, setEntities] = useState([]);
   const [moduleCatalog, setModuleCatalog] = useState([]);
+  const [businessUnits, setBusinessUnits] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '' });
   const [roleForm, setRoleForm] = useState({});
   const [moduleForm, setModuleForm] = useState({});
+  const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
@@ -17,6 +19,7 @@ export default function Users() {
     load();
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/users/module-catalog').then(res => setModuleCatalog(res.data));
+    client.get('/business-units').then(res => setBusinessUnits(res.data));
   }, []);
 
   async function createUser(e) {
@@ -52,6 +55,19 @@ export default function Users() {
 
   async function removeModule(userId, accessId) {
     await client.delete(`/users/${userId}/modules/${accessId}`);
+    load();
+  }
+
+  async function addBusinessUnit(userId) {
+    const businessUnitId = buForm[userId];
+    if (!businessUnitId) return;
+    await client.post(`/users/${userId}/business-units`, { business_unit_id: Number(businessUnitId) });
+    setBuForm({ ...buForm, [userId]: '' });
+    load();
+  }
+
+  async function removeBusinessUnit(userId, accessId) {
+    await client.delete(`/users/${userId}/business-units/${accessId}`);
     load();
   }
 
@@ -109,6 +125,24 @@ export default function Users() {
               {moduleCatalog.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
             </select>
             <button onClick={() => addModule(u.id)} className="btn btn-primary btn-sm">+ Accorder le module</button>
+          </div>
+
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès Business Units (Stock du Jour)</div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {u.businessUnits.map(b => (
+              <span key={b.id} className="badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)' }}>
+                {b.business_unit_nom}
+                {' '}<button onClick={() => removeBusinessUnit(u.id, b.id)} className="btn-icon">×</button>
+              </span>
+            ))}
+            {u.businessUnits.length === 0 && <span className="empty-row">Aucune BU accordée (lecture seule sur toutes si le module Stock est accordé).</span>}
+          </div>
+          <div className="form-inline" style={{ marginTop: 10 }}>
+            <select value={buForm[u.id] || ''} onChange={e => setBuForm({ ...buForm, [u.id]: e.target.value })}>
+              <option value="">Business Unit…</option>
+              {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            </select>
+            <button onClick={() => addBusinessUnit(u.id)} className="btn btn-primary btn-sm">+ Accorder la BU</button>
           </div>
         </div>
       ))}

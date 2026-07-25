@@ -61,6 +61,14 @@ export function hasModule(user, moduleKey) {
   return !!user && (user.modules || []).includes(moduleKey);
 }
 
+// Accès par Business Unit (module Stock du Jour) — miroir de permissions.js côté backend.
+// Sans AUCUN octroi : lecture seule sur toutes les BU. Avec au moins un octroi : restreint
+// à ces BU précises, en lecture ET en écriture.
+export function canWriteBusinessUnit(user, businessUnitId) {
+  if (isSuperAdmin(user)) return true;
+  return !!user && (user.businessUnits || []).map(Number).includes(Number(businessUnitId));
+}
+
 export function entitiesForRole(user, roleCode) {
   if (!user) return [];
   if (isSuperAdmin(user)) return 'all';

@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasModule } from '../../auth/AuthContext';
+import Loading from '../../components/Loading';
+import EmptyState from '../../components/EmptyState';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
+
+function greetingWord() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 18) return 'Bonjour';
+  return 'Bonsoir';
+}
 
 const ROLE_LABELS = {
   service_achat: 'Service Achat',
@@ -53,13 +61,14 @@ export default function Dashboard() {
     client.get('/dashboard').then(res => setData(res.data));
   }, []);
 
-  if (!data) return <p>Chargement…</p>;
+  if (!data) return <Loading />;
 
   const { isAdmin, myRequests, pendingAction, admin } = data;
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Tableau de bord</h1>
+      <h1 className="page-title" style={{ marginBottom: 4 }}>{greetingWord()} {user?.prenom}</h1>
+      <p className="page-subtitle" style={{ marginBottom: 20 }}>Voici un résumé de votre activité.</p>
 
       {canSeeAchats && pendingAction.total > 0 && (
         <section className="card">
@@ -84,7 +93,10 @@ export default function Dashboard() {
         <section className="card">
           <h2>Mes demandes d'achat</h2>
           {myRequests.total === 0 ? (
-            <p className="empty-row">Vous n'avez encore créé aucune demande. <Link to="/purchase-requests/new">Créer une demande</Link>.</p>
+            <EmptyState
+              title="Vous n'avez encore créé aucune demande."
+              action={<Link to="/purchase-requests/new" className="btn btn-primary btn-sm">+ Créer une demande</Link>}
+            />
           ) : (
             <>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -6 }}>{myRequests.total} demande(s) au total</p>

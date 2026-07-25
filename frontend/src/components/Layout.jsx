@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth, isSuperAdmin, hasModule } from '../auth/AuthContext';
+import NotificationBell from './NotificationBell';
 import logo from '../assets/logo-web-darklogo.png';
 
 function navClass({ isActive }) {
@@ -36,12 +37,15 @@ export default function Layout() {
             <NavLink to="/" end className={navClass}>Tableau de bord</NavLink>
             {hasModule(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
             {hasModule(user, 'rh') && <NavLink to="/employees" className={navClass}>Employés</NavLink>}
+            {hasModule(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
+            {hasModule(user, 'stock') && <NavLink to="/stock/saisie" className={navClass}>Stock du Jour</NavLink>}
             {hasAnyRefModule(user) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}
           </nav>
         </div>
         <div className="topbar-right">
+          <NotificationBell />
           <span className="user-chip">
             <span className="user-avatar">{initials(user)}</span>
             {user?.prenom} {user?.nom}

@@ -72,4 +72,20 @@ router.delete('/:id/modules/:accessId', requireAuth, requireSuperAdmin, async (r
   } catch (e) { next(e); }
 });
 
+router.post('/:id/business-units', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { business_unit_id } = req.body || {};
+    if (!business_unit_id) return res.status(400).json({ error: 'business_unit_id requis.' });
+    await usersService.grantBusinessUnit(Number(req.params.id), Number(business_unit_id));
+    res.status(201).json(await usersService.loadUserWithRoles(Number(req.params.id)));
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/business-units/:accessId', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  try {
+    await usersService.revokeBusinessUnit(Number(req.params.id), Number(req.params.accessId));
+    res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

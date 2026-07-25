@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
+import Loading from '../../components/Loading';
 import { StatusBadge } from './statusLabels.jsx';
 
 export default function ListPage() {
@@ -67,7 +68,7 @@ export default function ListPage() {
 
       <div className="card" style={{ padding: 0 }}>
         <div className="table-wrap">
-          {loading ? <p style={{ padding: 20 }}>Chargement…</p> : (
+          {loading ? <Loading /> : (
             <table>
               <thead>
                 <tr>
