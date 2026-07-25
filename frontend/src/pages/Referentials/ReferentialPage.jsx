@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
-import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
 
 // Page CRUD générique pour un référentiel "simple" (une table, champs plats + éventuels entity_ids).
-// Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/employés/produits/fournisseurs/entités.
-export default function ReferentialPage({ title, endpoint, fields, entities = [], sites = [], lists = {} }) {
-  const { user } = useAuth();
-  const canWrite = isSuperAdmin(user);
+// Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
+export default function ReferentialPage({ title, endpoint, fields, entities = [], sites = [], lists = {}, canWrite = false }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields));
   const [editingId, setEditingId] = useState(null);

@@ -14,7 +14,7 @@ app.use('/api/entities', require('./modules/referentials/entities.routes'));
 app.use('/api/sites', require('./modules/referentials/sites.routes'));
 app.use('/api/warehouses', require('./modules/referentials/warehouses.routes'));
 app.use('/api/machines', require('./modules/referentials/machines.routes'));
-app.use('/api/employees', require('./modules/referentials/employees.routes'));
+app.use('/api/employees', require('./modules/employees/employees.routes'));
 app.use('/api/products', require('./modules/referentials/products.routes'));
 app.use('/api/product-categories', require('./modules/referentials/product-categories.routes'));
 app.use('/api/business-units', require('./modules/referentials/business-units.routes'));
@@ -25,6 +25,7 @@ app.use('/api/purchase-orders', require('./modules/purchase-orders/purchase-orde
 app.use('/api/attachments', require('./modules/attachments/attachments.routes'));
 app.use('/api/notifications', require('./modules/notifications/notifications.routes'));
 app.use('/api/dashboard', require('./modules/dashboard/dashboard.routes'));
+app.use('/api/settings', require('./modules/settings/settings.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useParams } from 'react-router-dom';
+import { Navigate, NavLink, useParams } from 'react-router-dom';
 import client from '../../api/client';
+import { useAuth, hasModule } from '../../auth/AuthContext';
 import ReferentialPage from './ReferentialPage';
 
 const CONFIGS = {
   entities: {
-    title: 'Entités du groupe', endpoint: '/entities',
+    title: 'Entités du groupe', endpoint: '/entities', moduleKey: 'ref_entities',
     fields: [
       { key: 'code', label: 'Code', type: 'select', options: ['CCG', 'SOGUIPAL', 'PBIC'], required: true },
       { key: 'nom', label: 'Nom', required: true },
     ],
   },
   sites: {
-    title: 'Sites', endpoint: '/sites',
+    title: 'Sites', endpoint: '/sites', moduleKey: 'ref_sites',
     fields: [
       { key: 'entity_id', label: 'Entité', type: 'entitySelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -21,7 +22,7 @@ const CONFIGS = {
     ],
   },
   warehouses: {
-    title: 'Entrepôts', endpoint: '/warehouses',
+    title: 'Entrepôts', endpoint: '/warehouses', moduleKey: 'ref_warehouses',
     fields: [
       { key: 'site_id', label: 'Site', type: 'siteSelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -29,7 +30,7 @@ const CONFIGS = {
     ],
   },
   machines: {
-    title: 'Machines de production', endpoint: '/machines',
+    title: 'Machines de production', endpoint: '/machines', moduleKey: 'ref_machines',
     fields: [
       { key: 'site_id', label: 'Site', type: 'siteSelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -37,33 +38,22 @@ const CONFIGS = {
       { key: 'categorie', label: 'Catégorie' },
     ],
   },
-  employees: {
-    title: 'Employés', endpoint: '/employees',
-    fields: [
-      { key: 'entity_id', label: 'Entité', type: 'entitySelect', required: true },
-      { key: 'matricule', label: 'Matricule' },
-      { key: 'nom', label: 'Nom', required: true },
-      { key: 'prenom', label: 'Prénom', required: true },
-      { key: 'poste', label: 'Poste' },
-      { key: 'service', label: 'Service' },
-    ],
-  },
   productCategories: {
-    title: 'Catégories de produits', endpoint: '/product-categories',
+    title: 'Catégories de produits', endpoint: '/product-categories', moduleKey: 'ref_product_categories',
     fields: [
       { key: 'code', label: 'Code', required: true },
       { key: 'nom', label: 'Nom', required: true },
     ],
   },
   businessUnits: {
-    title: 'Business Units', endpoint: '/business-units',
+    title: 'Business Units', endpoint: '/business-units', moduleKey: 'ref_business_units',
     fields: [
       { key: 'code', label: 'Code', required: true },
       { key: 'nom', label: 'Nom', required: true },
     ],
   },
   products: {
-    title: 'Produits', endpoint: '/products',
+    title: 'Produits', endpoint: '/products', moduleKey: 'ref_products',
     fields: [
       { key: 'code', label: 'Code' },
       { key: 'designation', label: 'Désignation', required: true },
@@ -74,7 +64,7 @@ const CONFIGS = {
     ],
   },
   suppliers: {
-    title: 'Fournisseurs', endpoint: '/suppliers',
+    title: 'Fournisseurs', endpoint: '/suppliers', moduleKey: 'ref_suppliers',
     fields: [
       { key: 'nom', label: 'Nom', required: true },
       { key: 'contact_nom', label: 'Contact' },
@@ -87,12 +77,13 @@ const CONFIGS = {
 
 const NAV = [
   ['entities', 'Entités'], ['sites', 'Sites'], ['warehouses', 'Entrepôts'], ['machines', 'Machines'],
-  ['employees', 'Employés'], ['products', 'Produits'], ['productCategories', 'Catégories de produits'],
+  ['products', 'Produits'], ['productCategories', 'Catégories de produits'],
   ['businessUnits', 'Business Units'], ['suppliers', 'Fournisseurs'],
 ];
 
 export default function ReferentialsIndex() {
   const { type } = useParams();
+  const { user } = useAuth();
   const [entities, setEntities] = useState([]);
   const [sites, setSites] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -105,18 +96,25 @@ export default function ReferentialsIndex() {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
   }, []);
 
-  const config = CONFIGS[type] || CONFIGS.sites;
+  const allowedNav = NAV.filter(([key]) => hasModule(user, CONFIGS[key].moduleKey));
+
+  if (allowedNav.length === 0) return <p>Aucun référentiel ne vous a été accordé.</p>;
+
+  const config = CONFIGS[type];
+  const canAccessCurrent = config && hasModule(user, config.moduleKey);
+  if (!canAccessCurrent) return <Navigate to={`/referentials/${allowedNav[0][0]}`} replace />;
 
   return (
     <div>
       <nav className="subnav">
-        {NAV.map(([key, label]) => (
+        {allowedNav.map(([key, label]) => (
           <NavLink key={key} to={`/referentials/${key}`} className={({ isActive }) => isActive ? 'active' : undefined}>{label}</NavLink>
         ))}
       </nav>
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
         entities={entities} sites={sites} lists={{ categories, businessUnits }}
+        canWrite={hasModule(user, config.moduleKey)}
       />
     </div>
   );

@@ -24,6 +24,7 @@ router.post('/login', async (req, res, next) => {
       prenom: full.prenom,
       email: full.email,
       roles: full.roles.map(r => ({ entity_id: r.entity_id, entity_code: r.entity_code, role_code: r.role_code })),
+      modules: full.modules,
     };
     const token = jwt.sign(payload, env.jwtSecret, { expiresIn: '8h' });
     res.json({ token, user: full });

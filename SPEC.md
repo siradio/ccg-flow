@@ -36,8 +36,16 @@ users
 user_entity_roles                          -- un utilisateur peut avoir plusieurs rôles, un par entité
   id, user_id (FK), entity_id (FK, nullable si rôle global ex. super_admin), role_code, created_at
 
-employees (employés)                       -- référentiel RH, indépendant du login
-  id, matricule, nom, prenom, poste, service, entity_id (FK), site_id (FK), actif
+employees (employés)                       -- module RH dédié, indépendant du login
+  id, matricule, nom, prenom, poste, departement, entity_id (FK), site_id (FK), business_unit_id (FK, nullable),
+  manager (texte libre), date_embauche, type_contrat ('CDI'|'CDD'|'Stage'|'Consultant'|'Journalier'),
+  statut ('actif'|'inactif'|'sorti'), salaire_mensuel, telephone, email
+  -- ancienneté calculée à la volée (AGE(now, date_embauche)), jamais stockée.
+  -- "matricule" N'EST PAS unique dans les faits (source Excel : ~59 codes partagés par 2 employés
+  -- distincts) : gardé comme champ indexé pour la recherche, jamais comme contrainte d'unicité.
+  -- Le champ "Business_Unit" du fichier source mélangeait entité (CCG Groupe, Soguipal) et ligne de
+  -- production précise (Yaourt, Tomate, Lait, Mayo/Margarine) : séparé ici en entity_id (toujours
+  -- renseigné) + business_unit_id (seulement pour une ligne de production précise, sinon NULL).
 
 sites
   id, entity_id (FK), nom, adresse, ville
@@ -174,6 +182,35 @@ Toute vérification de permission est **scopée par entité** : un `controle_ges
 
 Le refus à n'importe quelle étape (`controle_gestion`, `finances`, `dga`) **exige un commentaire** (champ obligatoire, validé côté serveur, pas seulement côté front).
 
+### 2.3 Accès par module (organisation de l'application par module)
+
+Couche **indépendante** des rôles ci-dessus (`user_entity_roles`), qui gèrent *l'action* dans le
+circuit Achat. L'accès par module gère *la visibilité de l'application elle-même* : quels
+onglets/écrans un utilisateur voit et peut utiliser, tous modules confondus (RH, Achats, Stock,
+chaque référentiel pris séparément). Un utilisateur peut très bien détenir le rôle `service_achat`
+sans avoir le module `achats` accordé — dans ce cas il ne voit tout simplement pas le module.
+
+```
+user_module_access
+  id, user_id (FK), module_key, created_at
+```
+
+Catalogue des `module_key` (`backend/src/config/modules.js`) :
+
+| Clé | Module |
+|---|---|
+| `achats` | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
+| `rh` | RH (Employés) |
+| `stock` | Stock — réservé pour le futur module, aucune route réelle pour l'instant |
+| `ref_entities`, `ref_sites`, `ref_warehouses`, `ref_machines`, `ref_products`, `ref_product_categories`, `ref_business_units`, `ref_suppliers` | Un par onglet du référentiel — accès fin, pas tout-ou-rien |
+
+Règles :
+- **super_admin a toujours accès à tout**, sans octroi explicite (`hasModule()` bypass, comme pour les rôles).
+- Pour tout autre utilisateur, l'accès est **refusé par défaut** — il faut l'accorder explicitement (Admin → Utilisateurs → "Accès aux modules").
+- Avoir le module d'un référentiel (ex. `ref_products`) donne aussi le **droit d'écriture** dessus (créer/éditer/supprimer), pas seulement la lecture — un gestionnaire de stock avec `ref_products` peut gérer le catalogue produits, pas juste le consulter.
+- **Ce qui reste volontairement en lecture ouverte à tout utilisateur authentifié**, même sans le module du référentiel correspondant : les listes `GET` d'entités/sites/produits/fournisseurs, parce qu'elles servent de données de référence ailleurs dans l'app (ex. choisir un site sur la fiche employé, ou un produit sur une ligne de demande d'achat) indépendamment du module. Seule l'**écriture** sur ces référentiels est gated par module ; la lecture de `/api/employees` et de tout le domaine `/api/purchase-requests`, elle, est entièrement gated (y compris en lecture), car ce sont des données métier sensibles propres à leur module.
+- Contrôle appliqué **à la fois** côté backend (`requireModule()`, source de vérité) et côté frontend (navigation masquée + garde de route `RequireModule`, juste pour l'UX).
+
 ---
 
 ## 3. Workflow de validation — Demande d'achat
@@ -212,6 +249,22 @@ Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis contro
 
 Un `super_admin` peut éditer ces étapes via une interface (ou directement en base pour la v1, une UI d'administration du workflow n'est pas bloquante pour livrer le module).
 
+### 3.3 Paramètres applicatifs (`app_settings`)
+
+Table clé/valeur générique (`key`, `value`), éditable par un `super_admin` sans redéploiement,
+pour les seuils/règles qui ne méritent pas leur propre table dédiée :
+
+```
+app_settings
+  key, value
+```
+
+| Clé | Défaut | Rôle |
+|---|---|---|
+| `min_suppliers_devis` | `2` | Nombre minimum de fournisseurs à sélectionner avant de pouvoir lancer une demande de devis (§3.1 étape `devis`). Mettre à `1` désactive de fait la contrainte — utile si un référentiel fournisseurs d'une entité n'est pas encore complet. |
+
+Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key`.
+
 ---
 
 ## 4. Endpoints API
@@ -228,6 +281,10 @@ POST   /api/users                                (super_admin)
 PUT    /api/users/:id                             (super_admin)
 POST   /api/users/:id/roles                       { entity_id, role_code } (super_admin)
 DELETE /api/users/:id/roles/:roleId               (super_admin)
+
+GET    /api/users/module-catalog                  catalogue des modules disponibles (super_admin)
+POST   /api/users/:id/modules                     { module_key } (super_admin)
+DELETE /api/users/:id/modules/:accessId           (super_admin)
 ```
 
 ### 4.2 Référentiels
@@ -236,9 +293,18 @@ GET/POST/PUT/DELETE   /api/entities              (super_admin pour écriture)
 GET/POST/PUT/DELETE   /api/sites
 GET/POST/PUT/DELETE   /api/warehouses
 GET/POST/PUT/DELETE   /api/machines
-GET/POST/PUT/DELETE   /api/employees
 GET/POST/PUT/DELETE   /api/products               ?entity_id= filtre
 GET/POST/PUT/DELETE   /api/suppliers               ?entity_id= filtre
+```
+
+### 4.2bis Employés (module dédié, pas un simple référentiel générique)
+```
+GET    /api/employees      ?q=&entity_id=&business_unit_id=&statut=&departement=  liste + recherche + filtres
+                            (lecture ouverte à tout utilisateur authentifié)
+GET    /api/employees/:id
+POST   /api/employees      (super_admin)
+PUT    /api/employees/:id  (super_admin)
+DELETE /api/employees/:id  (super_admin)
 ```
 
 ### 4.3 Demandes d'achat
@@ -275,6 +341,12 @@ GET    /api/purchase-orders/:id/pdf
 ```
 GET    /api/workflows/:moduleCode
 PUT    /api/workflows/:moduleCode                   (super_admin) réordonner/éditer les étapes
+```
+
+### 4.5bis Paramètres applicatifs
+```
+GET    /api/settings                                tous les paramètres (lecture ouverte à tout utilisateur authentifié)
+PUT    /api/settings/:key                           { value } (super_admin)
 ```
 
 ### 4.6 Notifications
@@ -320,9 +392,11 @@ erp-ccg/
 │   │   │   │   ├── sites.routes.js
 │   │   │   │   ├── warehouses.routes.js
 │   │   │   │   ├── machines.routes.js
-│   │   │   │   ├── employees.routes.js
 │   │   │   │   ├── products.routes.js
 │   │   │   │   └── suppliers.routes.js
+│   │   │   ├── employees/                  # module dédié (pas un référentiel générique) : recherche,
+│   │   │   │   ├── employees.routes.js      # filtres, ancienneté calculée
+│   │   │   │   └── employees.service.js
 │   │   │   ├── purchase-requests/
 │   │   │   │   ├── purchase-requests.routes.js
 │   │   │   │   ├── purchase-requests.service.js   # logique métier + moteur de workflow
@@ -356,6 +430,9 @@ erp-ccg/
     │   │   │   ├── ListPage.jsx
     │   │   │   ├── DetailPage.jsx        # timeline workflow + actions selon rôle
     │   │   │   └── CreatePage.jsx
+    │   │   ├── Employees/                # module dédié : liste (recherche/filtres) + fiche complète
+    │   │   │   ├── ListPage.jsx
+    │   │   │   └── FormPage.jsx          # création ET édition
     │   │   ├── Referentials/
     │   │   │   └── ... (une page par référentiel)
     │   │   └── Admin/

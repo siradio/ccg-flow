@@ -56,6 +56,23 @@ function requireRoleOnEntity(roleCode, entityId) {
   };
 }
 
+// Accès par module (RH, Achats, un référentiel précis...) — couche indépendante des rôles
+// métier ci-dessus. req.user.modules est embarqué dans le JWT (voir auth.routes.js).
+// Un super_admin a toujours accès à tout, sans avoir besoin d'un octroi explicite.
+function hasModule(user, moduleKey) {
+  if (isSuperAdmin(user)) return true;
+  return (user.modules || []).includes(moduleKey);
+}
+
+function requireModule(moduleKey) {
+  return (req, res, next) => {
+    if (!hasModule(req.user, moduleKey)) {
+      return res.status(403).json({ error: `Accès refusé : ce module (${moduleKey}) ne vous a pas été accordé.` });
+    }
+    next();
+  };
+}
+
 module.exports = {
   PERMS,
   isSuperAdmin,
@@ -63,6 +80,8 @@ module.exports = {
   hasAnyRoleOnEntity,
   hasPerm,
   hasPermAnywhere,
+  hasModule,
   requireSuperAdmin,
   requireRoleOnEntity,
+  requireModule,
 };

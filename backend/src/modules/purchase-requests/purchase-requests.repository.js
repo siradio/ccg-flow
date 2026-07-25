@@ -46,6 +46,56 @@ async function list({ entityId, status, requesterId }) {
   );
 }
 
+// Demandes attendant concrètement une action de l'utilisateur, selon les rôles de
+// validation qu'il détient (par entité) — même logique que dashboard.service.js.
+async function listPendingAction(roleEntityPairs) {
+  if (!roleEntityPairs || roleEntityPairs.length === 0) return [];
+  const clauses = [];
+  const params = [];
+  for (const { roleCode, entityId } of roleEntityPairs) {
+    if (roleCode === 'service_achat') {
+      params.push(entityId);
+      clauses.push(`(pr.entity_id = $${params.length} AND pr.status IN ('soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'))`);
+    } else {
+      params.push(entityId, roleCode);
+      clauses.push(`(pr.entity_id = $${params.length - 1} AND pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})`);
+    }
+  }
+  return all(
+    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom
+     FROM purchase_requests pr
+     JOIN entities e ON e.id = pr.entity_id
+     JOIN users u ON u.id = pr.requester_user_id
+     LEFT JOIN workflow_steps ws ON ws.id = pr.current_step_id
+     WHERE ${clauses.join(' OR ')}
+     ORDER BY pr.created_at DESC`,
+    params
+  );
+}
+
+// Visibilité par défaut (aucun filtre mine/entityId explicite) : mes propres demandes,
+// où que ce soit, PLUS toutes les demandes des entités où l'utilisateur détient un rôle
+// de validation (entityIds ne contient que ces entités-là, jamais les entités "demandeur seul").
+async function listVisibleTo({ status, requesterId, entityIds }) {
+  const params = [requesterId];
+  let visibilityClause = `pr.requester_user_id = $1`;
+  if (entityIds && entityIds.length > 0) {
+    params.push(entityIds);
+    visibilityClause = `(${visibilityClause} OR pr.entity_id = ANY($${params.length}))`;
+  }
+  const clauses = [visibilityClause];
+  if (status) { params.push(status); clauses.push(`pr.status = $${params.length}`); }
+  return all(
+    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom
+     FROM purchase_requests pr
+     JOIN entities e ON e.id = pr.entity_id
+     JOIN users u ON u.id = pr.requester_user_id
+     WHERE ${clauses.join(' AND ')}
+     ORDER BY pr.created_at DESC`,
+    params
+  );
+}
+
 async function updateStatusAndStep(id, status, currentStepId) {
   return one(
     'UPDATE purchase_requests SET status = $1, current_step_id = $2, updated_at = now() WHERE id = $3 RETURNING *',
@@ -244,7 +294,7 @@ async function getApprovalsForPR(prId) {
 }
 
 module.exports = {
-  createDraft, setNumero, getById, list, updateStatusAndStep, setMontantFinal,
+  createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal,
   addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu,
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,

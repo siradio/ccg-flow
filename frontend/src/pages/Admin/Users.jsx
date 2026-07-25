@@ -6,12 +6,18 @@ const ROLE_CODES = ['super_admin', 'demandeur', 'service_achat', 'controle_gesti
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [entities, setEntities] = useState([]);
+  const [moduleCatalog, setModuleCatalog] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '' });
   const [roleForm, setRoleForm] = useState({});
+  const [moduleForm, setModuleForm] = useState({});
   const [error, setError] = useState('');
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
-  useEffect(() => { load(); client.get('/entities').then(res => setEntities(res.data)); }, []);
+  useEffect(() => {
+    load();
+    client.get('/entities').then(res => setEntities(res.data));
+    client.get('/users/module-catalog').then(res => setModuleCatalog(res.data));
+  }, []);
 
   async function createUser(e) {
     e.preventDefault();
@@ -36,6 +42,23 @@ export default function Users() {
     load();
   }
 
+  async function addModule(userId) {
+    const moduleKey = moduleForm[userId];
+    if (!moduleKey) return;
+    await client.post(`/users/${userId}/modules`, { module_key: moduleKey });
+    setModuleForm({ ...moduleForm, [userId]: '' });
+    load();
+  }
+
+  async function removeModule(userId, accessId) {
+    await client.delete(`/users/${userId}/modules/${accessId}`);
+    load();
+  }
+
+  function moduleLabel(key) {
+    return moduleCatalog.find(m => m.key === key)?.label || key;
+  }
+
   return (
     <div>
       <h1 className="page-title" style={{ marginBottom: 20 }}>Utilisateurs</h1>
@@ -45,7 +68,9 @@ export default function Users() {
           <strong>{u.prenom} {u.nom}</strong>
           <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
           {!u.actif && <em style={{ color: 'var(--color-text-muted)' }}> (désactivé)</em>}
-          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+
+          <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {u.roles.map(r => (
               <span key={r.id} className="badge" style={{ background: 'var(--color-border)', color: 'var(--color-text)' }}>
                 {r.role_code}{r.entity_code ? ` (${r.entity_code})` : ''}
@@ -66,6 +91,24 @@ export default function Users() {
               </select>
             )}
             <button onClick={() => addRole(u.id)} className="btn btn-primary btn-sm">+ Ajouter le rôle</button>
+          </div>
+
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès aux modules</div>
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {u.modules.map(m => (
+              <span key={m.id} className="badge" style={{ background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
+                {moduleLabel(m.module_key)}
+                {' '}<button onClick={() => removeModule(u.id, m.id)} className="btn-icon">×</button>
+              </span>
+            ))}
+            {u.modules.length === 0 && <span className="empty-row">Aucun module accordé (super_admin a accès à tout par défaut).</span>}
+          </div>
+          <div className="form-inline" style={{ marginTop: 10 }}>
+            <select value={moduleForm[u.id] || ''} onChange={e => setModuleForm({ ...moduleForm, [u.id]: e.target.value })}>
+              <option value="">Module…</option>
+              {moduleCatalog.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+            <button onClick={() => addModule(u.id)} className="btn btn-primary btn-sm">+ Accorder le module</button>
           </div>
         </div>
       ))}

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth, isSuperAdmin } from '../auth/AuthContext';
+import { useAuth, isSuperAdmin, hasModule } from '../auth/AuthContext';
 import logo from '../assets/logo-web-darklogo.png';
 
 function navClass({ isActive }) {
@@ -8,6 +8,16 @@ function navClass({ isActive }) {
 
 function initials(user) {
   return `${user?.prenom?.[0] || ''}${user?.nom?.[0] || ''}`.toUpperCase();
+}
+
+const REF_MODULE_KEYS = [
+  'ref_entities', 'ref_sites', 'ref_warehouses', 'ref_machines',
+  'ref_products', 'ref_product_categories', 'ref_business_units', 'ref_suppliers',
+];
+
+function hasAnyRefModule(user) {
+  if (isSuperAdmin(user)) return true;
+  return REF_MODULE_KEYS.some(k => hasModule(user, k));
 }
 
 export default function Layout() {
@@ -24,8 +34,9 @@ export default function Layout() {
           </span>
           <nav className="main-nav">
             <NavLink to="/" end className={navClass}>Tableau de bord</NavLink>
-            <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>
-            <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>
+            {hasModule(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
+            {hasModule(user, 'rh') && <NavLink to="/employees" className={navClass}>Employés</NavLink>}
+            {hasAnyRefModule(user) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}
           </nav>

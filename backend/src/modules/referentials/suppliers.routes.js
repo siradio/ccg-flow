@@ -1,7 +1,7 @@
 const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSuperAdmin } = require('../../middleware/permissions');
+const { requireModule } = require('../../middleware/permissions');
 
 const router = express.Router();
 
@@ -36,7 +36,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireAuth, requireSuperAdmin, async (req, res, next) => {
+router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
   try {
     const { nom, contact_nom, contact_email, contact_tel, adresse, actif, entity_ids } = req.body || {};
     if (!nom) return res.status(400).json({ error: 'nom obligatoire.' });
@@ -51,7 +51,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireAuth, requireSuperAdmin, async (req, res, next) => {
+router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
   try {
     const existing = await one('SELECT * FROM suppliers WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
@@ -78,7 +78,7 @@ router.put('/:id', requireAuth, requireSuperAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireAuth, requireSuperAdmin, async (req, res, next) => {
+router.delete('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
   try {
     await run('DELETE FROM suppliers WHERE id = $1', [req.params.id]);
     res.json({ ok: true });

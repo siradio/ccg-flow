@@ -7,8 +7,9 @@ const notifications = require('../notifications/notifications.service');
 const mailer = require('../../utils/mailer');
 const pdf = require('../../utils/pdf');
 const numbering = require('../../utils/numbering');
-const { hasRoleOnEntity, hasAnyRoleOnEntity } = require('../../middleware/permissions');
+const { hasRoleOnEntity, hasAnyRoleOnEntity, isSuperAdmin } = require('../../middleware/permissions');
 const { httpError } = require('../../utils/httpError');
+const settings = require('../settings/settings.service');
 
 const MODULE_CODE = 'demande_achat';
 
@@ -130,8 +131,9 @@ async function createQuoteRequest(user, prId, { supplierIds, message }) {
   if (!['soumise', 'en_analyse_achat'].includes(pr.status)) {
     throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
   }
-  if (!Array.isArray(supplierIds) || supplierIds.length < 2) {
-    throw httpError(400, 'Sélectionnez au moins 2 fournisseurs à consulter.');
+  const minSuppliers = await settings.getIntValue('min_suppliers_devis', 2);
+  if (!Array.isArray(supplierIds) || supplierIds.length < minSuppliers) {
+    throw httpError(400, `Sélectionnez au moins ${minSuppliers} fournisseur(s) à consulter.`);
   }
 
   const qr = await repo.createQuoteRequest(prId, user.id, message);
@@ -305,18 +307,33 @@ async function generatePurchaseOrder(prId, userId) {
   return getFullDetail(prId);
 }
 
-async function listForUser(user, { entityId, status, mine }) {
-  const filter = { status };
-  if (mine) {
-    filter.requesterId = user.id;
-  } else if (entityId) {
-    if (!hasAnyRoleOnEntity(user, entityId)) throw httpError(403, "Vous n'avez aucun rôle sur cette entité.");
-    filter.entityId = entityId;
-  } else {
-    // Pas de filtre explicite : ne montrer que ce que l'utilisateur peut légitimement voir (ses propres demandes).
-    filter.requesterId = user.id;
+async function listForUser(user, { entityId, status, mine, pendingAction }) {
+  if (pendingAction) {
+    // Même logique que le calcul du tableau de bord (dashboard.service.js) : les demandes
+    // qui attendent concrètement une action de CET utilisateur, pas juste "ses" demandes.
+    const roleEntityPairs = (user.roles || [])
+      .filter(r => r.role_code !== 'demandeur' && r.entity_id)
+      .map(r => ({ roleCode: r.role_code, entityId: r.entity_id }));
+    return repo.listPendingAction(roleEntityPairs);
   }
-  return repo.list(filter);
+  if (mine) {
+    return repo.list({ status, requesterId: user.id });
+  }
+  if (entityId) {
+    if (!hasAnyRoleOnEntity(user, entityId)) throw httpError(403, "Vous n'avez aucun rôle sur cette entité.");
+    return repo.list({ status, entityId });
+  }
+  if (isSuperAdmin(user)) {
+    return repo.list({ status });
+  }
+  // Pas de filtre explicite : montrer tout ce que l'utilisateur peut légitimement voir —
+  // ses propres demandes partout, PLUS toutes les demandes des entités où il détient un
+  // rôle de validation (service_achat/controle_gestion/finances/dga), pas seulement les
+  // siennes — sinon un valideur ne verrait jamais les demandes des autres à traiter.
+  const visibleEntityIds = [...new Set(
+    (user.roles || []).filter(r => r.role_code !== 'demandeur' && r.entity_id).map(r => r.entity_id)
+  )];
+  return repo.listVisibleTo({ status, requesterId: user.id, entityIds: visibleEntityIds });
 }
 
 module.exports = {

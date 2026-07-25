@@ -5,4 +5,5 @@ module.exports = simpleCrudRouter({
   columns: ['entity_id', 'nom', 'adresse', 'ville'],
   filterColumn: 'entity_id',
   orderBy: 'nom',
+  moduleKey: 'ref_sites',
 });

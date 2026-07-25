@@ -20,6 +20,7 @@ export default function DetailPage() {
   const [steps, setSteps] = useState([]);
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [minSuppliers, setMinSuppliers] = useState(2);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
 
@@ -30,6 +31,7 @@ export default function DetailPage() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     client.get('/workflows/demande_achat').then(res => setSteps(res.data.steps));
+    client.get('/settings').then(res => setMinSuppliers(Number(res.data.min_suppliers_devis) || 1));
   }, []);
   useEffect(() => {
     if (!pr) return;
@@ -82,7 +84,7 @@ export default function DetailPage() {
         </section>
       )}
 
-      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} />
+      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} />
       <QuotesSection pr={pr} guarded={guarded} />
       <ValidationSection pr={pr} guarded={guarded} />
 
@@ -164,7 +166,7 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   );
 }
 
-function QuoteRequestSection({ pr, suppliers, guarded }) {
+function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [selected, setSelected] = useState([]);
@@ -179,7 +181,9 @@ function QuoteRequestSection({ pr, suppliers, guarded }) {
       <h2>Demande de devis</h2>
       {canCreate && (
         <div style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Sélectionnez au moins 2 fournisseurs à consulter :</p>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            Sélectionnez au moins {minSuppliers} fournisseur{minSuppliers > 1 ? 's' : ''} à consulter :
+          </p>
           {suppliers.map(s => (
             <label key={s.id} style={{ display: 'block', fontSize: 14, marginBottom: 2 }}>
               <input type="checkbox" checked={selected.includes(s.id)}
@@ -187,9 +191,15 @@ function QuoteRequestSection({ pr, suppliers, guarded }) {
               {' '}{s.nom}
             </label>
           ))}
+          {suppliers.length < minSuppliers && (
+            <p className="alert alert-danger" style={{ marginTop: 8 }}>
+              Cette entité n'a que {suppliers.length} fournisseur(s) référencé(s), il en faut au moins {minSuppliers}.
+              Ajoutez-en via Référentiels → Fournisseurs, ou baissez le seuil dans Workflow → Paramètres.
+            </p>
+          )}
           <textarea placeholder="Message aux fournisseurs" value={message} onChange={e => setMessage(e.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 8 }} />
-          <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < 2}
+          <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }))}>
             Lancer la consultation
           </button>

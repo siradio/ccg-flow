@@ -63,12 +63,36 @@ async function seed({ closePool = true } = {}) {
       'INSERT INTO user_entity_roles (user_id, entity_id, role_code) VALUES ($1,$2,$3)',
       [user.id, soguipal.id, roleCode]
     );
+    // L'accès au module "Demandes d'achat" est une couche indépendante du rôle métier
+    // (voir SPEC.md §2.3) : sans elle, même un service_achat ne verrait pas le module.
+    await run(
+      "INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'achats')",
+      [user.id]
+    );
   }
   const admin = await one(
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Admin', 'Système', 'admin@test', $1) RETURNING id",
     [hash]
   );
   await run("INSERT INTO user_entity_roles (user_id, entity_id, role_code) VALUES ($1, NULL, 'super_admin')", [admin.id]);
+
+  // Deux comptes illustrant l'accès par module (indépendant des rôles du workflow achat) :
+  // un profil RH qui ne voit que le module RH, un profil Stock qui ne voit que Stock (réservé)
+  // + le référentiel Produits — exactement les deux cas d'usage évoqués pour ce système d'accès.
+  const rhUser = await one(
+    "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Bah', 'Aissatou', 'rh.sog@test', $1) RETURNING id",
+    [hash]
+  );
+  await run("INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'rh')", [rhUser.id]);
+
+  const stockUser = await one(
+    "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Diallo', 'Ousmane', 'stock.sog@test', $1) RETURNING id",
+    [hash]
+  );
+  await run(
+    "INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'stock'), ($1, 'ref_products')",
+    [stockUser.id]
+  );
 
   const supplier1 = await one(
     "INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ('Fournisseur Atlantique', 'M. Keita', 'contact@atlantique-gn.test', '+224 620 000 001') RETURNING id"
@@ -89,8 +113,10 @@ async function seed({ closePool = true } = {}) {
   console.log(`Entités : CCG=${ccg.id}, Soguipal=${soguipal.id}, PBIC=${pbic.id}`);
   console.log(`Fournisseurs Soguipal : ${supplier1.id}, ${supplier2.id} — Produit : ${product.id}`);
   console.log('Comptes de démo (mot de passe pour tous : Test1234!) :');
-  demoUsers.forEach(([nom, prenom, email, role]) => console.log(`  - ${email}  — rôle: ${role}`));
-  console.log('  - admin@test  — rôle: super_admin');
+  demoUsers.forEach(([nom, prenom, email, role]) => console.log(`  - ${email}  — rôle: ${role} (module achats)`));
+  console.log('  - admin@test  — rôle: super_admin (tous modules)');
+  console.log('  - rh.sog@test  — module: rh (aucun rôle workflow achat)');
+  console.log('  - stock.sog@test  — modules: stock, ref_products (aucun rôle workflow achat)');
 
   if (closePool) await pool.end();
   return { entities: { ccg, soguipal, pbic }, supplierIds: [supplier1.id, supplier2.id], productId: product.id, password };

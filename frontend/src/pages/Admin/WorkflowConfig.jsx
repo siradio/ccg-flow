@@ -17,10 +17,19 @@ export default function WorkflowConfig() {
   const [error, setError] = useState('');
   const [draggingId, setDraggingId] = useState(null);
   const [overId, setOverId] = useState(null);
+  const [minSuppliers, setMinSuppliers] = useState('');
+  const [minSuppliersSaved, setMinSuppliersSaved] = useState(false);
 
   useEffect(() => {
     client.get('/workflows/demande_achat').then(res => { setTemplate(res.data); setSteps(res.data.steps); });
+    client.get('/settings').then(res => setMinSuppliers(res.data.min_suppliers_devis ?? '2'));
   }, []);
+
+  async function saveMinSuppliers() {
+    setMinSuppliersSaved(false);
+    await client.put('/settings/min_suppliers_devis', { value: minSuppliers });
+    setMinSuppliersSaved(true);
+  }
 
   function updateStep(id, field, value) {
     setSteps(steps.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -61,6 +70,19 @@ export default function WorkflowConfig() {
   return (
     <div>
       <h1 className="page-title">Configuration du workflow — {template.nom}</h1>
+
+      <section className="card" style={{ maxWidth: 480 }}>
+        <h2>Paramètres</h2>
+        <label className="field">
+          Nombre minimum de fournisseurs à consulter avant de lancer une demande de devis
+          <input type="number" min="1" value={minSuppliers} onChange={e => { setMinSuppliers(e.target.value); setMinSuppliersSaved(false); }} style={{ width: 100 }} />
+        </label>
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={saveMinSuppliers} className="btn btn-primary btn-sm">Enregistrer</button>
+          {minSuppliersSaved && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>Enregistré.</span>}
+        </div>
+      </section>
+
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0, marginBottom: 20 }}>
         Glissez une ligne par sa poignée (⠿) pour changer son ordre dans le circuit.
       </p>

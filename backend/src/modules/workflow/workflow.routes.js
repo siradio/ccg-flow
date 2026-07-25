@@ -1,9 +1,11 @@
 const express = require('express');
 const { one, all, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSuperAdmin } = require('../../middleware/permissions');
+const { requireSuperAdmin, requireModule } = require('../../middleware/permissions');
 
 const router = express.Router();
+router.use(requireAuth);
+router.use(requireModule('achats'));
 
 router.get('/:moduleCode', requireAuth, async (req, res, next) => {
   try {

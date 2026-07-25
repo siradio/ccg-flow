@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import RequireModule from './components/RequireModule';
 import Dashboard from './pages/Dashboard/Dashboard';
 import ListPage from './pages/PurchaseRequests/ListPage';
 import CreatePage from './pages/PurchaseRequests/CreatePage';
@@ -9,6 +10,8 @@ import DetailPage from './pages/PurchaseRequests/DetailPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import Users from './pages/Admin/Users';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
+import EmployeesListPage from './pages/Employees/ListPage';
+import EmployeesFormPage from './pages/Employees/FormPage';
 
 export default function App() {
   return (
@@ -16,9 +19,12 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
-        <Route path="purchase-requests" element={<ListPage />} />
-        <Route path="purchase-requests/new" element={<CreatePage />} />
-        <Route path="purchase-requests/:id" element={<DetailPage />} />
+        <Route path="purchase-requests" element={<RequireModule module="achats"><ListPage /></RequireModule>} />
+        <Route path="purchase-requests/new" element={<RequireModule module="achats"><CreatePage /></RequireModule>} />
+        <Route path="purchase-requests/:id" element={<RequireModule module="achats"><DetailPage /></RequireModule>} />
+        <Route path="employees" element={<RequireModule module="rh"><EmployeesListPage /></RequireModule>} />
+        <Route path="employees/new" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
+        <Route path="employees/:id" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />

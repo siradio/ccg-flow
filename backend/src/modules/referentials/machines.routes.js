@@ -5,4 +5,5 @@ module.exports = simpleCrudRouter({
   columns: ['site_id', 'nom', 'reference', 'categorie'],
   filterColumn: 'site_id',
   orderBy: 'nom',
+  moduleKey: 'ref_machines',
 });

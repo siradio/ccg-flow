@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
+import { useAuth, hasModule } from '../../auth/AuthContext';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
 
 const ROLE_LABELS = {
@@ -11,7 +12,7 @@ const ROLE_LABELS = {
 };
 
 const REFERENTIAL_KPIS = [
-  { key: 'employees', label: 'Employés', to: '/referentials/employees' },
+  { key: 'employees', label: 'Employés', to: '/employees' },
   { key: 'products', label: 'Produits', to: '/referentials/products' },
   { key: 'suppliers', label: 'Fournisseurs', to: '/referentials/suppliers' },
   { key: 'sites', label: 'Sites', to: '/referentials/sites' },
@@ -44,6 +45,8 @@ function StatusBars({ byStatus }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const canSeeAchats = hasModule(user, 'achats');
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -58,7 +61,7 @@ export default function Dashboard() {
     <div>
       <h1 className="page-title" style={{ marginBottom: 20 }}>Tableau de bord</h1>
 
-      {pendingAction.total > 0 && (
+      {canSeeAchats && pendingAction.total > 0 && (
         <section className="card">
           <div className="highlight-card">
             <div>
@@ -72,22 +75,30 @@ export default function Dashboard() {
                 </span>
               ))}
             </div>
-            <Link to="/purchase-requests" className="btn btn-primary">Voir les demandes</Link>
+            <Link to="/purchase-requests?pending=true" className="btn btn-primary">Voir les demandes</Link>
           </div>
         </section>
       )}
 
-      <section className="card">
-        <h2>Mes demandes d'achat</h2>
-        {myRequests.total === 0 ? (
-          <p className="empty-row">Vous n'avez encore créé aucune demande. <Link to="/purchase-requests/new">Créer une demande</Link>.</p>
-        ) : (
-          <>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -6 }}>{myRequests.total} demande(s) au total</p>
-            <StatusBars byStatus={myRequests.byStatus} />
-          </>
-        )}
-      </section>
+      {canSeeAchats && (
+        <section className="card">
+          <h2>Mes demandes d'achat</h2>
+          {myRequests.total === 0 ? (
+            <p className="empty-row">Vous n'avez encore créé aucune demande. <Link to="/purchase-requests/new">Créer une demande</Link>.</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: -6 }}>{myRequests.total} demande(s) au total</p>
+              <StatusBars byStatus={myRequests.byStatus} />
+            </>
+          )}
+        </section>
+      )}
+
+      {!canSeeAchats && !isAdmin && (
+        <section className="card">
+          <p className="empty-row" style={{ margin: 0 }}>Aucun module ne vous a encore été accordé, ou seuls des modules sans indicateur de suivi (ex. Stock) le sont pour l'instant.</p>
+        </section>
+      )}
 
       {isAdmin && admin && (
         <>

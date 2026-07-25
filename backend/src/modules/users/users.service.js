@@ -15,7 +15,22 @@ async function loadUserWithRoles(userId) {
      WHERE uer.user_id = $1`,
     [userId]
   );
-  return { ...user, roles };
+  const moduleRows = await all('SELECT module_key FROM user_module_access WHERE user_id = $1', [userId]);
+  return { ...user, roles, modules: moduleRows.map(m => m.module_key) };
+}
+
+async function grantModule(userId, moduleKey) {
+  const row = await one(
+    `INSERT INTO user_module_access (user_id, module_key) VALUES ($1,$2)
+     ON CONFLICT (user_id, module_key) DO NOTHING
+     RETURNING id`,
+    [userId, moduleKey]
+  );
+  return row ? row.id : null;
+}
+
+async function revokeModule(userId, accessRowId) {
+  await run('DELETE FROM user_module_access WHERE id = $1 AND user_id = $2', [accessRowId, userId]);
 }
 
 async function findByEmail(email) {
@@ -69,7 +84,15 @@ async function listUsers() {
     `SELECT uer.id, uer.user_id, uer.entity_id, e.code AS entity_code, uer.role_code
      FROM user_entity_roles uer LEFT JOIN entities e ON e.id = uer.entity_id`
   );
-  return users.map(u => ({ ...u, roles: roles.filter(r => r.user_id === u.id) }));
+  const modules = await all('SELECT id, user_id, module_key FROM user_module_access');
+  return users.map(u => ({
+    ...u,
+    roles: roles.filter(r => r.user_id === u.id),
+    modules: modules.filter(m => m.user_id === u.id),
+  }));
 }
 
-module.exports = { loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, listUsers };
+module.exports = {
+  loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, listUsers,
+  grantModule, revokeModule,
+};

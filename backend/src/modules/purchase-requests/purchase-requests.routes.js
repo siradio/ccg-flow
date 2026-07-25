@@ -1,12 +1,15 @@
 const express = require('express');
 const multer = require('multer');
 const { requireAuth } = require('../../middleware/auth');
+const { requireModule } = require('../../middleware/permissions');
 const service = require('./purchase-requests.service');
 const auditService = require('../audit/audit.service');
 const attachmentsService = require('../attachments/attachments.service');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 const router = express.Router();
+router.use(requireAuth);
+router.use(requireModule('achats'));
 
 router.post('/', requireAuth, async (req, res, next) => {
   try {
@@ -17,8 +20,8 @@ router.post('/', requireAuth, async (req, res, next) => {
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const { entityId, status, mine } = req.query;
-    res.json(await service.listForUser(req.user, { entityId, status, mine: mine === 'true' }));
+    const { entityId, status, mine, pendingAction } = req.query;
+    res.json(await service.listForUser(req.user, { entityId, status, mine: mine === 'true', pendingAction: pendingAction === 'true' }));
   } catch (e) { next(e); }
 });
 

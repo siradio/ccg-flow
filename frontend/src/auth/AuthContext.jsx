@@ -54,6 +54,13 @@ export function isSuperAdmin(user) {
   return !!user && user.roles.some(r => r.role_code === 'super_admin');
 }
 
+// Accès par module (RH, Achats, un référentiel précis...) — couche indépendante des rôles
+// de workflow ci-dessus. Un super_admin a toujours accès à tout.
+export function hasModule(user, moduleKey) {
+  if (isSuperAdmin(user)) return true;
+  return !!user && (user.modules || []).includes(moduleKey);
+}
+
 export function entitiesForRole(user, roleCode) {
   if (!user) return [];
   if (isSuperAdmin(user)) return 'all';

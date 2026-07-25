@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSuperAdmin } = require('../../middleware/permissions');
+const { MODULES, MODULE_KEYS } = require('../../config/modules');
 const usersService = require('./users.service');
 
 const router = express.Router();
@@ -45,6 +46,28 @@ router.post('/:id/roles', requireAuth, requireSuperAdmin, async (req, res, next)
 router.delete('/:id/roles/:roleId', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try {
     await usersService.removeRole(Number(req.params.id), Number(req.params.roleId));
+    res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
+  } catch (e) { next(e); }
+});
+
+router.get('/module-catalog', requireAuth, requireSuperAdmin, (req, res) => {
+  res.json(MODULES);
+});
+
+router.post('/:id/modules', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { module_key } = req.body || {};
+    if (!MODULE_KEYS.includes(module_key)) {
+      return res.status(400).json({ error: 'module_key invalide.' });
+    }
+    await usersService.grantModule(Number(req.params.id), module_key);
+    res.status(201).json(await usersService.loadUserWithRoles(Number(req.params.id)));
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/modules/:accessId', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  try {
+    await usersService.revokeModule(Number(req.params.id), Number(req.params.accessId));
     res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
   } catch (e) { next(e); }
 });
