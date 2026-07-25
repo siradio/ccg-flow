@@ -73,4 +73,17 @@ router.get('/series/by-product', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/dashboard', async (req, res, next) => {
+  try {
+    const { date_from, date_to, business_unit_id, category_id, product_id } = req.query;
+    res.json(await service.getDgDashboard(req.user, {
+      dateFrom: date_from,
+      dateTo: date_to,
+      businessUnitId: business_unit_id ? Number(business_unit_id) : null,
+      categoryId: category_id ? Number(category_id) : null,
+      productId: product_id ? Number(product_id) : null,
+    }));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

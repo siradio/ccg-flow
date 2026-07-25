@@ -319,7 +319,40 @@ Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, T
 Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
 BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (onglet "Graphiques" : évolution
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
-bord exécutif DG.
+bord exécutif DG — livré (§3.7).
+
+### 3.7 Tableau de bord exécutif DG (onglet "Dashboard DG")
+
+Objectif explicite du commanditaire : que la Direction Générale puisse évaluer la situation de
+stock **en moins de 30 secondes**, sans avoir à interroger qui que ce soit. Vue consolidée,
+volontairement dense, avec code couleur systématique (vert = sain, orange = sous seuil, rouge =
+rupture ou baisse).
+
+Filtres partagés par tout le dashboard : période (7/30/90 jours ou personnalisée), Business Unit,
+catégorie de produit, produit précis. **Le filtre "site" demandé initialement n'a pas été implémenté** :
+les produits de ce référentiel ne sont rattachés qu'à une Business Unit, pas à un site précis
+(`products` n'a pas de `site_id`) — un filtre par site donnerait donc un résultat vide ou trompeur
+tant que cette relation n'existe pas dans le modèle. À réévaluer si le besoin se confirme.
+
+Contenu, calculé côté backend par `GET /api/stock/dashboard` :
+- **Stock global** et **par BU**, à la date de saisie la plus récente disponible (`asOf`,
+  qui n'est pas forcément "aujourd'hui" si personne n'a encore saisi le jour même) — avec variation
+  et flèche de tendance (▲/▼/→) par rapport à la saisie distincte précédente (`previousAsOf`), qui
+  n'est pas forcément J-1 calendaire puisque les saisies ne sont pas garanties quotidiennes.
+- **Alertes rupture (stock = 0) et sous-seuil**, comptées et listées, avec carte rouge/orange dès
+  qu'il y en a au moins une.
+- **Carte par BU** avec un indicateur de statut rouge/orange/vert (rouge si au moins un produit de
+  la BU est en rupture, orange si au moins un est sous son seuil sans être en rupture, vert sinon).
+- **Courbe d'évolution du stock global** sur la période choisie.
+- **Top 10 des plus fortes baisses** et **top 10 des plus fortes hausses** sur la période
+  (comparaison entre la première et la dernière saisie de chaque produit dans la période — pas
+  forcément J vs J-1, dépend de quand chaque produit a été saisi).
+- **Top 10 des stocks les plus élevés** à la date `asOf`.
+
+Accès : gated par le module `stock` uniquement (comme le reste de l'onglet Stock du Jour), pas de
+rôle "DG" dédié — cohérent avec le principe déjà appliqué aux autres pages en lecture seule du
+module (Historique, Graphiques) : la restriction fine se fait par Business Unit visible (§2.4),
+pas par un rôle applicatif supplémentaire.
 
 ```
 stock_entries
@@ -489,6 +522,10 @@ GET    /api/stock/series/by-bu        ?date_from=&date_to= -> évolution quotidi
                                        saisie n'est pas comblé — voir §3.5)
 GET    /api/stock/series/by-product   ?product_id=&date_from=&date_to= -> évolution quotidienne
                                        d'un produit précis
+GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&category_id=&product_id=
+                                       -> tableau de bord exécutif DG (§3.7) : stock global/par BU
+                                       avec variation vs saisie précédente, alertes rupture/seuil,
+                                       top 10 baisses/hausses/stocks élevés, courbe d'évolution
 ```
 
 ---

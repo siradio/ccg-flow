@@ -178,7 +178,172 @@ async function getSeriesByProduct(user, { productId, dateFrom, dateTo }) {
   );
 }
 
+// --- Tableau de bord exécutif DG ---------------------------------------------------------
+//
+// Toutes les requêtes ci-dessous partagent le même filtre "produit" (BU visibles pour
+// l'utilisateur + filtres optionnels BU/catégorie/produit choisis dans l'UI), pour rester
+// cohérentes entre les différents blocs du dashboard.
+
+function productFilterClauses(params, { visible, businessUnitId, categoryId, productId }) {
+  const clauses = ['p.actif = true'];
+  if (visible !== null) {
+    if (visible.length === 0) { clauses.push('FALSE'); return clauses; }
+    params.push(visible);
+    clauses.push(`p.business_unit_id = ANY($${params.length})`);
+  }
+  if (businessUnitId) { params.push(businessUnitId); clauses.push(`p.business_unit_id = $${params.length}`); }
+  if (categoryId) { params.push(categoryId); clauses.push(`p.category_id = $${params.length}`); }
+  if (productId) { params.push(productId); clauses.push(`p.id = $${params.length}`); }
+  return clauses;
+}
+
+// Stock total par BU + global "tel que connu à la date asOfDate" : pour chaque produit, la
+// dernière saisie dont la date est <= asOfDate (report de la dernière valeur connue, pas
+// seulement les saisies du jour précis).
+async function totalsAsOf(asOfDate, filters) {
+  const params = [asOfDate];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  const byBu = await all(
+    `WITH latest AS (
+       SELECT DISTINCT ON (p.id) p.id AS product_id, p.business_unit_id, se.quantite
+       FROM products p
+       JOIN stock_entries se ON se.product_id = p.id AND se.date_stock <= $1
+       WHERE ${where}
+       ORDER BY p.id, se.date_stock DESC
+     )
+     SELECT bu.id AS business_unit_id, bu.nom AS business_unit, COALESCE(SUM(latest.quantite), 0)::float AS total
+     FROM business_units bu
+     LEFT JOIN latest ON latest.business_unit_id = bu.id
+     GROUP BY bu.id, bu.nom
+     ORDER BY bu.nom`,
+    params
+  );
+  return { byBu, global: byBu.reduce((sum, r) => sum + r.total, 0) };
+}
+
+async function latestSnapshot(asOfDate, filters) {
+  const params = [asOfDate];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  return all(
+    `SELECT DISTINCT ON (p.id) p.id AS product_id, p.code, p.designation, p.seuil_alerte_stock,
+            p.business_unit_id, bu.nom AS business_unit, se.quantite::float AS quantite, se.date_stock
+     FROM products p
+     JOIN stock_entries se ON se.product_id = p.id AND se.date_stock <= $1
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     WHERE ${where}
+     ORDER BY p.id, se.date_stock DESC`,
+    params
+  );
+}
+
+// Les deux dates de saisie les plus récentes (<= asOfDate) parmi les produits filtrés — sert
+// de base à la variation "jour vs jour précédent" (qui n'est pas forcément J vs J-1 calendaire :
+// les saisies ne sont pas garanties tous les jours).
+async function distinctDatesDesc(asOfDate, filters, limit) {
+  const params = [asOfDate];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  const rows = await all(
+    `SELECT DISTINCT se.date_stock
+     FROM stock_entries se JOIN products p ON p.id = se.product_id
+     WHERE se.date_stock <= $1 AND ${where}
+     ORDER BY se.date_stock DESC
+     LIMIT ${Number(limit)}`,
+    params
+  );
+  return rows.map(r => r.date_stock);
+}
+
+function delta(curr, prev) {
+  if (prev == null) return { previousTotal: null, deltaAbs: null, deltaPct: null };
+  const deltaAbs = curr - prev;
+  return { previousTotal: prev, deltaAbs, deltaPct: prev !== 0 ? deltaAbs / prev : null };
+}
+
+// Plus fortes baisses/hausses sur la période choisie : pour chaque produit ayant au moins 2
+// saisies distinctes dans [dateFrom, dateTo], écart entre sa première et sa dernière saisie
+// de la période (pas nécessairement J vs J-1 : dépend de quand le produit a été saisi).
+async function topMovers(dateFrom, dateTo, filters, limit) {
+  const params = [dateFrom, dateTo];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  const rows = await all(
+    `WITH first_in_period AS (
+       SELECT DISTINCT ON (p.id) p.id AS product_id, se.quantite AS start_qty, se.date_stock AS start_date
+       FROM products p JOIN stock_entries se ON se.product_id = p.id
+       WHERE se.date_stock BETWEEN $1 AND $2 AND ${where}
+       ORDER BY p.id, se.date_stock ASC
+     ),
+     last_in_period AS (
+       SELECT DISTINCT ON (p.id) p.id AS product_id, se.quantite AS end_qty, se.date_stock AS end_date
+       FROM products p JOIN stock_entries se ON se.product_id = p.id
+       WHERE se.date_stock BETWEEN $1 AND $2 AND ${where}
+       ORDER BY p.id, se.date_stock DESC
+     )
+     SELECT p.id AS product_id, p.code, p.designation, bu.nom AS business_unit,
+            f.start_qty::float AS start_qty, f.start_date, l.end_qty::float AS end_qty, l.end_date,
+            (l.end_qty - f.start_qty)::float AS delta_abs
+     FROM first_in_period f
+     JOIN last_in_period l ON l.product_id = f.product_id
+     JOIN products p ON p.id = f.product_id
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     WHERE f.start_date != l.end_date`,
+    params
+  );
+  const drops = [...rows].filter(r => r.delta_abs < 0).sort((a, b) => a.delta_abs - b.delta_abs).slice(0, limit);
+  const gains = [...rows].filter(r => r.delta_abs > 0).sort((a, b) => b.delta_abs - a.delta_abs).slice(0, limit);
+  return { drops, gains };
+}
+
+async function getGlobalEvolution(dateFrom, dateTo, filters) {
+  const params = [dateFrom, dateTo];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  return all(
+    `SELECT se.date_stock, SUM(se.quantite)::float AS total
+     FROM stock_entries se JOIN products p ON p.id = se.product_id
+     WHERE se.date_stock BETWEEN $1 AND $2 AND ${where}
+     GROUP BY se.date_stock ORDER BY se.date_stock`,
+    params
+  );
+}
+
+// Vue consolidée pour le Directeur Général : "en moins de 30 secondes" — état actuel, variation
+// jour vs jour précédent, alertes rupture/seuil, top mouvements sur la période, courbe globale.
+async function getDgDashboard(user, { dateFrom, dateTo, businessUnitId, categoryId, productId }) {
+  if (!dateFrom || !dateTo) throw httpError(400, 'dateFrom et dateTo requis.');
+  const visible = visibleBusinessUnitIds(user);
+  const filters = { visible, businessUnitId: businessUnitId || null, categoryId: categoryId || null, productId: productId || null };
+
+  const [d1, d2] = await distinctDatesDesc(dateTo, filters, 2);
+
+  const current = d1 ? await totalsAsOf(d1, filters) : { byBu: [], global: 0 };
+  const previous = d2 ? await totalsAsOf(d2, filters) : null;
+  const snapshot = d1 ? await latestSnapshot(d1, filters) : [];
+
+  const prevByBu = new Map((previous?.byBu || []).map(r => [r.business_unit_id, r.total]));
+  const byBu = current.byBu.map(r => ({ ...r, ...delta(r.total, prevByBu.has(r.business_unit_id) ? prevByBu.get(r.business_unit_id) : null) }));
+  const global = { total: current.global, ...delta(current.global, previous ? previous.global : null) };
+
+  const rupture = snapshot.filter(r => Number(r.quantite) === 0);
+  const seuilBas = snapshot.filter(r => r.seuil_alerte_stock != null && Number(r.quantite) > 0 && Number(r.quantite) < Number(r.seuil_alerte_stock));
+  const topStock = [...snapshot].sort((a, b) => Number(b.quantite) - Number(a.quantite)).slice(0, 10);
+
+  const { drops, gains } = await topMovers(dateFrom, dateTo, filters, 10);
+  const evolution = await getGlobalEvolution(dateFrom, dateTo, filters);
+
+  return {
+    asOf: d1 || null,
+    previousAsOf: d2 || null,
+    global,
+    byBu,
+    rupture,
+    seuilBas,
+    topStock,
+    topDrops: drops,
+    topGains: gains,
+    evolution,
+  };
+}
+
 module.exports = {
   upsertEntry, listEntries, getEntry, deleteEntry, businessUnitsVisibleTo, getDaySheet,
-  getSeriesByBu, getSeriesByProduct,
+  getSeriesByBu, getSeriesByProduct, getDgDashboard,
 };

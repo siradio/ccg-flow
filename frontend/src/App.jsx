@@ -16,6 +16,7 @@ import KpiPage from './pages/Kpi/KpiPage';
 import StockEntryPage from './pages/Stock/EntryPage';
 import StockHistoryPage from './pages/Stock/HistoryPage';
 import StockChartsPage from './pages/Stock/ChartsPage';
+import StockDgDashboardPage from './pages/Stock/DgDashboardPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="stock/saisie" element={<RequireModule module="stock"><StockEntryPage /></RequireModule>} />
         <Route path="stock/historique" element={<RequireModule module="stock"><StockHistoryPage /></RequireModule>} />
         <Route path="stock/graphiques" element={<RequireModule module="stock"><StockChartsPage /></RequireModule>} />
+        <Route path="stock/dashboard-dg" element={<RequireModule module="stock"><StockDgDashboardPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />
