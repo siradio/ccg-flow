@@ -463,6 +463,9 @@ GET    /api/dashboard        page d'accueil de l'application, contenu adapté au
 GET    /api/kpi/achats       demandes par statut/entité, montants par devise, taux de refus,
                               délai moyen jusqu'au bon de commande, top fournisseurs
 GET    /api/kpi/rh           effectif actif par BU/entité/statut/contrat, ancienneté moyenne
+GET    /api/kpi/stock        stock par BU (dernière saisie connue par produit), stock global,
+                              nombre de produits suivis, produits en rupture (qty=0), produits
+                              sous leur seuil d'alerte (§3.5)
 ```
 
 ### 4.9 Stock du Jour (module `stock`)

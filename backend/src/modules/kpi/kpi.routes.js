@@ -17,4 +17,9 @@ router.get('/rh', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+router.get('/stock', async (req, res, next) => {
+  try { res.json(await service.getStockKpi()); }
+  catch (e) { next(e); }
+});
+
 module.exports = router;

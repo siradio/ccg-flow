@@ -161,14 +161,90 @@ function RhKpi({ data }) {
   );
 }
 
+function StockKpi({ data }) {
+  return (
+    <>
+      <div className="kpi-grid">
+        <div className="card kpi-card">
+          <div className="kpi-value">{Math.round(data.stockGlobal).toLocaleString('fr-FR')}</div>
+          <div className="kpi-label">Stock global (dernière saisie par produit, toutes BU)</div>
+        </div>
+        <div className="card kpi-card">
+          <div className="kpi-value">{data.produitsSuivis}</div>
+          <div className="kpi-label">Produits suivis (au moins une saisie)</div>
+        </div>
+        <div className="card kpi-card" style={{ background: data.rupture.length > 0 ? 'var(--color-danger-soft)' : undefined }}>
+          <div className="kpi-value">{data.rupture.length}</div>
+          <div className="kpi-label">Produits en rupture (stock = 0)</div>
+        </div>
+        <div className="card kpi-card" style={{ background: data.seuilBas.length > 0 ? 'var(--color-warning-bg)' : undefined }}>
+          <div className="kpi-value">{data.seuilBas.length}</div>
+          <div className="kpi-label">Produits sous le seuil d'alerte</div>
+        </div>
+      </div>
+
+      <div className="dashboard-columns">
+        <section className="card">
+          <h2>Stock par Business Unit</h2>
+          <BarList entries={data.stockParBu.map(e => ({ label: e.business_unit, count: Math.round(e.total) }))} />
+        </section>
+
+        <section className="card">
+          <h2>Produits en rupture</h2>
+          {data.rupture.length === 0 ? <p className="empty-row">Aucun produit en rupture.</p> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Produit</th><th>BU</th><th>Date</th></tr></thead>
+                <tbody>
+                  {data.rupture.map(r => (
+                    <tr key={r.product_id}>
+                      <td>{r.designation}{r.code ? ` (${r.code})` : ''}</td>
+                      <td>{r.business_unit}</td>
+                      <td>{new Date(r.date_stock).toLocaleDateString('fr-FR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="card">
+        <h2>Produits sous le seuil d'alerte</h2>
+        {data.seuilBas.length === 0 ? <p className="empty-row">Aucun produit sous son seuil.</p> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Produit</th><th>BU</th><th>Quantité</th><th>Seuil</th><th>Date</th></tr></thead>
+              <tbody>
+                {data.seuilBas.map(r => (
+                  <tr key={r.product_id}>
+                    <td>{r.designation}{r.code ? ` (${r.code})` : ''}</td>
+                    <td>{r.business_unit}</td>
+                    <td>{Number(r.quantite).toLocaleString('fr-FR')}</td>
+                    <td>{Number(r.seuil_alerte_stock).toLocaleString('fr-FR')}</td>
+                    <td>{new Date(r.date_stock).toLocaleDateString('fr-FR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
 export default function KpiPage() {
   const [tab, setTab] = useState('achats');
   const [achats, setAchats] = useState(null);
   const [rh, setRh] = useState(null);
+  const [stock, setStock] = useState(null);
 
   useEffect(() => {
     client.get('/kpi/achats').then(res => setAchats(res.data));
     client.get('/kpi/rh').then(res => setRh(res.data));
+    client.get('/kpi/stock').then(res => setStock(res.data));
   }, []);
 
   return (
@@ -178,10 +254,12 @@ export default function KpiPage() {
       <nav className="subnav">
         <a className={tab === 'achats' ? 'active' : undefined} onClick={() => setTab('achats')} style={{ cursor: 'pointer' }}>Achats</a>
         <a className={tab === 'rh' ? 'active' : undefined} onClick={() => setTab('rh')} style={{ cursor: 'pointer' }}>RH</a>
+        <a className={tab === 'stock' ? 'active' : undefined} onClick={() => setTab('stock')} style={{ cursor: 'pointer' }}>Stock du Jour</a>
       </nav>
 
       {tab === 'achats' && (achats ? <AchatsKpi data={achats} /> : <p>Chargement…</p>)}
       {tab === 'rh' && (rh ? <RhKpi data={rh} /> : <p>Chargement…</p>)}
+      {tab === 'stock' && (stock ? <StockKpi data={stock} /> : <p>Chargement…</p>)}
     </div>
   );
 }

@@ -90,4 +90,59 @@ async function getRhKpi() {
   };
 }
 
-module.exports = { getAchatsKpi, getRhKpi };
+async function getStockKpi() {
+  // "Dernière" quantité connue par produit = la saisie la plus récente (une par produit),
+  // pas une somme des saisies historiques qui sont des relevés, pas des mouvements cumulables.
+  const latestByProduct = `
+    SELECT DISTINCT ON (se.product_id) se.product_id, se.quantite, se.date_stock
+    FROM stock_entries se
+    ORDER BY se.product_id, se.date_stock DESC
+  `;
+
+  const stockParBu = await all(
+    `WITH latest AS (${latestByProduct})
+     SELECT bu.id AS business_unit_id, bu.nom AS business_unit, COALESCE(SUM(latest.quantite), 0)::float AS total
+     FROM business_units bu
+     JOIN products p ON p.business_unit_id = bu.id AND p.actif = true
+     LEFT JOIN latest ON latest.product_id = p.id
+     GROUP BY bu.id, bu.nom
+     ORDER BY bu.nom`
+  );
+
+  const stockGlobal = stockParBu.reduce((sum, r) => sum + r.total, 0);
+
+  const produitsSuivis = await one(
+    `SELECT COUNT(DISTINCT product_id)::int AS n FROM stock_entries`
+  );
+
+  const rupture = await all(
+    `WITH latest AS (${latestByProduct})
+     SELECT p.id AS product_id, p.code, p.designation, bu.nom AS business_unit, latest.date_stock
+     FROM latest
+     JOIN products p ON p.id = latest.product_id
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     WHERE latest.quantite = 0
+     ORDER BY bu.nom, p.designation`
+  );
+
+  const seuilBas = await all(
+    `WITH latest AS (${latestByProduct})
+     SELECT p.id AS product_id, p.code, p.designation, bu.nom AS business_unit,
+            latest.quantite, p.seuil_alerte_stock, latest.date_stock
+     FROM latest
+     JOIN products p ON p.id = latest.product_id
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     WHERE p.seuil_alerte_stock IS NOT NULL AND latest.quantite > 0 AND latest.quantite < p.seuil_alerte_stock
+     ORDER BY bu.nom, p.designation`
+  );
+
+  return {
+    stockParBu,
+    stockGlobal,
+    produitsSuivis: produitsSuivis.n,
+    rupture,
+    seuilBas,
+  };
+}
+
+module.exports = { getAchatsKpi, getRhKpi, getStockKpi };
