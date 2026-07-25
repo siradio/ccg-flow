@@ -55,4 +55,22 @@ router.delete('/entries/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get('/series/by-bu', async (req, res, next) => {
+  try {
+    const { date_from, date_to } = req.query;
+    res.json(await service.getSeriesByBu(req.user, { dateFrom: date_from, dateTo: date_to }));
+  } catch (e) { next(e); }
+});
+
+router.get('/series/by-product', async (req, res, next) => {
+  try {
+    const { product_id, date_from, date_to } = req.query;
+    res.json(await service.getSeriesByProduct(req.user, {
+      productId: product_id ? Number(product_id) : null,
+      dateFrom: date_from,
+      dateTo: date_to,
+    }));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

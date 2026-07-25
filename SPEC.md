@@ -317,7 +317,9 @@ volontairement laissé simple pour cette v1.
 
 Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, Tomate, Yaourt,
 Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
-BU — livré ; (2) intégration KPI ; (3) graphiques Recharts ; (4) tableau de bord exécutif DG.
+BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (onglet "Graphiques" : évolution
+par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
+bord exécutif DG.
 
 ```
 stock_entries
@@ -482,6 +484,11 @@ POST   /api/stock/entries             { date, productId, quantite, unite, commen
                                        (date_stock, product_id) ; 403 si pas d'accès écriture sur
                                        la BU du produit
 DELETE /api/stock/entries/:id
+GET    /api/stock/series/by-bu        ?date_from=&date_to= -> évolution quotidienne du stock total
+                                       par BU (somme des saisies réellement faites, un jour sans
+                                       saisie n'est pas comblé — voir §3.5)
+GET    /api/stock/series/by-product   ?product_id=&date_from=&date_to= -> évolution quotidienne
+                                       d'un produit précis
 ```
 
 ---

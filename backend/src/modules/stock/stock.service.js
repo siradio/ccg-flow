@@ -129,4 +129,56 @@ async function getDaySheet(user, { dateStock, businessUnitId }) {
   return { canWrite: canWriteBusinessUnit(user, Number(businessUnitId)), products };
 }
 
-module.exports = { upsertEntry, listEntries, getEntry, deleteEntry, businessUnitsVisibleTo, getDaySheet };
+// Évolution quotidienne du stock total par BU, telle que réellement saisie (somme des saisies
+// existantes par jour/BU) — un jour sans saisie pour un produit n'est pas comblé artificiellement,
+// il n'apparaît simplement pas dans la somme de ce jour-là pour ce produit.
+async function getSeriesByBu(user, { dateFrom, dateTo }) {
+  if (!dateFrom || !dateTo) throw httpError(400, 'dateFrom et dateTo requis.');
+  const clauses = ['se.date_stock >= $1', 'se.date_stock <= $2'];
+  const params = [dateFrom, dateTo];
+
+  const visible = visibleBusinessUnitIds(user);
+  if (visible !== null) {
+    if (visible.length === 0) return [];
+    params.push(visible);
+    clauses.push(`p.business_unit_id = ANY($${params.length})`);
+  }
+
+  return all(
+    `SELECT se.date_stock, bu.id AS business_unit_id, bu.nom AS business_unit,
+            SUM(se.quantite)::float AS total
+     FROM stock_entries se
+     JOIN products p ON p.id = se.product_id
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     WHERE ${clauses.join(' AND ')}
+     GROUP BY se.date_stock, bu.id, bu.nom
+     ORDER BY se.date_stock`,
+    params
+  );
+}
+
+// Évolution quotidienne d'un produit précis (ex. pour tracer sa courbe sur la période choisie).
+async function getSeriesByProduct(user, { productId, dateFrom, dateTo }) {
+  if (!productId) throw httpError(400, 'productId requis.');
+  if (!dateFrom || !dateTo) throw httpError(400, 'dateFrom et dateTo requis.');
+
+  const product = await one('SELECT id, business_unit_id FROM products WHERE id = $1', [productId]);
+  if (!product) throw httpError(404, 'Produit introuvable.');
+  const visible = visibleBusinessUnitIds(user);
+  if (visible !== null && !visible.includes(product.business_unit_id)) {
+    throw httpError(403, "Vous n'avez pas accès à cette Business Unit.");
+  }
+
+  return all(
+    `SELECT date_stock, quantite::float AS quantite
+     FROM stock_entries
+     WHERE product_id = $1 AND date_stock >= $2 AND date_stock <= $3
+     ORDER BY date_stock`,
+    [productId, dateFrom, dateTo]
+  );
+}
+
+module.exports = {
+  upsertEntry, listEntries, getEntry, deleteEntry, businessUnitsVisibleTo, getDaySheet,
+  getSeriesByBu, getSeriesByProduct,
+};
