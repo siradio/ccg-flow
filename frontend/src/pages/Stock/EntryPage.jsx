@@ -25,6 +25,8 @@ export default function EntryPage() {
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
+  const [justSavedId, setJustSavedId] = useState(null);
+  const [rowErrors, setRowErrors] = useState({});
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function EntryPage() {
     if (!draft || draft.quantite === '' || draft.quantite === null) return;
     setSavingId(row.product_id);
     setError('');
+    setRowErrors(e => ({ ...e, [row.product_id]: null }));
     try {
       const res = await client.post('/stock/entries', {
         date,
@@ -70,8 +73,14 @@ export default function EntryPage() {
           : p),
       }));
       setSavedAt(new Date());
+      // Confirmation directement sur la ligne : la bannière du haut est invisible quand on a
+      // fait défiler une grille longue, ce qui donnait l'impression que le clic ne faisait rien.
+      setJustSavedId(row.product_id);
+      setTimeout(() => setJustSavedId(id => (id === row.product_id ? null : id)), 2000);
     } catch (err) {
-      setError(err.response?.data?.error || "Erreur lors de l'enregistrement.");
+      const msg = err.response?.data?.error || "Erreur lors de l'enregistrement.";
+      setError(msg);
+      setRowErrors(e => ({ ...e, [row.product_id]: msg }));
     } finally {
       setSavingId(null);
     }
@@ -130,8 +139,15 @@ export default function EntryPage() {
                   const draft = drafts[row.product_id] || { quantite: '', unite: '', commentaire: '' };
                   const currentQty = draft.quantite !== '' ? Number(draft.quantite) : (row.quantite != null ? Number(row.quantite) : null);
                   const low = row.seuil_alerte_stock != null && currentQty != null && currentQty < Number(row.seuil_alerte_stock);
+                  const rowError = rowErrors[row.product_id];
+                  const justSaved = justSavedId === row.product_id;
+                  const rowStyle = rowError
+                    ? { background: 'var(--color-danger-soft)' }
+                    : justSaved
+                      ? { background: 'var(--color-success-bg)' }
+                      : low ? { background: 'var(--color-danger-soft)' } : undefined;
                   return (
-                    <tr key={row.product_id} style={low ? { background: 'var(--color-danger-soft)' } : undefined}>
+                    <tr key={row.product_id} style={rowStyle}>
                       <td>{row.designation}{row.code ? ` (${row.code})` : ''}</td>
                       <td>
                         {sheet.canWrite ? (
@@ -153,10 +169,15 @@ export default function EntryPage() {
                       </td>
                       {sheet.canWrite && (
                         <td>
-                          <button className="btn btn-primary btn-sm" disabled={savingId === row.product_id || draft.quantite === ''}
-                            onClick={() => saveRow(row)}>
-                            {savingId === row.product_id ? '…' : row.entry_id ? 'Mettre à jour' : 'Enregistrer'}
+                          <button
+                            className={justSaved ? 'btn btn-sm' : 'btn btn-primary btn-sm'}
+                            style={justSaved ? { background: 'var(--color-success-fg)', color: '#fff', borderColor: 'var(--color-success-fg)' } : undefined}
+                            disabled={savingId === row.product_id || draft.quantite === ''}
+                            onClick={() => saveRow(row)}
+                          >
+                            {savingId === row.product_id ? '…' : justSaved ? 'Enregistré ✓' : row.entry_id ? 'Mettre à jour' : 'Enregistrer'}
                           </button>
+                          {rowError && <div style={{ color: 'var(--color-danger)', fontSize: 12, marginTop: 4, maxWidth: 160 }}>{rowError}</div>}
                         </td>
                       )}
                     </tr>
