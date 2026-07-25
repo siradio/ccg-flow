@@ -293,6 +293,43 @@ async function topMovers(dateFrom, dateTo, filters, limit) {
   return { drops, gains };
 }
 
+// Stock actuel de TOUS les produits actifs, par BU (pas seulement ceux ayant une saisie) — pour
+// le tableau "stock du jour par BU" du dashboard : un produit jamais saisi apparaît avec une
+// quantité nulle, pour que la Direction voie aussi les trous de saisie, pas seulement les valeurs.
+async function getBuProductSnapshot(dateTo, filters) {
+  const params = [dateTo];
+  const where = productFilterClauses(params, filters).join(' AND ');
+  const rows = await all(
+    `SELECT p.id AS product_id, p.code, p.designation, p.unite, p.seuil_alerte_stock,
+            p.business_unit_id, bu.nom AS business_unit,
+            latest.quantite::float AS quantite, latest.date_stock
+     FROM products p
+     JOIN business_units bu ON bu.id = p.business_unit_id
+     LEFT JOIN LATERAL (
+       SELECT se.quantite, se.date_stock
+       FROM stock_entries se
+       WHERE se.product_id = p.id AND se.date_stock <= $1
+       ORDER BY se.date_stock DESC
+       LIMIT 1
+     ) latest ON true
+     WHERE ${where}
+     ORDER BY bu.nom, p.designation`,
+    params
+  );
+
+  const byBu = [];
+  const index = new Map();
+  for (const row of rows) {
+    if (!index.has(row.business_unit_id)) {
+      const entry = { business_unit_id: row.business_unit_id, business_unit: row.business_unit, products: [] };
+      index.set(row.business_unit_id, entry);
+      byBu.push(entry);
+    }
+    index.get(row.business_unit_id).products.push(row);
+  }
+  return byBu;
+}
+
 async function getGlobalEvolution(dateFrom, dateTo, filters) {
   const params = [dateFrom, dateTo];
   const where = productFilterClauses(params, filters).join(' AND ');
@@ -328,6 +365,7 @@ async function getDgDashboard(user, { dateFrom, dateTo, businessUnitId, category
 
   const { drops, gains } = await topMovers(dateFrom, dateTo, filters, 10);
   const evolution = await getGlobalEvolution(dateFrom, dateTo, filters);
+  const byBuProducts = await getBuProductSnapshot(dateTo, filters);
 
   return {
     asOf: d1 || null,
@@ -340,6 +378,7 @@ async function getDgDashboard(user, { dateFrom, dateTo, businessUnitId, category
     topDrops: drops,
     topGains: gains,
     evolution,
+    byBuProducts,
   };
 }
 

@@ -18,16 +18,9 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Identifiants incorrects ou compte désactivé.' });
     }
     const full = await usersService.loadUserWithRoles(user.id);
-    const payload = {
-      id: full.id,
-      nom: full.nom,
-      prenom: full.prenom,
-      email: full.email,
-      roles: full.roles.map(r => ({ entity_id: r.entity_id, entity_code: r.entity_code, role_code: r.role_code })),
-      modules: full.modules,
-      businessUnits: full.businessUnits,
-    };
-    const token = jwt.sign(payload, env.jwtSecret, { expiresIn: '8h' });
+    // Le token ne porte que l'identité : rôles/modules/BU sont relus en base à chaque requête
+    // (voir middleware/auth.js), pour qu'un changement de droits prenne effet immédiatement.
+    const token = jwt.sign({ id: full.id }, env.jwtSecret, { expiresIn: '8h' });
     res.json({ token, user: full });
   } catch (e) { next(e); }
 });

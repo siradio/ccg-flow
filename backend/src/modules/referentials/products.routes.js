@@ -38,13 +38,13 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
 router.post('/', requireAuth, requireModule('ref_products'), async (req, res, next) => {
   try {
-    const { code, designation, category_id, business_unit_id, unite, actif, entity_ids } = req.body || {};
+    const { code, designation, category_id, business_unit_id, unite, actif, entity_ids, seuil_alerte_stock } = req.body || {};
     if (!designation || !category_id) {
       return res.status(400).json({ error: 'designation et category_id obligatoires.' });
     }
     const product = await one(
-      'INSERT INTO products (code, designation, category_id, business_unit_id, unite, actif) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [code || null, designation, category_id, business_unit_id || null, unite || null, actif === undefined ? true : actif]
+      'INSERT INTO products (code, designation, category_id, business_unit_id, unite, actif, seuil_alerte_stock) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [code || null, designation, category_id, business_unit_id || null, unite || null, actif === undefined ? true : actif, seuil_alerte_stock === '' ? null : seuil_alerte_stock ?? null]
     );
     for (const entityId of entity_ids || []) {
       await run('INSERT INTO product_entities (product_id, entity_id) VALUES ($1,$2)', [product.id, entityId]);
@@ -57,9 +57,9 @@ router.put('/:id', requireAuth, requireModule('ref_products'), async (req, res, 
   try {
     const existing = await one('SELECT * FROM products WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
-    const { code, designation, category_id, business_unit_id, unite, actif, entity_ids } = req.body || {};
+    const { code, designation, category_id, business_unit_id, unite, actif, entity_ids, seuil_alerte_stock } = req.body || {};
     const product = await one(
-      'UPDATE products SET code=$1, designation=$2, category_id=$3, business_unit_id=$4, unite=$5, actif=$6 WHERE id=$7 RETURNING *',
+      'UPDATE products SET code=$1, designation=$2, category_id=$3, business_unit_id=$4, unite=$5, actif=$6, seuil_alerte_stock=$7 WHERE id=$8 RETURNING *',
       [
         code ?? existing.code,
         designation ?? existing.designation,
@@ -67,6 +67,7 @@ router.put('/:id', requireAuth, requireModule('ref_products'), async (req, res, 
         business_unit_id === undefined ? existing.business_unit_id : business_unit_id,
         unite ?? existing.unite,
         actif === undefined ? existing.actif : actif,
+        seuil_alerte_stock === undefined ? existing.seuil_alerte_stock : (seuil_alerte_stock === '' ? null : seuil_alerte_stock),
         req.params.id,
       ]
     );

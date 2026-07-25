@@ -209,6 +209,37 @@ export default function DgDashboardPage() {
             )}
           </section>
 
+          <div className="dashboard-section-title">Stock du jour — détail par Business Unit</div>
+          {data.byBuProducts.map(bu => (
+            <section key={bu.business_unit_id} className="card" style={{ marginBottom: 16 }}>
+              <h2>{bu.business_unit}</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Produit</th><th>Quantité</th><th>Unité</th><th>Dernière saisie</th></tr></thead>
+                  <tbody>
+                    {bu.products.map(p => {
+                      const qty = p.quantite != null ? Number(p.quantite) : null;
+                      const rowStyle = qty === 0
+                        ? { background: 'var(--color-danger-soft)' }
+                        : (p.seuil_alerte_stock != null && qty != null && qty < Number(p.seuil_alerte_stock))
+                          ? { background: 'var(--color-warning-bg)' }
+                          : undefined;
+                      return (
+                        <tr key={p.product_id} style={rowStyle}>
+                          <td>{p.designation}{p.code ? ` (${p.code})` : ''}</td>
+                          <td>{qty != null ? fmt(qty) : '—'}</td>
+                          <td>{p.unite || '—'}</td>
+                          <td>{p.date_stock ? new Date(p.date_stock).toLocaleDateString('fr-FR') : 'Jamais saisi'}</td>
+                        </tr>
+                      );
+                    })}
+                    {bu.products.length === 0 && <tr><td className="empty-row" colSpan={4}>Aucun produit actif pour cette BU.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+
           <div className="dashboard-columns" style={{ marginTop: 16 }}>
             <section className="card">
               <h2>Top 10 des plus fortes baisses (sur la période)</h2>

@@ -243,6 +243,24 @@ Règles :
 - Gérée via **Admin → Utilisateurs → "Accès Business Units (Stock du Jour)"** (octroi/révocation),
   `POST/DELETE /api/users/:id/business-units`.
 
+### 2.5 Fraîcheur des droits (rôles, modules, BU)
+
+`requireAuth` (`backend/src/middleware/auth.js`) ne fait pas confiance au contenu du JWT pour les
+droits : le token ne porte que l'**identité** (`{ id }`), et `roles`/`modules`/`businessUnits` sont
+**relus en base à chaque requête** (`usersService.loadUserWithRoles`). Conséquence : un octroi ou
+un retrait d'accès par un super_admin (rôle, module, ou BU) **prend effet immédiatement** sur les
+requêtes suivantes de l'utilisateur concerné, sans qu'il ait besoin de se déconnecter/reconnecter.
+Avant ce choix, ces informations étaient embarquées dans le JWT à la connexion et ne se
+rafraîchissaient qu'au prochain login — un octroi de BU pouvait donc sembler "ne pas marcher" pour
+un utilisateur déjà connecté.
+
+Limite connue, acceptée pour cette v1 : côté **frontend**, l'objet `user` du contexte React
+(`AuthContext`) n'est chargé qu'au montage de l'app (`GET /auth/me`) — la barre de navigation
+(liens de module visibles) ne se met donc à jour qu'après un **rechargement de page** (F5), pas
+en temps réel. Les vérifications qui comptent réellement pour la sécurité (écriture, lecture de
+données sensibles) sont, elles, toujours revérifiées côté serveur à chaque appel API et donc
+toujours à jour — la barre de navigation est purement un confort d'affichage.
+
 ---
 
 ## 3. Workflow de validation — Demande d'achat
@@ -319,9 +337,9 @@ Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, T
 Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
 BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (onglet "Graphiques" : évolution
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
-bord exécutif DG — livré (§3.7).
+bord (§3.6).
 
-### 3.7 Tableau de bord exécutif DG (onglet "Dashboard DG")
+### 3.6 Tableau de bord exécutif (onglet "Dashboard")
 
 Objectif explicite du commanditaire : que la Direction Générale puisse évaluer la situation de
 stock **en moins de 30 secondes**, sans avoir à interroger qui que ce soit. Vue consolidée,
@@ -348,6 +366,10 @@ Contenu, calculé côté backend par `GET /api/stock/dashboard` :
   (comparaison entre la première et la dernière saisie de chaque produit dans la période — pas
   forcément J vs J-1, dépend de quand chaque produit a été saisi).
 - **Top 10 des stocks les plus élevés** à la date `asOf`.
+- **Détail par Business Unit** : un tableau séparé par BU listant **tous** les produits actifs de
+  la BU (pas seulement ceux ayant une saisie) avec leur dernière quantité connue à la date `dateTo`
+  choisie — un produit jamais saisi apparaît avec "Jamais saisi", pour que la Direction voie aussi
+  les trous de saisie, pas seulement les valeurs. Ligne rouge si rupture, orange si sous seuil.
 
 Accès : gated par le module `stock` uniquement (comme le reste de l'onglet Stock du Jour), pas de
 rôle "DG" dédié — cohérent avec le principe déjà appliqué aux autres pages en lecture seule du
@@ -372,12 +394,15 @@ Décisions de conception :
   ligne existante, incrémente `updated_by`/`updated_at`) plutôt que de créer un doublon — cohérent
   avec le besoin réel : "corriger la saisie du jour", pas cumuler plusieurs relevés par jour.
 - Seuil d'alerte configurable **par produit** (`products.seuil_alerte_stock`, §1.1), pas un
-  paramètre global dans `app_settings` — chaque produit a un volume d'écoulement différent.
+  paramètre global dans `app_settings` — chaque produit a un volume d'écoulement différent. Se
+  configure dans **Référentiels → Produits** (champ "Seuil d'alerte stock", éditable par quiconque
+  a le module `ref_products`) — vide/non renseigné = pas d'alerte sous-seuil pour ce produit
+  (seule la rupture à 0 reste détectée).
 - Écriture restreinte par Business Unit via la couche §2.4 ; lecture soumise aux mêmes BU visibles
   pour un utilisateur restreint, ouverte à toutes pour un utilisateur non restreint (mais toujours
   gated par le module `stock` lui-même — pas d'accès du tout sans le module).
 
-### 3.6 Référentiel produits "produit fini" (import PILCO)
+### 3.7 Référentiel produits "produit fini" (import PILCO)
 
 Le référentiel produits des 4 Business Units de production (Lait, Tomate, Yaourt, Mayo/Margarine)
 a été importé depuis 4 fichiers Excel PILCO fournis (un par BU, onglet "Produits"), 23 produits au
@@ -523,9 +548,10 @@ GET    /api/stock/series/by-bu        ?date_from=&date_to= -> évolution quotidi
 GET    /api/stock/series/by-product   ?product_id=&date_from=&date_to= -> évolution quotidienne
                                        d'un produit précis
 GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&category_id=&product_id=
-                                       -> tableau de bord exécutif DG (§3.7) : stock global/par BU
+                                       -> tableau de bord exécutif (§3.6) : stock global/par BU
                                        avec variation vs saisie précédente, alertes rupture/seuil,
-                                       top 10 baisses/hausses/stocks élevés, courbe d'évolution
+                                       top 10 baisses/hausses/stocks élevés, courbe d'évolution,
+                                       détail produit par produit pour chaque BU
 ```
 
 ---

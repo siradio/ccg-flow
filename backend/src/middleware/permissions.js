@@ -2,7 +2,9 @@
 // IMPORTANT : c'est CETTE table qui fait foi pour la sécurité — jamais le front-end seul.
 //
 // Un utilisateur porte un rôle PAR ENTITÉ (user_entity_roles), sauf super_admin qui est global.
-// Le JWT embarque req.user.roles = [{ entity_id, role_code }, ...].
+// req.user.roles = [{ entity_id, role_code }, ...], relu en base à chaque requête par
+// requireAuth (middleware/auth.js) — jamais depuis le JWT, pour que les changements de droits
+// prennent effet immédiatement sans attendre une reconnexion.
 
 const PERMS = {
   super_admin:       ['all'],
@@ -57,7 +59,7 @@ function requireRoleOnEntity(roleCode, entityId) {
 }
 
 // Accès par module (RH, Achats, un référentiel précis...) — couche indépendante des rôles
-// métier ci-dessus. req.user.modules est embarqué dans le JWT (voir auth.routes.js).
+// métier ci-dessus. req.user.modules est relu en base à chaque requête (voir requireAuth).
 // Un super_admin a toujours accès à tout, sans avoir besoin d'un octroi explicite.
 function hasModule(user, moduleKey) {
   if (isSuperAdmin(user)) return true;
@@ -75,7 +77,7 @@ function requireModule(moduleKey) {
 
 // Accès par Business Unit (module Stock du Jour) — couche encore plus fine que hasModule('stock') :
 // un "Gestionnaire de Stock" ne doit voir/saisir que la ou les BU qui lui sont accordées.
-// req.user.businessUnits est embarqué dans le JWT (voir auth.routes.js) = tableau d'ids de BU.
+// req.user.businessUnits = tableau d'ids de BU, relu en base à chaque requête (voir requireAuth).
 //
 // - Sans AUCUN octroi de BU (tableau vide) : accès en LECTURE SEULE à toutes les BU (cf. §7 du
 //   cahier des charges : "les autres utilisateurs disposent uniquement d'un accès en lecture").

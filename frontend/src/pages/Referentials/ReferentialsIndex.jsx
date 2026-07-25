@@ -60,6 +60,7 @@ const CONFIGS = {
       { key: 'category_id', label: 'Catégorie', type: 'fkSelect', listKey: 'categories', required: true },
       { key: 'business_unit_id', label: 'Business Unit', type: 'fkSelect', listKey: 'businessUnits' },
       { key: 'unite', label: 'Unité' },
+      { key: 'seuil_alerte_stock', label: 'Seuil d\'alerte stock', type: 'number' },
       { key: 'entity_ids', label: 'Entités', type: 'multiEntity' },
     ],
   },
