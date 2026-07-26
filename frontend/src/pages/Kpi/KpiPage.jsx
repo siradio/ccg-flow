@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
 
@@ -164,6 +165,9 @@ function RhKpi({ data }) {
 function StockKpi({ data }) {
   return (
     <>
+      <p style={{ marginBottom: 16 }}>
+        <Link to="/stock/dashboard-dg">Voir l'analyse détaillée (par Business Unit, évolution, top mouvements) →</Link>
+      </p>
       <div className="kpi-grid">
         <div className="card kpi-card">
           <div className="kpi-value">{Math.round(data.stockGlobal).toLocaleString('fr-FR')}</div>
@@ -254,7 +258,7 @@ export default function KpiPage() {
       <nav className="subnav">
         <a className={tab === 'achats' ? 'active' : undefined} onClick={() => setTab('achats')} style={{ cursor: 'pointer' }}>Achats</a>
         <a className={tab === 'rh' ? 'active' : undefined} onClick={() => setTab('rh')} style={{ cursor: 'pointer' }}>RH</a>
-        <a className={tab === 'stock' ? 'active' : undefined} onClick={() => setTab('stock')} style={{ cursor: 'pointer' }}>Stock du Jour</a>
+        <a className={tab === 'stock' ? 'active' : undefined} onClick={() => setTab('stock')} style={{ cursor: 'pointer' }}>Stock (résumé)</a>
       </nav>
 
       {tab === 'achats' && (achats ? <AchatsKpi data={achats} /> : <p>Chargement…</p>)}

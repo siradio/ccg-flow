@@ -6,7 +6,7 @@ export default function StockSubnav() {
       <NavLink to="/stock/saisie" className={({ isActive }) => isActive ? 'active' : undefined}>Saisie du jour</NavLink>
       <NavLink to="/stock/historique" className={({ isActive }) => isActive ? 'active' : undefined}>Historique</NavLink>
       <NavLink to="/stock/graphiques" className={({ isActive }) => isActive ? 'active' : undefined}>Graphiques</NavLink>
-      <NavLink to="/stock/dashboard-dg" className={({ isActive }) => isActive ? 'active' : undefined}>Dashboard</NavLink>
+      <NavLink to="/stock/dashboard-dg" className={({ isActive }) => isActive ? 'active' : undefined}>Analyse détaillée</NavLink>
     </nav>
   );
 }

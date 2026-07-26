@@ -317,19 +317,26 @@ app_settings
 
 ### 3.4 Module KPI
 
-Photo instantanée (pas de filtre de période dans cette v1), en lecture seule, sur deux domaines :
+Photo instantanée (pas de filtre de période dans cette v1), en lecture seule, sur trois domaines
+(onglets Achats / RH / **Stock (résumé)**) :
 
 - **Achats** : demandes par statut, par entité, montant des bons de commande générés (par
   devise), taux de demandes ayant subi au moins un refus (pas seulement le statut final
   `rejetee`, qui ne survient qu'en cas de `comportement_si_refus = 'annulation'` — voir §3.1),
   délai moyen entre création et génération du bon de commande, top fournisseurs par montant.
 - **RH** : effectif actif par Business Unit / entité / statut / type de contrat, ancienneté moyenne.
+- **Stock (résumé)** : stock global/par BU, produits suivis, rupture, sous-seuil (`GET /api/kpi/stock`)
+  — volontairement une version *courte* : ce même onglet renvoie vers l'**Analyse détaillée**
+  du module Stock du Jour (§3.6) pour la comparaison par BU, la courbe d'évolution, les top 10 et
+  le détail produit par produit. Les deux ne dupliquent pas le calcul (l'onglet KPI appelle
+  `GET /api/kpi/stock`, la page Stock appelle `GET /api/stock/dashboard` — deux endpoints
+  distincts qui interrogent la même donnée), mais évitent de tout répéter au même endroit.
 
-Accès via le module `kpi` — **volontairement indépendant** des modules `achats`/`rh` : un
+Accès via le module `kpi` — **volontairement indépendant** des modules `achats`/`rh`/`stock` : un
 utilisateur Direction/Finance peut voir les agrégats consolidés sans avoir accès aux fiches
-individuelles (ni à la liste des employés, ni à l'écran de validation d'une demande). Point de
-départ pour un futur vrai module de reporting multi-modules (avec filtre de période et export),
-volontairement laissé simple pour cette v1.
+individuelles (ni à la liste des employés, ni à l'écran de validation d'une demande, ni à la
+saisie de stock). Point de départ pour un futur vrai module de reporting multi-modules (avec
+filtre de période et export), volontairement laissé simple pour cette v1.
 
 ### 3.5 Module Stock du Jour (module `stock`)
 
@@ -339,7 +346,7 @@ BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (ongle
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
 bord (§3.6).
 
-### 3.6 Tableau de bord exécutif (onglet "Dashboard")
+### 3.6 Tableau de bord exécutif (onglet "Analyse détaillée")
 
 Objectif explicite du commanditaire : que la Direction Générale puisse évaluer la situation de
 stock **en moins de 30 secondes**, sans avoir à interroger qui que ce soit. Vue consolidée,
