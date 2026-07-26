@@ -3,7 +3,15 @@ const path = require('path');
 const { Pool } = require('pg');
 const env = require('./config/env');
 
-const pool = new Pool({ connectionString: env.databaseUrl });
+// Azure Database for PostgreSQL exige TLS (contrairement au Postgres Docker local, sans SSL) —
+// activé explicitement plutôt que de compter sur le parsing implicite de "sslmode=require" dans
+// la chaîne de connexion, pour ne pas dépendre du comportement interne de pg/pg-connection-string.
+// `rejectUnauthorized: false` : approche standard recommandée par Azure pour Node/pg, la chaîne de
+// certification d'Azure n'étant pas systématiquement dans le magasin CA par défaut de Node.
+const pool = new Pool({
+  connectionString: env.databaseUrl,
+  ssl: /\bsslmode=require\b/.test(env.databaseUrl || '') ? { rejectUnauthorized: false } : false,
+});
 
 async function all(text, params = []) {
   const { rows } = await pool.query(text, params);

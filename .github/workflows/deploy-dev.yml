@@ -1,8 +1,9 @@
 name: Deploy - Dev
 
+# En pause : l'App Service tourne pour l'instant sur un plan Basic (pas de slot "dev" créé), le
+# temps de finaliser un premier déploiement à environnement unique (voir deploy-prod.yml). Rétablir
+# le déclencheur `push: branches: [develop]` une fois le plan passé en Standard + le slot dev créé.
 on:
-  push:
-    branches: [develop]
   workflow_dispatch:
 
 permissions:

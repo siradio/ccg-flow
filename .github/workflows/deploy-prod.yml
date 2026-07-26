@@ -42,9 +42,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Déployer sur le slot de production
+      # Pas de `slot-name` pour l'instant : environnement unique le temps de finaliser le
+      # déploiement (App Service Plan Basic, ne supporte pas les slots). Remettre
+      # `slot-name: production` une fois passé en Standard + slot dev créé (voir deploy-dev.yml).
+      - name: Déployer sur l'App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          slot-name: production
           package: backend
