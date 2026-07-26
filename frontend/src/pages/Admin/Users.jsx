@@ -76,6 +76,13 @@ export default function Users() {
     load();
   }
 
+  async function toggleActive(u) {
+    const action = u.actif ? 'désactiver' : 'réactiver';
+    if (!window.confirm(`Confirmer : ${action} ${u.prenom} ${u.nom} ?`)) return;
+    await client.put(`/users/${u.id}`, { actif: !u.actif });
+    load();
+  }
+
   function moduleLabel(key) {
     return moduleCatalog.find(m => m.key === key)?.label || key;
   }
@@ -86,9 +93,16 @@ export default function Users() {
 
       {users.map(u => (
         <div key={u.id} className="card">
-          <strong>{u.prenom} {u.nom}</strong>
-          <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
-          {!u.actif && <em style={{ color: 'var(--color-text-muted)' }}> (désactivé)</em>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong>{u.prenom} {u.nom}</strong>
+              <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
+              {!u.actif && <em style={{ color: 'var(--color-text-muted)' }}> (désactivé)</em>}
+            </div>
+            <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
+              {u.actif ? 'Désactiver' : 'Réactiver'}
+            </button>
+          </div>
 
           <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

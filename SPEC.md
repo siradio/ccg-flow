@@ -32,6 +32,13 @@ entities (entités du groupe)
 
 users
   id, nom, prenom, email (unique), password_hash, actif, employee_id (FK -> employees, nullable), created_at
+  -- Pas de suppression d'utilisateur dans l'UI : `actif=false` (désactivation) est la seule
+  -- opération offerte (bouton "Désactiver" dans Admin -> Utilisateurs, `PUT /api/users/:id`).
+  -- Un utilisateur est référencé par des clés étrangères NOT NULL dans purchase_requests,
+  -- approvals, stock_entries.created_by, product_prices.created_by, etc. : le supprimer casserait
+  -- ces historiques (ou, si on ajoutait un ON DELETE CASCADE, effacerait silencieusement des
+  -- demandes d'achat/saisies de stock/prix réels). Un compte désactivé ne peut plus se connecter
+  -- (vérifié dans /api/auth/login) mais reste visible dans tout l'historique qu'il a produit.
 
 user_entity_roles                          -- un utilisateur peut avoir plusieurs rôles, un par entité
   id, user_id (FK), entity_id (FK, nullable si rôle global ex. super_admin), role_code, created_at
