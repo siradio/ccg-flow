@@ -801,3 +801,83 @@ Scénario à exécuter (via un script `backend/test/e2e.purchase-request.test.js
 - Le PDF de la demande de devis (étape 6) et celui du bon de commande (étape 13) sont générés et non vides.
 
 Une fois ce scénario automatisé et vert, le module Demande d'achat est considéré fonctionnellement complet pour la v1.
+
+---
+
+## 8. Déploiement Azure & CI/CD
+
+Premier déploiement réel (modules Demande d'achat + Référentiels) : Azure App Service + Azure
+Database for PostgreSQL, deux environnements (dev/prod) via des **slots de déploiement** sur un
+seul App Service (plutôt que deux App Services séparés) — moins cher, bascule instantanée
+possible, au prix d'un même plan tarifaire partagé entre dev et prod.
+
+### 8.1 Architecture
+
+- **Un seul App Service** (Node.js 20, Linux) sert à la fois l'API (`/api/*`) et le build React —
+  pas de second service/domaine/CORS à gérer (§ décision prise avec l'utilisateur). Le serveur
+  Express (`backend/src/server.js`) sert les fichiers statiques du frontend dès qu'il en trouve un
+  build à l'un de ces deux emplacements :
+  - `backend/public` — structure de déploiement : le CI copie `frontend/dist` ici avant de
+    packager, pour que le dossier `backend/` déployé soit **autonome** (c'est tout ce qui est
+    envoyé à Azure — pas besoin du dossier `frontend/` sur le serveur).
+  - `frontend/dist` — repli pour tester un build de production en local sans cette copie.
+- **Deux slots** sur le même App Service : `dev` (persistant, sert d'environnement de test) et
+  `production` (le slot par défaut). Chaque slot a sa **propre base de données** (§8.3) — ce ne
+  sont pas des slots utilisés pour un swap bleu/vert à chaque déploiement, mais deux environnements
+  durables, chacun alimenté directement par sa propre branche Git (§8.2).
+- **Une seule Azure Database for PostgreSQL Flexible Server**, avec deux bases distinctes
+  (`erp_ccg_dev`, `erp_ccg_prod`) plutôt que deux serveurs séparés — pour maîtriser le coût. Les
+  migrations s'appliquent automatiquement au démarrage (`runMigrations()` dans `db.js`, déjà en
+  place), donc rien à faire côté CI pour ça : chaque redémarrage après déploiement les rejoue.
+
+### 8.2 Branches et workflows GitHub Actions
+
+| Branche | Slot Azure | Workflow |
+|---|---|---|
+| `develop` | `dev` | `.github/workflows/deploy-dev.yml` |
+| `main` | `production` | `.github/workflows/deploy-prod.yml` |
+
+- `.github/workflows/ci.yml` : sur toute push/PR vers `main`/`develop` — lance la suite de tests
+  backend (`npm test`, contre un Postgres éphémère fourni par GitHub Actions) et vérifie que le
+  build frontend passe. Ne déploie rien — c'est la porte de qualité avant tout déploiement.
+- Chaque workflow de déploiement : build frontend → copie dans `backend/public` → `npm ci
+  --omit=dev` dans `backend/` → authentification Azure par **OIDC** (`azure/login`, pas de secret
+  longue durée stocké dans GitHub) → déploiement du dossier `backend/` sur le slot correspondant
+  (`azure/webapps-deploy`).
+- Déclenchable aussi manuellement (`workflow_dispatch`) sans attendre un push.
+
+### 8.3 Secrets et variables GitHub à configurer
+
+Dans **Settings → Secrets and variables → Actions** du repo :
+
+| Nom | Type | Valeur |
+|---|---|---|
+| `AZURE_CLIENT_ID` | Secret | Application (client) ID de l'App Registration Azure AD |
+| `AZURE_TENANT_ID` | Secret | Tenant ID Azure AD |
+| `AZURE_SUBSCRIPTION_ID` | Secret | ID de l'abonnement Azure |
+| `AZURE_WEBAPP_NAME` | **Variable** (pas secret) | Nom de l'App Service (ex. `ccg-flow-api`) |
+
+Ces identifiants ne donnent que le droit de déployer (rôle *Contributor* scopé à l'App Service),
+pas d'accès aux données — `DATABASE_URL`, `JWT_SECRET`, `SMTP_*` sont configurés séparément,
+**directement dans Azure** (App Settings par slot, jamais dans GitHub) :
+
+- Dans le portail Azure : App Service → Environment variables → onglet du slot concerné.
+- **Cocher "Deployment slot setting"** pour `DATABASE_URL` (et idéalement les autres secrets
+  aussi) — sans ça, un swap manuel de slots ferait pointer le slot de prod vers la base de dev (ou
+  l'inverse). Comme les slots ne sont pas utilisés en mode swap ici (§8.1), l'impact est limité,
+  mais c'est une protection qui ne coûte rien à activer.
+- Ne **jamais** définir `PORT` dans les App Settings Azure — Azure l'injecte lui-même.
+
+### 8.4 Ce qui reste à faire (guidé pas-à-pas, portail Azure)
+
+1. Groupe de ressources (ex. `rg-ccg-flow`).
+2. Azure Database for PostgreSQL Flexible Server + 2 bases (`erp_ccg_dev`, `erp_ccg_prod`).
+3. App Service Plan (Linux, palier **Standard S1 minimum** — nécessaire pour les slots de
+   déploiement) + Web App (Node 20 LTS) + slot `dev`.
+4. App Settings par slot (`DATABASE_URL`, `JWT_SECRET`, `SMTP_*`), avec "Deployment slot setting"
+   coché pour `DATABASE_URL`.
+5. App Registration Azure AD + identifiant fédéré (federated credential) de confiance GitHub OIDC,
+   scopé au repo et à chaque branche (`develop`, `main`) — évite tout secret Azure stocké côté
+   GitHub.
+6. Rôle *Contributor* de cette App Registration limité à l'App Service (pas à tout l'abonnement).
+7. Créer la branche `develop` et pousser dessus pour valider le premier déploiement dev.

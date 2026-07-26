@@ -1,0 +1,50 @@
+name: Deploy - Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # requis pour l'authentification Azure OIDC (pas de secret longue durée)
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production   # peut être configuré avec une règle d'approbation manuelle sur GitHub
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assembler le paquet de déploiement (backend autonome)
+        run: |
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public/
+
+      - name: Installer les dépendances backend (production uniquement)
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Connexion Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Déployer sur le slot de production
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          slot-name: production
+          package: backend

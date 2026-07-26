@@ -4,6 +4,10 @@ dist-ssr/
 *.log
 npm-debug.log*
 
+# Build du frontend copié ici par le CI avant déploiement Azure (§ déploiement, SPEC.md) —
+# jamais committé, régénéré à chaque build.
+backend/public/
+
 # Secrets locaux — jamais commités, voir .env.example pour le modèle
 .env
 .env.*

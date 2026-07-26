@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
@@ -31,6 +33,21 @@ app.use('/api/stock', require('./modules/stock/stock.routes'));
 app.use('/api/prices', require('./modules/prices/prices.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// En production, un seul App Service sert à la fois l'API et le build React (§ déploiement Azure,
+// SPEC.md) — évite un second service/CORS/domaine à gérer. N'a d'effet que si un build existe :
+// en dev local, le frontend tourne séparément via `vite` sur le port 5173.
+// - `../public` : structure de déploiement Azure — le CI copie frontend/dist dans backend/public
+//   pour que le paquet déployé (juste le dossier backend/) soit autonome.
+// - `../../frontend/dist` : repli pour tester un build de prod en local sans cette copie.
+const frontendDist = [path.join(__dirname, '../public'), path.join(__dirname, '../../frontend/dist')]
+  .find(p => fs.existsSync(p));
+if (frontendDist) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 
