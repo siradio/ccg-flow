@@ -1,61 +1,210 @@
+const path = require('path');
 const PDFDocument = require('pdfkit');
+
+const BRAND_BLUE = '#1d4ed8';
+const BRAND_NAVY = '#0f1b33';
+const MUTED_GRAY = '#6b7280';
+const LOGO_PATH = path.join(__dirname, '../assets/logo-ccg.png');
+
+const PAGE_WIDTH = 495; // largeur utile en A4 avec des marges de 50pt de chaque côté
+
+// Coordonnées réelles de l'entreprise — à compléter (téléphone/email/NIF) quand disponibles.
+const COMPANY = {
+  nom: 'CCG',
+  raisonSociale: 'Comptoir Commercial Général',
+  adresse: 'Sanoyah km 38, Conakry, République de Guinée',
+  telephone: null,
+  email: null,
+  rccm: 'GN.TCC.2022.M2.13989',
+  nif: null,
+};
+
+// Formatage manuel plutôt que toLocaleString('fr-FR') : Node/ICU utilise une espace fine
+// insécable (U+202F) comme séparateur de milliers, un caractère absent de l'encodage WinAnsi des
+// polices standard de pdfkit (Helvetica) — le rendu produisait des "/" à la place des espaces.
+function money(n) {
+  const [intPart, decPart] = Number(n || 0).toFixed(2).split('.');
+  const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${withSpaces},${decPart}`;
+}
 
 function renderPdf(drawFn) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
     const chunks = [];
     doc.on('data', c => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     drawFn(doc);
+    renderFooters(doc);
     doc.end();
   });
 }
 
-function linesTable(doc, lines) {
+// En-tête commun (logo + identité entreprise + titre du document) — partagé par les deux documents
+// pour que toute évolution de l'identité visuelle s'applique aux deux à la fois.
+function renderLetterhead(doc, title) {
+  const top = doc.y;
+  try {
+    doc.image(LOGO_PATH, 50, top, { width: 55 });
+  } catch (e) {
+    // Le logo est un plus visuel, jamais bloquant : un fichier manquant/corrompu ne doit pas
+    // empêcher la génération du document.
+  }
+
+  const textX = 115;
+  doc.fontSize(14).font('Helvetica-Bold').fillColor(BRAND_NAVY).text(COMPANY.nom, textX, top);
+  doc.fontSize(9).font('Helvetica').fillColor(MUTED_GRAY);
+  doc.text(COMPANY.raisonSociale, textX);
+  if (COMPANY.adresse) doc.text(COMPANY.adresse, textX);
+  const contact = [COMPANY.telephone, COMPANY.email].filter(Boolean).join(' — ');
+  if (contact) doc.text(contact, textX);
+  const legal = [COMPANY.rccm && `RCCM ${COMPANY.rccm}`, COMPANY.nif && `NIF ${COMPANY.nif}`].filter(Boolean).join(' — ');
+  if (legal) doc.text(legal, textX);
+
+  doc.y = Math.max(doc.y, top + 55) + 12;
+  doc.x = 50;
+  doc.moveTo(50, doc.y).lineTo(50 + PAGE_WIDTH, doc.y).lineWidth(2).strokeColor(BRAND_BLUE).stroke();
+  doc.moveDown(1.2);
+
+  doc.fillColor(BRAND_NAVY).fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.fillColor('black');
   doc.moveDown();
-  doc.fontSize(10).font('Helvetica-Bold');
-  doc.text('Désignation', 50, doc.y, { continued: true, width: 260 });
-  doc.text('Quantité', 310, doc.y, { continued: true, width: 80 });
-  doc.text('Unité', 390, doc.y);
-  doc.moveDown(0.5);
-  doc.font('Helvetica');
+}
+
+// Tableau des lignes, partagé par les deux documents. `showPrices` ajoute Prix unitaire/Montant —
+// pertinent sur un bon de commande (prix négocié acté), pas sur une demande de devis (on demande
+// justement un prix : y afficher notre estimation interne désavantagerait la négociation).
+function linesTable(doc, lines, { showPrices = false } = {}) {
+  const cols = showPrices
+    ? [
+        { key: 'designation', label: 'Désignation', width: 180 },
+        { key: 'quantite', label: 'Quantité', width: 55, align: 'right' },
+        { key: 'unite', label: 'Unité', width: 55 },
+        { key: 'prix', label: 'Prix unitaire', width: 95, align: 'right' },
+        { key: 'montant', label: 'Montant', width: 110, align: 'right' },
+      ]
+    : [
+        { key: 'designation', label: 'Désignation', width: 300 },
+        { key: 'quantite', label: 'Quantité', width: 100, align: 'right' },
+        { key: 'unite', label: 'Unité', width: 95 },
+      ];
+
+  doc.moveDown();
+  const headerY = doc.y;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor('white');
+  doc.rect(50, headerY - 4, PAGE_WIDTH, 20).fill(BRAND_BLUE);
+  doc.fillColor('white');
+  let x = 50;
+  for (const col of cols) {
+    doc.text(col.label, x + 6, headerY, { width: col.width - 8, align: col.align || 'left' });
+    x += col.width;
+  }
+  doc.y = headerY + 20;
+  doc.fillColor('black').font('Helvetica').fontSize(9);
+
+  let total = 0;
+  let rowIndex = 0;
   for (const line of lines) {
-    doc.text(line.description_libre || line.designation || '—', 50, doc.y, { continued: true, width: 260 });
-    doc.text(String(line.quantite), 310, doc.y, { continued: true, width: 80 });
-    doc.text(line.unite || '', 390, doc.y);
+    const rowY = doc.y;
+    if (rowIndex % 2 === 1) {
+      doc.rect(50, rowY - 3, PAGE_WIDTH, 18).fill('#f3f4f6');
+      doc.fillColor('black');
+    }
+    const prixUnitaire = line.prix_unitaire_final ?? line.prix_unitaire_estime ?? 0;
+    const montantLigne = Number(line.quantite) * Number(prixUnitaire);
+    total += montantLigne;
+
+    const values = {
+      designation: line.description_libre || line.designation || '—',
+      quantite: String(line.quantite),
+      unite: line.unite || '',
+      prix: money(prixUnitaire),
+      montant: money(montantLigne),
+    };
+    x = 50;
+    for (const col of cols) {
+      doc.text(values[col.key], x + 6, rowY, { width: col.width - 8, align: col.align || 'left' });
+      x += col.width;
+    }
+    doc.y = rowY + 18;
+    rowIndex += 1;
+  }
+  doc.moveTo(50, doc.y).lineTo(50 + PAGE_WIDTH, doc.y).lineWidth(0.5).strokeColor('#d1d5db').stroke();
+  doc.moveDown(0.5);
+  // Les cellules ci-dessus positionnent le texte à des x explicites ; sans ce reset, doc.x reste
+  // sur la position de la dernière cellule et fausse le calcul de largeur des textes suivants
+  // (ex. "Montant total" qui se retrouvait à retourner à la ligne au milieu du nombre).
+  doc.x = 50;
+  return total;
+}
+
+// Bloc "Émis par / Approuvé par" — noms tirés des données réelles (demandeur, dernière
+// approbation validée), pas de signature manuscrite (hors périmètre applicatif, voir §6 SPEC.md).
+function renderSignatureBlock(doc, { emisPar, approuvePar }) {
+  doc.moveDown(2);
+  const y = doc.y;
+  const colWidth = PAGE_WIDTH / 2 - 10;
+
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Émis par', 50, y, { width: colWidth });
+  doc.font('Helvetica').fillColor('black').text(emisPar || '—', 50, doc.y, { width: colWidth });
+  doc.moveDown(2);
+  doc.moveTo(50, doc.y).lineTo(50 + colWidth, doc.y).strokeColor('#9ca3af').lineWidth(0.5).stroke();
+  doc.fontSize(8).fillColor(MUTED_GRAY).text('Signature', 50, doc.y + 3, { width: colWidth });
+
+  const x2 = 50 + colWidth + 20;
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Approuvé par', x2, y, { width: colWidth });
+  doc.font('Helvetica').fillColor('black').text(approuvePar || '—', x2, y + 14, { width: colWidth });
+  doc.moveTo(x2, y + 44).lineTo(x2 + colWidth, y + 44).strokeColor('#9ca3af').lineWidth(0.5).stroke();
+  doc.fontSize(8).fillColor(MUTED_GRAY).text('Signature', x2, y + 47, { width: colWidth });
+
+  doc.fillColor('black');
+}
+
+// Pied de page (mentions + numérotation), identique sur chaque page — posé une fois le document
+// entièrement dessiné, via bufferPages, pour connaître le nombre total de pages à l'avance.
+function renderFooters(doc) {
+  const range = doc.bufferedPageRange();
+  const legal = [COMPANY.raisonSociale, COMPANY.rccm && `RCCM ${COMPANY.rccm}`].filter(Boolean).join(' — ');
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const bottom = doc.page.height - doc.page.margins.bottom + 15;
+    doc.fontSize(8).font('Helvetica').fillColor(MUTED_GRAY);
+    doc.text(legal, 50, bottom, { width: PAGE_WIDTH, align: 'center' });
+    doc.text(`Document généré automatiquement — Page ${i - range.start + 1}/${range.count}`, 50, bottom + 11, { width: PAGE_WIDTH, align: 'center' });
   }
 }
 
 async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supplierNom }) {
   return renderPdf(doc => {
-    doc.fontSize(16).font('Helvetica-Bold').text('Demande de devis', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(11).font('Helvetica');
+    renderLetterhead(doc, 'Demande de devis');
+    doc.fontSize(11).font('Helvetica').fillColor('black');
     doc.text(`Entité : ${entityNom}`);
     doc.text(`Référence demande d'achat : ${purchaseRequest.numero}`);
     doc.text(`Objet : ${purchaseRequest.objet}`);
     doc.text(`Fournisseur sollicité : ${supplierNom}`);
     doc.text(`Date : ${new Date().toLocaleDateString('fr-FR')}`);
-    linesTable(doc, lines);
-    doc.moveDown(2);
+    linesTable(doc, lines, { showPrices: false });
+    doc.moveDown(1.5);
     doc.text('Merci de nous faire parvenir votre meilleure offre de prix pour les articles ci-dessus.');
   });
 }
 
-async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, supplierNom }) {
+async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, supplierNom, emisPar, approuvePar }) {
   return renderPdf(doc => {
-    doc.fontSize(16).font('Helvetica-Bold').text('Bon de commande', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(11).font('Helvetica');
+    renderLetterhead(doc, 'Bon de commande');
+    doc.fontSize(11).font('Helvetica').fillColor('black');
     doc.text(`Numéro : ${purchaseOrder.numero}`);
     doc.text(`Entité : ${entityNom}`);
     doc.text(`Fournisseur : ${supplierNom}`);
     doc.text(`Référence demande d'achat : ${purchaseRequest.numero}`);
     doc.text(`Date : ${new Date(purchaseOrder.generated_at).toLocaleDateString('fr-FR')}`);
-    linesTable(doc, lines);
-    doc.moveDown(2);
-    doc.fontSize(12).font('Helvetica-Bold').text(`Montant total : ${purchaseOrder.montant} ${purchaseOrder.devise}`);
+    linesTable(doc, lines, { showPrices: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
+      .text(`Montant total : ${money(purchaseOrder.montant)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+    doc.fillColor('black');
+    renderSignatureBlock(doc, { emisPar, approuvePar });
   });
 }
 

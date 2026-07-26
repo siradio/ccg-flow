@@ -156,6 +156,33 @@ async function setLinesFournisseurRetenu(prId, supplierId) {
   await run('UPDATE purchase_request_lines SET fournisseur_retenu_id = $1 WHERE purchase_request_id = $2', [supplierId, prId]);
 }
 
+// Le devis retenu ne porte qu'un montant global par fournisseur (table `quotes`, pas de détail
+// ligne par ligne côté fournisseur) : on répartit ce montant sur les lignes au prorata de leur
+// estimation initiale (prix_unitaire_estime * quantite), ou à parts égales par quantité si aucune
+// estimation n'existe. Résultat : prix_unitaire_final toujours renseigné après sélection d'un
+// devis, et la somme des montants de ligne correspond exactement au montant du devis retenu.
+async function setLinesPrixUnitaireFinal(prId, montantTotal) {
+  const lines = await getLines(prId);
+  if (lines.length === 0) return;
+
+  const poidsEstimes = lines.map(l => Number(l.prix_unitaire_estime || 0) * Number(l.quantite));
+  const sommePoids = poidsEstimes.reduce((a, b) => a + b, 0);
+  const sommeQuantites = lines.reduce((a, l) => a + Number(l.quantite), 0);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const quantite = Number(line.quantite);
+    let montantLigne;
+    if (sommePoids > 0) {
+      montantLigne = montantTotal * (poidsEstimes[i] / sommePoids);
+    } else {
+      montantLigne = montantTotal * (quantite / sommeQuantites);
+    }
+    const prixUnitaire = quantite > 0 ? montantLigne / quantite : 0;
+    await run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [prixUnitaire, line.id]);
+  }
+}
+
 // ─── Demandes de devis ───────────────────────────────────────────────────
 
 async function createQuoteRequest(prId, userId, message) {
@@ -295,7 +322,7 @@ async function getApprovalsForPR(prId) {
 
 module.exports = {
   createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal,
-  addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu,
+  addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu, setLinesPrixUnitaireFinal,
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,
   createQuote, getQuote, getQuotesForPR, selectQuote, getAttachments,

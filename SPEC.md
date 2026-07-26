@@ -352,6 +352,41 @@ app_settings
 
 Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key`.
 
+### 3.2bis Documents générés (PDF)
+
+`backend/src/utils/pdf.js` génère les deux PDF du circuit (demande de devis, bon de commande) à
+partir d'un même module partagé — logo, en-tête entreprise, couleurs et pied de page s'appliquent
+donc identiquement aux deux dès qu'on les modifie à un seul endroit.
+
+- **Format A4**, marges 50pt, logo (`backend/src/assets/logo-ccg.png`, copie de
+  `frontend/src/assets/logo-web-darklogo.png`) + bloc identité entreprise en en-tête : nom, raison
+  sociale, adresse, RCCM/NIF (constantes `COMPANY` en tête de fichier — téléphone/email/NIF
+  encore vides, à compléter quand disponibles). Couleurs reprises de la charte de l'app
+  (`--color-primary` #1d4ed8, `--color-navy` #0f1b33).
+- **Tableau des lignes** avec en-tête bleu et lignes alternées ; colonnes Prix unitaire/Montant
+  affichées **seulement sur le bon de commande** (`showPrices: true`) — volontairement absentes de
+  la demande de devis puisqu'on y demande justement un prix au fournisseur, y afficher notre
+  estimation interne desservirait la négociation.
+- **Bloc signature** "Émis par" (demandeur de la demande d'achat) / "Approuvé par" (dernière
+  approbation validée du circuit) sur le bon de commande — noms réels tirés de
+  `purchase_requests.requester_*` et `approvals`, pas de signature manuscrite (hors périmètre,
+  voir §6).
+- **Pied de page** sur chaque page : mention légale (raison sociale + RCCM) et numérotation
+  `Page X/Y`, calculée via `bufferPages` une fois le document entièrement composé.
+- **Formatage des montants fait à la main**, pas via `toLocaleString('fr-FR')` : Node/ICU produit
+  une espace fine insécable (U+202F) comme séparateur de milliers, un caractère absent de
+  l'encodage WinAnsi des polices standard de pdfkit (Helvetica) — le rendu produisait des "/" à la
+  place des espaces. `money()` construit la chaîne avec une espace normale à la place.
+
+**Bug corrigé à cette occasion** : `selectQuote` (sélection du devis retenu) ne renseignait jamais
+`purchase_request_lines.prix_unitaire_final` — seuls `fournisseur_retenu_id` et le montant global
+de la demande (`montant_final`) étaient mis à jour. Comme les devis fournisseurs ne portent qu'un
+montant global (table `quotes`, pas de détail ligne par ligne), `setLinesPrixUnitaireFinal`
+répartit ce montant sur les lignes au prorata de `prix_unitaire_estime × quantité` (ou à parts
+égales par quantité si aucune estimation n'existe), de sorte que la somme des montants de ligne
+corresponde exactement au montant du devis retenu. Les deux bons de commande déjà générés en base
+ont été corrigés rétroactivement (même calcul) pour que leur PDF affiche un prix cohérent.
+
 ### 3.4 Module KPI
 
 Photo instantanée (pas de filtre de période dans cette v1), en lecture seule, sur trois domaines

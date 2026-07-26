@@ -33,12 +33,17 @@ router.get('/:id/pdf', requireAuth, async (req, res, next) => {
     const po = await loadAuthorized(req);
     if (!po) return res.status(404).json({ error: 'Bon de commande introuvable.' });
     const lines = await prRepo.getLines(po.purchase_request_id);
+    const pr = await prRepo.getById(po.purchase_request_id);
+    const approvals = await prRepo.getApprovalsForPR(po.purchase_request_id);
+    const finalApproval = [...approvals].reverse().find(a => a.statut === 'validee' && a.validated_by_nom);
     const buffer = await pdf.generatePurchaseOrderPdf({
       purchaseOrder: po,
       purchaseRequest: { numero: po.purchase_request_numero },
       lines,
       entityNom: po.entity_nom,
       supplierNom: po.supplier_nom,
+      emisPar: pr ? `${pr.requester_prenom} ${pr.requester_nom}` : null,
+      approuvePar: finalApproval ? `${finalApproval.validated_by_prenom} ${finalApproval.validated_by_nom}` : null,
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${po.numero}.pdf"`);

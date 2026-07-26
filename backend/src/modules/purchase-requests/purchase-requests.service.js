@@ -195,6 +195,7 @@ async function selectQuote(user, prId, quoteId) {
   if (!selected) throw httpError(404, 'Devis introuvable.');
   const quote = await repo.getQuote(quoteId);
   await repo.setLinesFournisseurRetenu(prId, quote.supplier_id);
+  await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
   await repo.setMontantFinal(prId, quote.montant, quote.devise);
   await repo.updateStatusAndStep(prId, 'devis_selectionne', null);
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
