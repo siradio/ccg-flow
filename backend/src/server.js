@@ -28,6 +28,7 @@ app.use('/api/dashboard', require('./modules/dashboard/dashboard.routes'));
 app.use('/api/settings', require('./modules/settings/settings.routes'));
 app.use('/api/kpi', require('./modules/kpi/kpi.routes'));
 app.use('/api/stock', require('./modules/stock/stock.routes'));
+app.use('/api/prices', require('./modules/prices/prices.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

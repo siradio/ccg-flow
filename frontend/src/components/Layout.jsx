@@ -39,6 +39,7 @@ export default function Layout() {
             {hasModule(user, 'rh') && <NavLink to="/employees" className={navClass}>Employés</NavLink>}
             {hasModule(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
             {hasModule(user, 'stock') && <NavLink to="/stock/saisie" className={navClass}>Stock du Jour</NavLink>}
+            {hasModule(user, 'prix') && <NavLink to="/prices/historique" className={navClass}>Prix</NavLink>}
             {hasAnyRefModule(user) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}

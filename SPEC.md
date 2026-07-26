@@ -208,6 +208,7 @@ Catalogue des `module_key` (`backend/src/config/modules.js`) :
 | `rh` | RH (Employés) |
 | `kpi` | KPI (Achats + RH) — agrégats en lecture seule, voir §3.4 ; indépendant de `achats`/`rh` : donne les statistiques consolidées sans donner accès aux fiches individuelles |
 | `stock` | Stock du Jour — saisie/historique de stock quotidien par Business Unit, voir §3.5 et §2.4 pour la restriction fine d'écriture par BU |
+| `prix` | Historique des prix — voir §3.8 ; contrairement aux référentiels ci-dessous, la **lecture** est aussi gated par ce module (donnée jugée sensible), pas seulement l'écriture |
 | `ref_entities`, `ref_sites`, `ref_warehouses`, `ref_machines`, `ref_products`, `ref_product_categories`, `ref_business_units`, `ref_suppliers` | Un par onglet du référentiel — accès fin, pas tout-ou-rien |
 
 Règles :
@@ -424,6 +425,39 @@ Yaourt. Ce n'est pas un défaut d'import (vérifié ligne à ligne), mais un vra
 du référentiel source côté métier pour ces deux BU — à signaler si la saisie de stock quotidien
 doit couvrir plus de produits sur Lait/Tomate.
 
+### 3.8 Module Historique des prix (module `prix`)
+
+Suivi du prix de chaque produit (toutes BU confondues, référentiel §1.1), avec **historique
+complet des changements** et un graphique d'évolution.
+
+```
+product_prices
+  id, product_id (FK -> products), prix (NUMERIC), devise ('GNF'|'USD'|'EUR', défaut GNF),
+  date_effet (DATE), commentaire (texte, nullable), created_by (FK -> users), created_at
+```
+
+Décisions de conception :
+- **Table en pur ajout (append-only), jamais d'upsert** — contrairement à `stock_entries` (relevé
+  du jour, corrigible), chaque ligne ici est un **événement daté** ("le prix a changé le X pour
+  Y"). Un produit peut avoir plusieurs lignes à la même `date_effet` (ex. correction d'une erreur
+  de saisie le jour même) : ce n'est pas une anomalie, aucune contrainte d'unicité ne l'empêche.
+  Le prix "actuel" d'un produit est simplement sa ligne la plus récente (`date_effet` puis
+  `created_at` en cas d'égalité).
+- **La BU n'est jamais dupliquée sur `product_prices`** — dérivée de `products.business_unit_id`,
+  même principe que pour le stock.
+- **Accès gated par le module `prix` en LECTURE ET EN ÉCRITURE** — contrairement aux référentiels
+  simples (§2.3) dont la lecture reste ouverte à tout utilisateur authentifié, le prix est une
+  donnée jugée sensible : seul un utilisateur avec le module `prix` explicitement accordé peut
+  consulter ou enregistrer un prix. Pas de restriction fine par Business Unit comme pour le stock
+  (§2.4) dans cette v1 — quiconque a le module peut voir/saisir le prix de n'importe quel produit,
+  toutes BU confondues. À affiner plus tard si un besoin de cloisonnement par BU apparaît (même
+  pattern que `user_business_unit_access` serait réutilisable).
+- Page **Historique** : filtres période/BU/catégorie/produit + formulaire d'ajout d'un nouveau
+  prix (BU → produit en cascade, comme la saisie de stock).
+- Page **Graphique** : évolution d'un produit choisi, tracée en **marche d'escalier** (`stepAfter`)
+  plutôt qu'en courbe lissée — le prix ne varie pas continûment, il change par paliers discrets à
+  chaque `date_effet`, une interpolation lissée serait trompeuse.
+
 ---
 
 ## 4. Endpoints API
@@ -559,6 +593,17 @@ GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&cat
                                        avec variation vs saisie précédente, alertes rupture/seuil,
                                        top 10 baisses/hausses/stocks élevés, courbe d'évolution,
                                        détail produit par produit pour chaque BU
+```
+
+### 4.10 Historique des prix (module `prix`)
+```
+GET    /api/prices/current    ?business_unit_id=&category_id= -> dernier prix connu par produit
+GET    /api/prices/history     ?date_from=&date_to=&business_unit_id=&category_id=&product_id=
+                                -> historique complet filtrable (§3.8)
+GET    /api/prices/series      ?product_id=&date_from=&date_to= -> évolution du prix d'un produit
+                                (pour le graphique en marche d'escalier)
+POST   /api/prices             { productId, prix, devise, dateEffet, commentaire } -> ajoute un
+                                nouveau changement de prix (jamais d'upsert, voir §3.8)
 ```
 
 ---

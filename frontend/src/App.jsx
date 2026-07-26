@@ -17,6 +17,8 @@ import StockEntryPage from './pages/Stock/EntryPage';
 import StockHistoryPage from './pages/Stock/HistoryPage';
 import StockChartsPage from './pages/Stock/ChartsPage';
 import StockDgDashboardPage from './pages/Stock/DgDashboardPage';
+import PricesHistoryPage from './pages/Prices/HistoryPage';
+import PricesChartPage from './pages/Prices/ChartPage';
 
 export default function App() {
   return (
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="stock/historique" element={<RequireModule module="stock"><StockHistoryPage /></RequireModule>} />
         <Route path="stock/graphiques" element={<RequireModule module="stock"><StockChartsPage /></RequireModule>} />
         <Route path="stock/dashboard-dg" element={<RequireModule module="stock"><StockDgDashboardPage /></RequireModule>} />
+        <Route path="prices/historique" element={<RequireModule module="prix"><PricesHistoryPage /></RequireModule>} />
+        <Route path="prices/graphique" element={<RequireModule module="prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />
