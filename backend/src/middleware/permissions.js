@@ -95,6 +95,30 @@ function visibleBusinessUnitIds(user) {
   return granted.length > 0 ? granted : null;
 }
 
+// Niveau d'accès fin à l'intérieur du module `prix` (§3.8) — hiérarchie stricte :
+// consultation < ajout < edition. req.user.prixNiveau est relu en base à chaque requête
+// (voir requireAuth), défaut 'consultation' si aucune ligne n'existe pour cet utilisateur.
+// Un super_admin a toujours le niveau le plus élevé, sans octroi explicite.
+const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
+
+function prixNiveau(user) {
+  if (isSuperAdmin(user)) return 'edition';
+  return user.prixNiveau || 'consultation';
+}
+
+function hasPrixLevel(user, minLevel) {
+  return PRIX_LEVELS.indexOf(prixNiveau(user)) >= PRIX_LEVELS.indexOf(minLevel);
+}
+
+function requirePrixLevel(minLevel) {
+  return (req, res, next) => {
+    if (!hasPrixLevel(req.user, minLevel)) {
+      return res.status(403).json({ error: `Accès refusé : niveau "${minLevel}" requis sur le module prix.` });
+    }
+    next();
+  };
+}
+
 module.exports = {
   PERMS,
   isSuperAdmin,
@@ -105,7 +129,10 @@ module.exports = {
   hasModule,
   canWriteBusinessUnit,
   visibleBusinessUnitIds,
+  prixNiveau,
+  hasPrixLevel,
   requireSuperAdmin,
   requireRoleOnEntity,
   requireModule,
+  requirePrixLevel,
 };

@@ -69,6 +69,19 @@ export function canWriteBusinessUnit(user, businessUnitId) {
   return !!user && (user.businessUnits || []).map(Number).includes(Number(businessUnitId));
 }
 
+// Niveau d'accès fin du module `prix` (§3.8) — miroir de permissions.js côté backend.
+// Hiérarchie stricte : consultation < ajout < edition. super_admin = toujours 'edition'.
+const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
+
+export function prixNiveau(user) {
+  if (isSuperAdmin(user)) return 'edition';
+  return user?.prixNiveau || 'consultation';
+}
+
+export function hasPrixLevel(user, minLevel) {
+  return PRIX_LEVELS.indexOf(prixNiveau(user)) >= PRIX_LEVELS.indexOf(minLevel);
+}
+
 export function entitiesForRole(user, roleCode) {
   if (!user) return [];
   if (isSuperAdmin(user)) return 'all';

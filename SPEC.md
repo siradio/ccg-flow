@@ -262,6 +262,35 @@ en temps réel. Les vérifications qui comptent réellement pour la sécurité (
 données sensibles) sont, elles, toujours revérifiées côté serveur à chaque appel API et donc
 toujours à jour — la barre de navigation est purement un confort d'affichage.
 
+### 2.6 Niveau d'accès fin du module Prix
+
+Cinquième couche de permission (même famille que §2.4, mais **un seul niveau par utilisateur**,
+pas un ensemble comme les BU) : à l'intérieur du module `prix`, quel niveau d'action un
+utilisateur peut effectuer.
+
+```
+user_prix_access
+  user_id (PK, FK -> users), niveau ('consultation'|'ajout'|'edition'), updated_at
+```
+
+Hiérarchie stricte, chaque niveau inclut les précédents : `consultation` (lecture seule) <
+`ajout` (peut en plus enregistrer un nouveau changement de prix) < `edition` (peut en plus
+corriger ou supprimer une ligne d'historique existante — §3.8).
+
+Règles :
+- **super_admin bypass**, toujours au niveau `edition`, sans octroi explicite.
+- Un utilisateur avec le module `prix` mais **aucune** ligne dans `user_prix_access` est au
+  niveau `consultation` par défaut — le plus restrictif, cohérent avec le principe "refusé par
+  défaut" du reste de l'application (§2.3).
+- Contrairement à `user_business_unit_access` (une ligne par BU accordée, un utilisateur peut en
+  avoir plusieurs), ici il y a **au plus une ligne par utilisateur** (`user_id` en clé primaire) :
+  changer de niveau fait un upsert, pas un ajout d'une ligne supplémentaire.
+- Gérée via **Admin → Utilisateurs → "Niveau d'accès Prix"** (simple sélecteur, pas de
+  bouton octroi/révocation séparé puisqu'il n'y a qu'une valeur active à la fois),
+  `PUT /api/users/:id/prix-niveau`.
+- Vérifié côté serveur par `requirePrixLevel(minLevel)` (`middleware/permissions.js`) sur chaque
+  route d'écriture de `prices.routes.js` — jamais seulement côté frontend.
+
 ---
 
 ## 3. Workflow de validation — Demande d'achat
@@ -346,6 +375,13 @@ Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + hist
 BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (onglet "Graphiques" : évolution
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
 bord (§3.6).
+
+**Navigation à deux niveaux** : le lien principal du menu est **"Stock"** (module `stock`, label
+inchangé en base) ; en dessous, un premier niveau d'onglets nomme la **section** ("Stock du Jour"
+pour l'instant, seule section existante) et un second niveau nomme les **pages** de cette section
+(Saisie du jour / Historique / Graphiques / Analyse détaillée — `StockSectionNav.jsx` puis
+`StockSubnav.jsx`). Préparé pour accueillir un futur **"Mouvement Stock"** comme section sœur,
+sans nouveau renommage du menu principal à ce moment-là.
 
 ### 3.6 Tableau de bord exécutif (onglet "Analyse détaillée")
 
@@ -447,13 +483,15 @@ Décisions de conception :
   même principe que pour le stock.
 - **Accès gated par le module `prix` en LECTURE ET EN ÉCRITURE** — contrairement aux référentiels
   simples (§2.3) dont la lecture reste ouverte à tout utilisateur authentifié, le prix est une
-  donnée jugée sensible : seul un utilisateur avec le module `prix` explicitement accordé peut
-  consulter ou enregistrer un prix. Pas de restriction fine par Business Unit comme pour le stock
-  (§2.4) dans cette v1 — quiconque a le module peut voir/saisir le prix de n'importe quel produit,
-  toutes BU confondues. À affiner plus tard si un besoin de cloisonnement par BU apparaît (même
-  pattern que `user_business_unit_access` serait réutilisable).
+  donnée jugée sensible : seul un utilisateur avec le module `prix` explicitement accordé peut y
+  accéder, à un niveau qui dépend de `user_prix_access` (§2.6). Pas de restriction fine par
+  Business Unit comme pour le stock (§2.4) dans cette v1 — le niveau d'accès s'applique à tous les
+  produits, toutes BU confondues. À affiner plus tard si un besoin de cloisonnement par BU
+  apparaît (même pattern que `user_business_unit_access` serait réutilisable).
 - Page **Historique** : filtres période/BU/catégorie/produit + formulaire d'ajout d'un nouveau
-  prix (BU → produit en cascade, comme la saisie de stock).
+  prix (BU → produit en cascade, comme la saisie de stock) — visible seulement au niveau
+  "ajout" ou "edition" ; boutons Éditer/Supprimer sur chaque ligne visibles seulement au niveau
+  "edition" (§2.6).
 - Page **Graphique** : évolution d'un produit choisi, tracée en **marche d'escalier** (`stepAfter`)
   plutôt qu'en courbe lissée — le prix ne varie pas continûment, il change par paliers discrets à
   chaque `date_effet`, une interpolation lissée serait trompeuse.
@@ -478,6 +516,11 @@ DELETE /api/users/:id/roles/:roleId               (super_admin)
 GET    /api/users/module-catalog                  catalogue des modules disponibles (super_admin)
 POST   /api/users/:id/modules                     { module_key } (super_admin)
 DELETE /api/users/:id/modules/:accessId           (super_admin)
+
+POST   /api/users/:id/business-units              { business_unit_id } (super_admin, §2.4)
+DELETE /api/users/:id/business-units/:accessId    (super_admin, §2.4)
+
+PUT    /api/users/:id/prix-niveau                 { niveau } (super_admin, §2.6)
 ```
 
 ### 4.2 Référentiels
@@ -595,15 +638,19 @@ GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&cat
                                        détail produit par produit pour chaque BU
 ```
 
-### 4.10 Historique des prix (module `prix`)
+### 4.10 Historique des prix (module `prix`, niveaux §2.6)
 ```
 GET    /api/prices/current    ?business_unit_id=&category_id= -> dernier prix connu par produit
+                                (niveau consultation suffit)
 GET    /api/prices/history     ?date_from=&date_to=&business_unit_id=&category_id=&product_id=
-                                -> historique complet filtrable (§3.8)
+                                -> historique complet filtrable (§3.8) (niveau consultation suffit)
 GET    /api/prices/series      ?product_id=&date_from=&date_to= -> évolution du prix d'un produit
-                                (pour le graphique en marche d'escalier)
+                                (niveau consultation suffit)
 POST   /api/prices             { productId, prix, devise, dateEffet, commentaire } -> ajoute un
-                                nouveau changement de prix (jamais d'upsert, voir §3.8)
+                                nouveau changement de prix (jamais d'upsert, voir §3.8) — niveau
+                                "ajout" ou "edition" requis
+PUT    /api/prices/:id         niveau "edition" requis — corrige une ligne d'historique existante
+DELETE /api/prices/:id         niveau "edition" requis — supprime une ligne d'historique existante
 ```
 
 ---

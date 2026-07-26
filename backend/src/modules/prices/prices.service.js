@@ -1,4 +1,4 @@
-const { all, one } = require('../../db');
+const { all, one, run } = require('../../db');
 const { httpError } = require('../../utils/httpError');
 
 const PRICE_SELECT = `
@@ -84,4 +84,30 @@ async function getPriceSeries(user, { productId, dateFrom, dateTo }) {
   );
 }
 
-module.exports = { addPrice, listPrices, getCurrentPrices, getPriceSeries };
+// Correction d'une ligne d'historique déjà saisie — réservé au super_admin (voir prices.routes.js).
+// Reste une exception ponctuelle au principe "jamais d'upsert" du §3.8 : la correction d'une
+// vraie erreur de saisie (montant, date, produit) ne doit pas nécessiter de contourner l'API en
+// base directement, mais ce n'est pas une opération que l'écriture normale du module doit offrir.
+async function updatePrice(id, { prix, devise, dateEffet, commentaire }) {
+  const existing = await one('SELECT * FROM product_prices WHERE id = $1', [id]);
+  if (!existing) throw httpError(404, 'Entrée de prix introuvable.');
+  await run(
+    `UPDATE product_prices SET prix=$1, devise=$2, date_effet=$3, commentaire=$4 WHERE id=$5`,
+    [
+      prix !== undefined && prix !== null && prix !== '' ? prix : existing.prix,
+      devise || existing.devise,
+      dateEffet || existing.date_effet,
+      commentaire === undefined ? existing.commentaire : commentaire,
+      id,
+    ]
+  );
+  return one(`${PRICE_SELECT} WHERE pp.id = $1`, [id]);
+}
+
+async function deletePrice(id) {
+  const existing = await one('SELECT id FROM product_prices WHERE id = $1', [id]);
+  if (!existing) throw httpError(404, 'Entrée de prix introuvable.');
+  await run('DELETE FROM product_prices WHERE id = $1', [id]);
+}
+
+module.exports = { addPrice, listPrices, getCurrentPrices, getPriceSeries, updatePrice, deletePrice };

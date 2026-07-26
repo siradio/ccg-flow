@@ -38,7 +38,7 @@ export default function Layout() {
             {hasModule(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
             {hasModule(user, 'rh') && <NavLink to="/employees" className={navClass}>Employés</NavLink>}
             {hasModule(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
-            {hasModule(user, 'stock') && <NavLink to="/stock/saisie" className={navClass}>Stock du Jour</NavLink>}
+            {hasModule(user, 'stock') && <NavLink to="/stock/saisie" className={navClass}>Stock</NavLink>}
             {hasModule(user, 'prix') && <NavLink to="/prices/historique" className={navClass}>Prix</NavLink>}
             {hasAnyRefModule(user) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}

@@ -71,6 +71,11 @@ export default function Users() {
     load();
   }
 
+  async function setPrixNiveau(userId, niveau) {
+    await client.put(`/users/${userId}/prix-niveau`, { niveau });
+    load();
+  }
+
   function moduleLabel(key) {
     return moduleCatalog.find(m => m.key === key)?.label || key;
   }
@@ -143,6 +148,15 @@ export default function Users() {
               {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
             </select>
             <button onClick={() => addBusinessUnit(u.id)} className="btn btn-primary btn-sm">+ Accorder la BU</button>
+          </div>
+
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Niveau d'accès Prix</div>
+          <div className="form-inline" style={{ marginTop: 6 }}>
+            <select value={u.prixNiveau || 'consultation'} onChange={e => setPrixNiveau(u.id, e.target.value)}>
+              <option value="consultation">Consultation (lecture seule)</option>
+              <option value="ajout">Ajout (peut enregistrer un nouveau prix)</option>
+              <option value="edition">Édition (peut aussi corriger/supprimer)</option>
+            </select>
           </div>
         </div>
       ))}

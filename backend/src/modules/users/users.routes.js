@@ -88,4 +88,17 @@ router.delete('/:id/business-units/:accessId', requireAuth, requireSuperAdmin, a
   } catch (e) { next(e); }
 });
 
+const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
+
+router.put('/:id/prix-niveau', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { niveau } = req.body || {};
+    if (!PRIX_LEVELS.includes(niveau)) {
+      return res.status(400).json({ error: `niveau invalide, attendu: ${PRIX_LEVELS.join('|')}.` });
+    }
+    await usersService.setPrixNiveau(Number(req.params.id), niveau);
+    res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

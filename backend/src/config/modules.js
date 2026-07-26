@@ -4,7 +4,7 @@ const MODULES = [
   { key: 'achats', label: "Demandes d'achat" },
   { key: 'rh', label: 'RH (Employés)' },
   { key: 'kpi', label: 'KPI (Achats + RH)' },
-  { key: 'stock', label: 'Stock du Jour' },
+  { key: 'stock', label: 'Stock' },
   { key: 'prix', label: 'Historique des prix' },
   { key: 'ref_entities', label: 'Référentiel : Entités' },
   { key: 'ref_sites', label: 'Référentiel : Sites' },

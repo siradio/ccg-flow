@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
+import { useAuth, hasPrixLevel } from '../../auth/AuthContext';
 import PricesSubnav from './PricesSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
@@ -11,6 +12,9 @@ function today() {
 }
 
 export default function HistoryPage() {
+  const { user } = useAuth();
+  const canAdd = hasPrixLevel(user, 'ajout');
+  const canEdit = hasPrixLevel(user, 'edition');
   const [businessUnits, setBusinessUnits] = useState([]);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -24,6 +28,7 @@ export default function HistoryPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [formError, setFormError] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
@@ -73,14 +78,25 @@ export default function HistoryPage() {
     if (!form.product_id || form.prix === '') return;
     setSaving(true);
     try {
-      await client.post('/prices', {
-        productId: Number(form.product_id),
-        prix: Number(form.prix),
-        devise: form.devise,
-        dateEffet: form.date_effet,
-        commentaire: form.commentaire || null,
-      });
-      setForm(f => ({ ...f, prix: '', commentaire: '' }));
+      if (editingId) {
+        await client.put(`/prices/${editingId}`, {
+          prix: Number(form.prix),
+          devise: form.devise,
+          dateEffet: form.date_effet,
+          commentaire: form.commentaire || null,
+        });
+        setEditingId(null);
+        setForm({ business_unit_id: '', product_id: '', prix: '', devise: 'GNF', date_effet: today(), commentaire: '' });
+      } else {
+        await client.post('/prices', {
+          productId: Number(form.product_id),
+          prix: Number(form.prix),
+          devise: form.devise,
+          dateEffet: form.date_effet,
+          commentaire: form.commentaire || null,
+        });
+        setForm(f => ({ ...f, prix: '', commentaire: '' }));
+      }
       setSavedAt(new Date());
       load();
     } catch (err) {
@@ -88,6 +104,33 @@ export default function HistoryPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function startEdit(entry) {
+    setEditingId(entry.id);
+    setSavedAt(null);
+    setFormError('');
+    setForm({
+      business_unit_id: entry.business_unit_id ? String(entry.business_unit_id) : '',
+      product_id: String(entry.product_id),
+      prix: String(entry.prix),
+      devise: entry.devise,
+      date_effet: String(entry.date_effet).slice(0, 10),
+      commentaire: entry.commentaire || '',
+    });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setFormError('');
+    setForm({ business_unit_id: '', product_id: '', prix: '', devise: 'GNF', date_effet: today(), commentaire: '' });
+  }
+
+  async function deleteEntry(id) {
+    if (!window.confirm('Supprimer cette entrée de prix ?')) return;
+    await client.delete(`/prices/${id}`);
+    load();
   }
 
   return (
@@ -143,6 +186,7 @@ export default function HistoryPage() {
                   <th>Prix</th>
                   <th>Commentaire</th>
                   <th>Auteur</th>
+                  {canEdit && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -154,6 +198,12 @@ export default function HistoryPage() {
                     <td>{Number(e.prix).toLocaleString('fr-FR')} {e.devise}</td>
                     <td>{e.commentaire || '—'}</td>
                     <td>{e.created_by_prenom} {e.created_by_nom}</td>
+                    {canEdit && (
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button onClick={() => startEdit(e)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
+                        <button onClick={() => deleteEntry(e.id)} className="btn btn-danger btn-sm">Supprimer</button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -162,19 +212,20 @@ export default function HistoryPage() {
         </div>
       </div>
 
+      {canAdd && (
       <div className="card">
-        <h2>Enregistrer un nouveau prix</h2>
+        <h2>{editingId ? 'Modifier ce prix' : 'Enregistrer un nouveau prix'}</h2>
         <form onSubmit={submitPrice} className="form-inline">
           <label className="field" style={{ minWidth: 170 }}>
             Business Unit
-            <select value={form.business_unit_id} onChange={e => setForm(f => ({ ...f, business_unit_id: e.target.value, product_id: '' }))}>
+            <select value={form.business_unit_id} onChange={e => setForm(f => ({ ...f, business_unit_id: e.target.value, product_id: '' }))} disabled={!!editingId}>
               <option value="">Sélectionner…</option>
               {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
             </select>
           </label>
           <label className="field" style={{ minWidth: 220 }}>
             Produit
-            <select required value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))} disabled={!form.business_unit_id}>
+            <select required value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))} disabled={!form.business_unit_id || !!editingId}>
               <option value="">Sélectionner…</option>
               {formProducts.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
             </select>
@@ -198,12 +249,14 @@ export default function HistoryPage() {
             <input value={form.commentaire} onChange={e => setForm(f => ({ ...f, commentaire: e.target.value }))} />
           </label>
           <button type="submit" className="btn btn-primary" disabled={saving || !form.product_id || form.prix === ''}>
-            {saving ? '…' : 'Enregistrer'}
+            {saving ? '…' : editingId ? 'Enregistrer les modifications' : 'Enregistrer'}
           </button>
+          {editingId && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Annuler</button>}
           {formError && <div className="alert alert-danger" style={{ width: '100%' }}>{formError}</div>}
           {savedAt && <div className="alert alert-success" style={{ width: '100%' }}>Prix enregistré ✓</div>}
         </form>
       </div>
+      )}
     </div>
   );
 }

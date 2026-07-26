@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
+import StockSectionNav from './StockSectionNav';
 import StockSubnav from './StockSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
@@ -90,7 +91,8 @@ export default function EntryPage() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Stock du Jour</h1>
+      <h1 className="page-title" style={{ marginBottom: 20 }}>Stock</h1>
+      <StockSectionNav />
       <StockSubnav />
 
       <div className="form-inline" style={{ marginBottom: 16 }}>

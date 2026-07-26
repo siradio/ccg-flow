@@ -593,6 +593,18 @@ a.kpi-card:hover {
   font-weight: 600;
 }
 
+/* Second niveau de sous-navigation (ex. Stock -> Stock du Jour -> Saisie/Historique/...) :
+   même composant, légèrement plus petit et rapproché du premier niveau pour marquer la hiérarchie. */
+.subnav-nested {
+  margin-top: -14px;
+  padding-bottom: 8px;
+}
+
+.subnav-nested a {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
 /* ─── États de chargement / vides ───────────────────────────────────── */
 
 .loading-state {

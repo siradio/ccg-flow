@@ -23,6 +23,7 @@ async function requireAuth(req, res, next) {
       roles: full.roles.map(r => ({ entity_id: r.entity_id, entity_code: r.entity_code, role_code: r.role_code })),
       modules: full.modules,
       businessUnits: full.businessUnits,
+      prixNiveau: full.prixNiveau,
     };
     next();
   } catch (e) {
