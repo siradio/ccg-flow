@@ -12,7 +12,11 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production   # peut être configuré avec une règle d'approbation manuelle sur GitHub
+    # Pas de `environment:` ici : ce champ change le "sub" du token OIDC envoyé à Azure
+    # (repo:...:environment:X au lieu de repo:...:ref:refs/heads/main), qui ne correspondrait
+    # plus à l'identifiant fédéré "Branch" configuré côté Azure AD (App Registration
+    # ccg-flow-github-actions) — remettre uniquement en ajoutant AUSSI un identifiant fédéré de
+    # type "Environment" côté Azure si on veut activer des règles d'approbation GitHub plus tard.
     steps:
       - uses: actions/checkout@v4
 

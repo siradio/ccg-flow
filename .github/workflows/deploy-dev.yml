@@ -13,7 +13,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: dev
+    # Pas de `environment:` — voir le commentaire équivalent dans deploy-prod.yml : il faudra un
+    # identifiant fédéré Azure de type "Branch"/develop (déjà prévu, à créer) plutôt
+    # qu'"Environment" pour que le token OIDC corresponde à ce qui est configuré côté Azure AD.
     steps:
       - uses: actions/checkout@v4
 
