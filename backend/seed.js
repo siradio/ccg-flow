@@ -115,6 +115,20 @@ async function seed({ closePool = true } = {}) {
   );
   await run('INSERT INTO product_entities (product_id, entity_id) VALUES ($1,$2)', [product.id, soguipal.id]);
 
+  // Business Unit + produit rattaché — nécessaire pour tester Stock du Jour et Prix (ces deux
+  // modules exigent un produit avec business_unit_id, voir §3.5/§3.8 SPEC.md), absent du reste
+  // du seed ci-dessus qui ne couvre que le circuit Demande d'achat.
+  const businessUnit = await one(
+    "INSERT INTO business_units (code, nom) VALUES ('bu_test', 'BU Test') RETURNING id"
+  );
+  const stockProduct = await one(
+    `INSERT INTO products (code, designation, category_id, unite, business_unit_id)
+     VALUES ('STK-001', 'Produit Stock Test', (SELECT id FROM product_categories WHERE code = 'produit_fini'), 'unité', $1)
+     RETURNING id`,
+    [businessUnit.id]
+  );
+  await run('INSERT INTO product_entities (product_id, entity_id) VALUES ($1,$2)', [stockProduct.id, soguipal.id]);
+
   console.log('✅ Base peuplée.');
   console.log(`Entités : CCG=${ccg.id}, Soguipal=${soguipal.id}, PBIC=${pbic.id}`);
   console.log(`Fournisseurs Soguipal : ${supplier1.id}, ${supplier2.id} — Produit : ${product.id}`);
@@ -126,7 +140,14 @@ async function seed({ closePool = true } = {}) {
   console.log('  - direction@test  — module: kpi (aucun rôle workflow achat)');
 
   if (closePool) await pool.end();
-  return { entities: { ccg, soguipal, pbic }, supplierIds: [supplier1.id, supplier2.id], productId: product.id, password };
+  return {
+    entities: { ccg, soguipal, pbic },
+    supplierIds: [supplier1.id, supplier2.id],
+    productId: product.id,
+    businessUnitId: businessUnit.id,
+    stockProductId: stockProduct.id,
+    password,
+  };
 }
 
 if (require.main === module) {

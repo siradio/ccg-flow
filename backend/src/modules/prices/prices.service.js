@@ -84,10 +84,11 @@ async function getPriceSeries(user, { productId, dateFrom, dateTo }) {
   );
 }
 
-// Correction d'une ligne d'historique déjà saisie — réservé au super_admin (voir prices.routes.js).
-// Reste une exception ponctuelle au principe "jamais d'upsert" du §3.8 : la correction d'une
-// vraie erreur de saisie (montant, date, produit) ne doit pas nécessiter de contourner l'API en
-// base directement, mais ce n'est pas une opération que l'écriture normale du module doit offrir.
+// Correction d'une ligne d'historique déjà saisie — réservé au niveau "edition" (voir
+// requirePrixLevel dans prices.routes.js, §2.6 SPEC.md). Reste une exception ponctuelle au
+// principe "jamais d'upsert" du §3.8 : la correction d'une vraie erreur de saisie (montant, date,
+// produit) ne doit pas nécessiter de contourner l'API en base directement, mais ce n'est pas une
+// opération que le niveau "ajout" (écriture normale) doit offrir.
 async function updatePrice(id, { prix, devise, dateEffet, commentaire }) {
   const existing = await one('SELECT * FROM product_prices WHERE id = $1', [id]);
   if (!existing) throw httpError(404, 'Entrée de prix introuvable.');
