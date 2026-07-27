@@ -38,11 +38,24 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
 router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
   try {
-    const { nom, contact_nom, contact_email, contact_tel, adresse, actif, entity_ids } = req.body || {};
+    const {
+      nom, contact_nom, contact_email, contact_tel, adresse, actif,
+      origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
+      entity_ids,
+    } = req.body || {};
     if (!nom) return res.status(400).json({ error: 'nom obligatoire.' });
     const supplier = await one(
-      'INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel, adresse, actif) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null, actif === undefined ? true : actif]
+      `INSERT INTO suppliers
+         (nom, contact_nom, contact_email, contact_tel, adresse, actif,
+          origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [
+        nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
+        actif === undefined ? true : actif,
+        origine || null, pays || null, categorie || null, produits_offres || null,
+        mode_paiement || null, conditions_paiement || null,
+        a_contrat === undefined ? null : a_contrat, commentaires || null,
+      ]
     );
     for (const entityId of entity_ids || []) {
       await run('INSERT INTO supplier_entities (supplier_id, entity_id) VALUES ($1,$2)', [supplier.id, entityId]);
@@ -55,9 +68,17 @@ router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res,
   try {
     const existing = await one('SELECT * FROM suppliers WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
-    const { nom, contact_nom, contact_email, contact_tel, adresse, actif, entity_ids } = req.body || {};
+    const {
+      nom, contact_nom, contact_email, contact_tel, adresse, actif,
+      origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
+      entity_ids,
+    } = req.body || {};
     const supplier = await one(
-      'UPDATE suppliers SET nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6 WHERE id=$7 RETURNING *',
+      `UPDATE suppliers SET
+         nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6,
+         origine=$7, pays=$8, categorie=$9, produits_offres=$10, mode_paiement=$11,
+         conditions_paiement=$12, a_contrat=$13, commentaires=$14
+       WHERE id=$15 RETURNING *`,
       [
         nom ?? existing.nom,
         contact_nom ?? existing.contact_nom,
@@ -65,6 +86,14 @@ router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res,
         contact_tel ?? existing.contact_tel,
         adresse ?? existing.adresse,
         actif === undefined ? existing.actif : actif,
+        origine ?? existing.origine,
+        pays ?? existing.pays,
+        categorie ?? existing.categorie,
+        produits_offres ?? existing.produits_offres,
+        mode_paiement ?? existing.mode_paiement,
+        conditions_paiement ?? existing.conditions_paiement,
+        a_contrat === undefined ? existing.a_contrat : a_contrat,
+        commentaires ?? existing.commentaires,
         req.params.id,
       ]
     );

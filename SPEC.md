@@ -64,7 +64,9 @@ machines (machines de production)
   id, site_id (FK), nom, reference, categorie
 
 suppliers (fournisseurs)
-  id, nom, contact_nom, contact_email, contact_tel, adresse, actif
+  id, nom, contact_nom, contact_email, contact_tel, adresse, actif,
+  origine ('Import'|'Local'), pays, categorie, produits_offres,
+  mode_paiement, conditions_paiement, a_contrat (BOOLEAN, nullable), commentaires
 
 supplier_entities                          -- junction : quelles entités peuvent utiliser ce fournisseur
   supplier_id (FK), entity_id (FK)

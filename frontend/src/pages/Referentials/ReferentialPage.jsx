@@ -89,7 +89,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
 
 function emptyForm(fields) {
   const f = {};
-  for (const field of fields) f[field.key] = field.type === 'multiEntity' ? [] : field.type === 'checkbox' ? true : '';
+  for (const field of fields) f[field.key] = field.type === 'multiEntity' ? [] : field.type === 'checkbox' ? !!field.default : '';
   return f;
 }
 
@@ -151,6 +151,12 @@ function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
   }
   if (field.type === 'checkbox') {
     return <label style={{ fontSize: 13 }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} /> {field.label}</label>;
+  }
+  if (field.type === 'textarea') {
+    return (
+      <textarea placeholder={field.label} required={field.required} rows={2} style={{ minWidth: 220 }}
+        value={value || ''} onChange={e => onChange(e.target.value)} />
+    );
   }
   return (
     <input placeholder={field.label} required={field.required} type={field.type || 'text'} value={value || ''}
