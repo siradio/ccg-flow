@@ -34,8 +34,17 @@ const CONFIGS = {
     fields: [
       { key: 'site_id', label: 'Site', type: 'siteSelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
-      { key: 'reference', label: 'Référence' },
+      { key: 'code', label: 'Code' },
       { key: 'categorie', label: 'Catégorie' },
+      { key: 'calendrier_travail', label: 'Calendrier de travail' },
+      { key: 'capacite', label: 'Capacité', type: 'number' },
+      { key: 'efficacite_pct', label: 'Efficacité (%)', type: 'number' },
+      { key: 'temps_preparation_min', label: 'Temps de préparation (min)', type: 'number' },
+      { key: 'temps_nettoyage_min', label: 'Temps de nettoyage (min)', type: 'number' },
+      { key: 'cout_horaire', label: 'Coût par heure', type: 'number' },
+      { key: 'oee_cible_pct', label: 'OEE cible (%)', type: 'number' },
+      { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+      { key: 'description', label: 'Description', type: 'textarea' },
     ],
   },
   productCategories: {

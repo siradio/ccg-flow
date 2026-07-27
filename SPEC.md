@@ -60,8 +60,11 @@ sites
 warehouses (entrepôts)
   id, site_id (FK), nom, code
 
-machines (machines de production)
-  id, site_id (FK), nom, reference, categorie
+machines (machines de production — poste de charge au sens production/planification)
+  id, site_id (FK), nom, code, categorie, actif,
+  calendrier_travail, capacite (INTEGER, nb d'opérations simultanées),
+  efficacite_pct, temps_preparation_min, temps_nettoyage_min,
+  cout_horaire, oee_cible_pct, description
 
 suppliers (fournisseurs)
   id, nom, contact_nom, contact_email, contact_tel, adresse, actif,
