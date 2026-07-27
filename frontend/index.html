@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CCG Flow</title>
+    <script>
+      // Applique le thème avant le premier rendu React pour éviter un flash clair->sombre.
+      (function () {
+        var stored = localStorage.getItem('ccg-flow-theme');
+        var mode = ['light', 'dark', 'system'].indexOf(stored) !== -1 ? stored : 'system';
+        var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

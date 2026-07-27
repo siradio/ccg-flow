@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth, isSuperAdmin, hasModule } from '../auth/AuthContext';
 import NotificationBell from './NotificationBell';
+import ThemeSwitcher from './ThemeSwitcher';
 import logo from '../assets/logo-web-darklogo.png';
 
 function navClass({ isActive }) {
@@ -46,6 +47,7 @@ export default function Layout() {
           </nav>
         </div>
         <div className="topbar-right">
+          <ThemeSwitcher />
           <NotificationBell />
           <span className="user-chip">
             <span className="user-avatar">{initials(user)}</span>
