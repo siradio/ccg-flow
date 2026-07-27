@@ -113,11 +113,15 @@ async function submit(user, prId) {
   const lines = await repo.getLines(prId);
   if (lines.length === 0) throw httpError(400, 'Impossible de soumettre une demande sans ligne.');
 
-  await repo.updateStatusAndStep(prId, 'soumise', null);
+  // Avant de mobiliser le Service Achat (recherche fournisseurs, devis...), l'expression de
+  // besoin doit être validée par la DGA (ou toute autre personne détenant aussi le rôle `dga`
+  // sur cette entité — voir §2.4bis SPEC.md) — évite de faire ce travail pour rien si la
+  // dépense n'est finalement pas approuvée.
+  await repo.updateStatusAndStep(prId, 'en_attente_validation_besoin', null);
   await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'submit', userId: user.id });
   await notifications.notifyRoleOnEntity(
-    pr.entity_id, 'service_achat', 'Nouvelle demande d\'achat',
-    `La demande ${pr.numero} (${pr.objet}) attend votre analyse.`, `/purchase-requests/${prId}`
+    pr.entity_id, 'dga', 'Validation requise — expression de besoin',
+    `La demande ${pr.numero} (${pr.objet}) attend la validation de l'expression de besoin.`, `/purchase-requests/${prId}`
   );
   return getFullDetail(prId);
 }
@@ -209,6 +213,21 @@ async function validateStep(user, prId, commentaire) {
   if (!pr) throw httpError(404, 'Demande introuvable.');
   const template = await workflowEngine.getTemplate(MODULE_CODE);
 
+  if (pr.status === 'en_attente_validation_besoin') {
+    // Validation de l'expression de besoin par la DGA : ne touche pas current_step_id (ce
+    // statut n'est pas piloté par workflow_steps, voir submit()) — passe directement à
+    // "soumise" pour reprendre le circuit achat classique, exactement comme submit() le
+    // faisait avant l'ajout de cette étape.
+    await assertRole(user, 'dga', pr.entity_id, "valider l'expression de besoin");
+    await repo.updateStatusAndStep(prId, 'soumise', null);
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'validation_besoin', userId: user.id, details: { commentaire } });
+    await notifications.notifyRoleOnEntity(
+      pr.entity_id, 'service_achat', 'Nouvelle demande d\'achat',
+      `La demande ${pr.numero} (${pr.objet}) attend votre analyse.`, `/purchase-requests/${prId}`
+    );
+    return getFullDetail(prId);
+  }
+
   if (pr.status === 'devis_selectionne') {
     // Validation de l'étape "achat" : passage à l'étape suivante du circuit CONFIGURÉ (jamais un code en dur —
     // voir SPEC.md §3.2), ancrée sur l'étape fixe "validation_achat" pour retrouver son ordre.
@@ -259,6 +278,21 @@ async function validateStep(user, prId, commentaire) {
 async function rejectStep(user, prId, commentaire) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
+
+  if (pr.status === 'en_attente_validation_besoin') {
+    await assertRole(user, 'dga', pr.entity_id, "refuser l'expression de besoin");
+    if (!commentaire) throw httpError(400, 'Un commentaire est obligatoire pour refuser une expression de besoin.');
+    // Retour à brouillon (jamais d'annulation définitive, même principe que le reste du
+    // circuit) : le demandeur peut revoir sa demande et la resoumettre.
+    await repo.updateStatusAndStep(prId, 'brouillon', null);
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'rejet_besoin', userId: user.id, details: { commentaire } });
+    await notifications.notify(
+      pr.requester_user_id, 'Expression de besoin refusée',
+      `Votre demande ${pr.numero} a été refusée par la DGA : ${commentaire}`, `/purchase-requests/${prId}`
+    );
+    return getFullDetail(prId);
+  }
+
   if (!(pr.status === 'en_validation' && pr.current_step_id)) {
     throw httpError(400, `Aucun refus possible depuis le statut "${pr.status}".`);
   }

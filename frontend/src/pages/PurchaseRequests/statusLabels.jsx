@@ -1,5 +1,6 @@
 export const STATUS_LABELS = {
   brouillon: 'Brouillon',
+  en_attente_validation_besoin: 'En attente de validation (expression de besoin)',
   soumise: 'Soumise',
   en_analyse_achat: 'En analyse achat',
   devis_en_cours: 'Devis en cours',
@@ -11,12 +12,13 @@ export const STATUS_LABELS = {
 };
 
 export const STATUS_ORDER = [
-  'brouillon', 'soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne',
+  'brouillon', 'en_attente_validation_besoin', 'soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne',
   'en_validation', 'validee', 'bon_commande_genere', 'rejetee',
 ];
 
 export const STATUS_COLORS = {
   brouillon: { bg: '#f3f4f6', fg: '#374151' },
+  en_attente_validation_besoin: { bg: '#ede9fe', fg: '#5b21b6' },
   soumise: { bg: '#dbeafe', fg: '#1e40af' },
   en_analyse_achat: { bg: '#dbeafe', fg: '#1e40af' },
   devis_en_cours: { bg: '#fef3c7', fg: '#92400e' },

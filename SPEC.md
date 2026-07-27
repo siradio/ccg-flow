@@ -112,8 +112,8 @@ Le workflow réel décrit par CCG est *inséré comme donnée* dans ces deux tab
 purchase_requests (demandes_achat)
   id, numero (ex. DA-SOGUIPAL-2026-0001), entity_id (FK), workflow_template_id (FK),
   requester_user_id (FK), site_id (FK, nullable), objet, justification,
-  status ('brouillon'|'soumise'|'en_analyse_achat'|'devis_en_cours'|'devis_selectionne'
-          |'en_validation'|'validee'|'rejetee'|'bon_commande_genere'),
+  status ('brouillon'|'en_attente_validation_besoin'|'soumise'|'en_analyse_achat'|'devis_en_cours'
+          |'devis_selectionne'|'en_validation'|'validee'|'rejetee'|'bon_commande_genere'),
   current_step_id (FK -> workflow_steps, nullable une fois terminée),
   devise ('GNF'|'USD'|'EUR'), montant_estime, montant_final,
   created_at, updated_at
@@ -312,26 +312,64 @@ Chargé en base au premier démarrage comme `workflow_template` (`module_code = 
 
 | Ordre | Code étape | Rôle requis | Commentaire obligatoire si refus | Comportement si refus |
 |---|---|---|---|---|
-| 1 | `soumission` | `demandeur` | — | — (pas une validation, juste la création) |
-| 2 | `analyse_achat` | `service_achat` | non (pas un refus, une transformation) | — |
-| 3 | `devis` | `service_achat` | non | — |
-| 4 | `validation_achat` | `service_achat` | non | — |
-| 5 | `controle_gestion` | `controle_gestion` | **oui** | retour à l'étape `validation_achat` |
-| 6 | `finances` | `finances` | **oui** | retour à l'étape `validation_achat` |
-| 7 | `dga` | `dga` | **oui** | retour à l'étape `validation_achat` |
-| 8 | `generation_bc` | (système) | — | génération auto du bon de commande |
+| 1 | `expression_besoin` | `dga` | **oui** | retour à `brouillon` (statut, pas via `retour_step_code` — voir §3.1bis) |
+| 2 | `soumission` | `demandeur` | — | — (pas une validation, juste la création) |
+| 3 | `analyse_achat` | `service_achat` | non (pas un refus, une transformation) | — |
+| 4 | `devis` | `service_achat` | non | — |
+| 5 | `validation_achat` | `service_achat` | non | — |
+| 6 | `controle_gestion` | `controle_gestion` | **oui** | retour à l'étape `validation_achat` |
+| 7 | `finances` | `finances` | **oui** | retour à l'étape `validation_achat` |
+| 8 | `dga` | `dga` | **oui** | retour à l'étape `validation_achat` |
+| 9 | `generation_bc` | (système) | — | génération auto du bon de commande |
+
+L'étape 8 (`dga`, validation finale) existe encore par défaut mais est devenue redondante
+depuis l'ajout de `expression_besoin` (§3.1bis) : la DGA a déjà donné son accord en amont, avant
+même que le service achat ne consulte des fournisseurs. Elle peut être retirée du circuit par un
+`super_admin` via `Admin → Workflow` (§3.2) — aucun code à changer, le bon de commande se génère
+alors automatiquement dès la validation Finances.
 
 ### 3.1 Détail du cycle de vie d'une demande
 
-1. **Création (`brouillon` → `soumise`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site. Il soumet.
-2. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
-3. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut).
-4. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
-5. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
-6. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
-7. **Finances** — même logique, séquentiel après Contrôle de Gestion (jamais en parallèle).
-8. **DGA** — valide ou refuse en dernier lieu.
-9. **Génération automatique du bon de commande** — dès la validation DGA : création de `purchase_orders` (numéro généré, fournisseur retenu, montant total), génération du PDF, statut demande → `bon_commande_genere`. Le devis retenu est joint au dossier.
+1. **Création (`brouillon`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site.
+2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. La DGA (ou toute personne détenant aussi le rôle `dga` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
+3. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
+4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut).
+5. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
+6. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
+7. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
+8. **Finances** — même logique, séquentiel après Contrôle de Gestion (jamais en parallèle).
+9. **DGA (optionnelle, §ci-dessus)** — si l'étape existe encore dans le circuit configuré, valide ou refuse en dernier lieu.
+10. **Génération automatique du bon de commande** — dès la validation de la dernière étape du circuit configuré (Finances ou DGA selon la configuration) : création de `purchase_orders` (numéro généré, fournisseur retenu, montant total), génération du PDF, statut demande → `bon_commande_genere`. Le devis retenu est joint au dossier.
+
+### 3.1bis Expression de besoin (filtre DGA en amont)
+
+Ajouté suite à un retour métier : le service achat perdait du temps à consulter des fournisseurs
+et obtenir des devis pour des demandes finalement refusées en toute fin de circuit par la DGA.
+Le nouveau statut `en_attente_validation_besoin` s'intercale entre `brouillon` et `soumise` :
+
+- `POST /:id/submit` fait désormais passer la demande à `en_attente_validation_besoin` (au lieu
+  de `soumise` directement) et notifie le rôle `dga` sur l'entité (au lieu de `service_achat`).
+- `POST /:id/validate-step` (rôle `dga` requis) fait passer la demande à `soumise` et notifie
+  `service_achat` — reprend exactement le comportement que `submit()` avait avant ce changement.
+- `POST /:id/reject-step` (rôle `dga` requis, commentaire obligatoire) renvoie la demande à
+  `brouillon` — jamais d'annulation définitive, même principe que le reste du circuit (§3.2) — et
+  notifie le demandeur avec le motif.
+
+Contrairement au reste du circuit (§3.2), cette étape n'est **pas** pilotée par le moteur
+générique `workflow_steps`/`current_step_id` : `en_attente_validation_besoin` est un statut à
+part entière de `purchase_requests`, avec sa propre logique dans `purchase-requests.service.js`
+(nouvelles branches dans `validateStep()`/`rejectStep()`, avant les branches existantes). La ligne
+`expression_besoin` dans `workflow_steps` (ordre 1) est **décorative** — elle sert uniquement à
+l'affichage (`WorkflowTimeline`, `Admin → Workflow`) et est protégée en écriture comme les autres
+étapes ancrées techniquement (§3.2), mais la supprimer de la table n'aurait aucun effet sur la
+logique réelle (contrairement à `validation_achat`, dont le `code` est l'ancrage utilisé par le
+moteur pour retrouver sa position — §3.2).
+
+**"En cas d'absence du DGA"** : le modèle de rôles (`user_entity_roles`) autorise déjà plusieurs
+personnes à détenir le même rôle sur une même entité. Accorder le rôle `dga` à une personne
+remplaçante (via `Admin → Utilisateurs`) suffit : les deux sont notifiées et n'importe laquelle
+peut valider — aucun mécanisme de délégation/suppléance dédié n'a été ajouté, ce n'était pas
+nécessaire.
 
 ### 3.2 Configurabilité
 Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis controle_gestion puis finances puis dga". La logique métier lit `workflow_steps` triées par `ordre` pour un `module_code` donné, et détermine l'étape suivante et le rôle requis dynamiquement. Ceci permet, pour ce module ou un futur module (ex. BC commerciaux), de :
@@ -342,11 +380,13 @@ Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis contro
 
 Un `super_admin` édite ces étapes via une interface dédiée (`Admin → Workflow`,
 `frontend/src/pages/Admin/WorkflowConfig.jsx`) : réordonnancement par glisser-déposer, édition de
-nom/rôle requis/comportement si refus/étape de retour. Les 4 codes d'étape correspondant à des
-actions fixes côté serveur (`soumission`, `analyse_achat`, `devis`, `validation_achat` — ancrages
-techniques utilisés par le code, pas de simples étiquettes) sont protégés en écriture : renommer
-l'étape reste possible, pas changer son `code`. Cette même page héberge aussi l'éditeur des
-paramètres applicatifs (§3.3).
+nom/rôle requis/comportement si refus/étape de retour, et **suppression** d'une étape (bouton
+"Supprimer", bloqué pour l'étape système — génération du BC — et pour les étapes protégées, et
+refusé si une autre étape y revient encore en cas de refus). Les 5 codes d'étape correspondant à
+des actions fixes côté serveur (`expression_besoin`, `soumission`, `analyse_achat`, `devis`,
+`validation_achat` — ancrages techniques utilisés par le code, pas de simples étiquettes) sont
+protégés en écriture : renommer l'étape reste possible, pas changer son `code` ni la supprimer.
+Cette même page héberge aussi l'éditeur des paramètres applicatifs (§3.3).
 
 ### 3.3 Paramètres applicatifs (`app_settings`)
 

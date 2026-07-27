@@ -4,10 +4,11 @@ import client from '../../api/client';
 // Éditeur simple des étapes du workflow "demande_achat" — voir SPEC.md §3.2 : le moteur lit
 // cette configuration en base, l'enchaînement des étapes n'est jamais codé en dur côté serveur.
 
-// Ces 4 étapes correspondent à des actions fixes du service achat (ajout de lignes, envoi des
-// devis, sélection du devis...) codées explicitement côté serveur — leur "code" est un ancrage
-// technique, pas une simple étiquette. On peut renommer leur nom affiché, pas leur code.
-const PROTECTED_CODES = ['soumission', 'analyse_achat', 'devis', 'validation_achat'];
+// Ces étapes correspondent à des actions fixes codées explicitement côté serveur (ajout de
+// lignes, envoi des devis, sélection du devis, validation de l'expression de besoin par la
+// DGA...) — leur "code" est un ancrage technique, pas une simple étiquette. On peut renommer
+// leur nom affiché, pas leur code, ni les supprimer.
+const PROTECTED_CODES = ['expression_besoin', 'soumission', 'analyse_achat', 'devis', 'validation_achat'];
 const ROLE_OPTIONS = ['service_achat', 'controle_gestion', 'finances', 'dga'];
 
 export default function WorkflowConfig() {
@@ -33,6 +34,21 @@ export default function WorkflowConfig() {
 
   function updateStep(id, field, value) {
     setSteps(steps.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setSaved(false);
+  }
+
+  function deleteStep(id) {
+    setError('');
+    const target = steps.find(s => s.id === id);
+    if (!target) return;
+    const orphaned = steps.find(s => s.id !== id && s.retour_step_code === target.code);
+    if (orphaned) {
+      setError(`Impossible de supprimer "${target.nom}" : l'étape "${orphaned.nom}" y revient en cas de refus. Change d'abord son "Retour vers".`);
+      return;
+    }
+    if (!window.confirm(`Supprimer l'étape "${target.nom}" ? Cette action n'est effective qu'après avoir cliqué sur Enregistrer.`)) return;
+    const remaining = steps.filter(s => s.id !== id).sort((a, b) => a.ordre - b.ordre);
+    setSteps(remaining.map((s, i) => ({ ...s, ordre: i + 1 })));
     setSaved(false);
   }
 
@@ -93,12 +109,13 @@ export default function WorkflowConfig() {
               <tr>
                 <th></th><th>Ordre</th><th>Code</th><th>Nom</th>
                 <th>Rôle requis</th><th>Commentaire si refus</th>
-                <th>Comportement si refus</th><th>Retour vers</th>
+                <th>Comportement si refus</th><th>Retour vers</th><th></th>
               </tr>
             </thead>
             <tbody>
               {sortedSteps.map(s => {
                 const protectedCode = PROTECTED_CODES.includes(s.code);
+                const systemStep = !s.role_code_requis; // ex. génération auto du BC — jamais supprimable
                 return (
                   <tr
                     key={s.id}
@@ -139,6 +156,11 @@ export default function WorkflowConfig() {
                         <option value="">—</option>
                         {steps.filter(o => o.id !== s.id).map(o => <option key={o.id} value={o.code}>{o.code}</option>)}
                       </select>
+                    </td>
+                    <td>
+                      {!protectedCode && !systemStep && (
+                        <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => deleteStep(s.id)}>Supprimer</button>
+                      )}
                     </td>
                   </tr>
                 );

@@ -47,6 +47,9 @@ function assertSubsequenceInOrder(actions, expectedSubsequence) {
   }
 }
 
+// Soumet une demande ET fait valider l'expression de besoin par la DGA, pour obtenir directement
+// une demande au statut "soumise" comme avant l'ajout de cette étape (§3.1bis SPEC.md) — le
+// scénario de l'expression de besoin elle-même a son propre test dédié plus bas.
 async function createFundedDraft(demandeurToken, entityId, productId) {
   const createRes = await request(app).post('/api/purchase-requests')
     .set('Authorization', auth(demandeurToken))
@@ -62,7 +65,13 @@ async function createFundedDraft(demandeurToken, entityId, productId) {
   const submitRes = await request(app).post(`/api/purchase-requests/${prId}/submit`)
     .set('Authorization', auth(demandeurToken));
   assert.equal(submitRes.status, 200, JSON.stringify(submitRes.body));
-  assert.equal(submitRes.body.status, 'soumise');
+  assert.equal(submitRes.body.status, 'en_attente_validation_besoin');
+
+  const dgaToken = await login('dga.sog@test');
+  const validateBesoinRes = await request(app).post(`/api/purchase-requests/${prId}/validate-step`)
+    .set('Authorization', auth(dgaToken)).send({});
+  assert.equal(validateBesoinRes.status, 200, JSON.stringify(validateBesoinRes.body));
+  assert.equal(validateBesoinRes.body.status, 'soumise');
 
   return prId;
 }
@@ -154,9 +163,70 @@ test('scénario nominal : création -> devis -> validations en cascade -> bon de
   assert.equal(historyRes.status, 200);
   const actions = historyRes.body.map(h => h.action);
   assertSubsequenceInOrder(actions, [
-    'create', 'submit', 'quote_request_created', 'quote_request_sent', 'quote_selected',
+    'create', 'submit', 'validation_besoin', 'quote_request_created', 'quote_request_sent', 'quote_selected',
     'validation_achat', 'validation_controle_gestion', 'validation_finances', 'validation_dga', 'bon_commande_genere',
   ]);
+});
+
+test("expression de besoin : validée par la DGA avant le service achat, refusable avec retour en brouillon", async () => {
+  const { soguipal } = seeded.entities;
+  const demandeurToken = await login('demandeur.sog@test');
+  const achatToken = await login('achat.sog@test');
+  const dgaToken = await login('dga.sog@test');
+
+  const createRes = await request(app).post('/api/purchase-requests')
+    .set('Authorization', auth(demandeurToken))
+    .send({ entityId: soguipal.id, objet: 'Achat matériel bureau', justification: 'Renouvellement' });
+  const prId = createRes.body.id;
+  await request(app).post(`/api/purchase-requests/${prId}/lines`)
+    .set('Authorization', auth(demandeurToken))
+    .send({ productId: seeded.productId, quantite: 10, unite: 'unité' });
+
+  const submitRes = await request(app).post(`/api/purchase-requests/${prId}/submit`)
+    .set('Authorization', auth(demandeurToken));
+  assert.equal(submitRes.status, 200, JSON.stringify(submitRes.body));
+  assert.equal(submitRes.body.status, 'en_attente_validation_besoin');
+
+  // Le service achat ne peut rien faire tant que l'expression de besoin n'est pas validée.
+  const tooEarly = await request(app).post(`/api/purchase-requests/${prId}/quote-requests`)
+    .set('Authorization', auth(achatToken)).send({ supplierIds: seeded.supplierIds });
+  assert.equal(tooEarly.status, 400);
+
+  // Un rôle demandeur ne peut pas valider l'expression de besoin.
+  const forbidden = await request(app).post(`/api/purchase-requests/${prId}/validate-step`)
+    .set('Authorization', auth(demandeurToken)).send({});
+  assert.equal(forbidden.status, 403);
+
+  // Refus sans commentaire bloqué.
+  const rejectNoComment = await request(app).post(`/api/purchase-requests/${prId}/reject-step`)
+    .set('Authorization', auth(dgaToken)).send({});
+  assert.equal(rejectNoComment.status, 400);
+
+  // Refus avec commentaire : retour en brouillon, jamais d'annulation définitive (§3.2 SPEC.md).
+  const rejectRes = await request(app).post(`/api/purchase-requests/${prId}/reject-step`)
+    .set('Authorization', auth(dgaToken)).send({ comment: 'Achat non prioritaire ce trimestre' });
+  assert.equal(rejectRes.status, 200, JSON.stringify(rejectRes.body));
+  assert.equal(rejectRes.body.status, 'brouillon');
+
+  const notifRes = await request(app).get('/api/notifications').set('Authorization', auth(demandeurToken));
+  assert.ok(
+    notifRes.body.some(n => n.message.includes('Achat non prioritaire ce trimestre')),
+    'le demandeur doit être notifié du motif de refus'
+  );
+
+  // Le demandeur resoumet : validée cette fois, le circuit reprend normalement (service achat notifié).
+  const resubmitRes = await request(app).post(`/api/purchase-requests/${prId}/submit`)
+    .set('Authorization', auth(demandeurToken));
+  assert.equal(resubmitRes.body.status, 'en_attente_validation_besoin');
+
+  const validateRes = await request(app).post(`/api/purchase-requests/${prId}/validate-step`)
+    .set('Authorization', auth(dgaToken)).send({});
+  assert.equal(validateRes.status, 200, JSON.stringify(validateRes.body));
+  assert.equal(validateRes.body.status, 'soumise');
+
+  const canActNow = await request(app).post(`/api/purchase-requests/${prId}/quote-requests`)
+    .set('Authorization', auth(achatToken)).send({ supplierIds: seeded.supplierIds, message: 'Merci' });
+  assert.equal(canActNow.status, 201, JSON.stringify(canActNow.body));
 });
 
 test('scénario de rejet : retour à l\'étape précédente, pas d\'annulation', async () => {

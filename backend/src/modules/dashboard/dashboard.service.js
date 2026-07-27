@@ -26,6 +26,16 @@ async function getPendingAction(user) {
         [r.entity_id]
       );
       count = row.count;
+    } else if (r.role_code === 'dga') {
+      // Même double point d'action que listPendingAction() côté demandes d'achat : expression
+      // de besoin en amont + étape finale si elle existe encore dans le circuit configuré.
+      const row = await one(
+        `SELECT COUNT(*)::int AS count FROM purchase_requests pr
+         LEFT JOIN workflow_steps ws ON ws.id = pr.current_step_id
+         WHERE pr.entity_id = $1 AND (pr.status = 'en_attente_validation_besoin' OR (pr.status = 'en_validation' AND ws.role_code_requis = $2))`,
+        [r.entity_id, r.role_code]
+      );
+      count = row.count;
     } else {
       const row = await one(
         `SELECT COUNT(*)::int AS count FROM purchase_requests pr

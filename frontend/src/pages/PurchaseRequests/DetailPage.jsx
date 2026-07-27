@@ -79,7 +79,7 @@ export default function DetailPage() {
         <section className="card">
           <button className="btn btn-primary" disabled={pr.lines.length === 0}
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`))}>
-            Soumettre la demande
+            Soumettre l'expression de besoin
           </button>
         </section>
       )}
@@ -288,11 +288,12 @@ function ValidationSection({ pr, guarded }) {
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
   let requiredRole = null;
-  if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
+  if (pr.status === 'en_attente_validation_besoin') requiredRole = 'dga';
+  else if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
   else if (pr.status === 'en_validation') requiredRole = pr.current_step_role;
 
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
-  const canReject = pr.status === 'en_validation';
+  const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin';
 
   return (
     <section className="card">

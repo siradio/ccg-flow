@@ -1,12 +1,13 @@
 const STATUS_TO_MIN_ORDRE = {
   brouillon: 0,
-  soumise: 1,
-  en_analyse_achat: 2,
-  devis_en_cours: 3,
-  devis_selectionne: 4,
+  en_attente_validation_besoin: 1,
+  soumise: 2,
+  en_analyse_achat: 3,
+  devis_en_cours: 4,
+  devis_selectionne: 5,
   en_validation: null, // résolu via current_step_code
-  validee: 9,
-  bon_commande_genere: 9,
+  validee: 10,
+  bon_commande_genere: 10,
   rejetee: null,
 };
 
