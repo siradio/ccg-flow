@@ -17,6 +17,7 @@ import StockEntryPage from './pages/Stock/EntryPage';
 import StockHistoryPage from './pages/Stock/HistoryPage';
 import StockChartsPage from './pages/Stock/ChartsPage';
 import StockDgDashboardPage from './pages/Stock/DgDashboardPage';
+import StockMovementsPage from './pages/Stock/MovementsPage';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="stock/historique" element={<RequireModule module="stock"><StockHistoryPage /></RequireModule>} />
         <Route path="stock/graphiques" element={<RequireModule module="stock"><StockChartsPage /></RequireModule>} />
         <Route path="stock/dashboard-dg" element={<RequireModule module="stock"><StockDgDashboardPage /></RequireModule>} />
+        <Route path="stock/mouvements" element={<RequireModule module="stock"><StockMovementsPage /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule module="prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule module="prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />

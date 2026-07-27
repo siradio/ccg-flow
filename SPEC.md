@@ -77,7 +77,7 @@ business_units                             -- configurable par l'admin : BU Lait
 
 products (produits / articles)
   id, code, designation, category_id (FK -> product_categories), business_unit_id (FK -> business_units, nullable),
-  unite, actif, seuil_alerte_stock (nullable — voir §3.5, seuil configurable par produit)
+  unite, actif, seuil_alerte_stock (nullable — voir §3.6, seuil configurable par produit)
   -- Colonnes "produit fini" (référentiel PILCO importé pour le module Stock du Jour, réutilisable
   -- par d'autres modules futurs) : conditionnement (texte libre, ex. "Sachet", "Carton"),
   -- format_taille (numérique, ex. 0.2 pour "200g"), contenu_par_carton, kg_equivalent_carton,
@@ -214,7 +214,7 @@ Catalogue des `module_key` (`backend/src/config/modules.js`) :
 | `achats` | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
 | `rh` | RH (Employés) |
 | `kpi` | KPI (Achats + RH) — agrégats en lecture seule, voir §3.4 ; indépendant de `achats`/`rh` : donne les statistiques consolidées sans donner accès aux fiches individuelles |
-| `stock` | Stock du Jour — saisie/historique de stock quotidien par Business Unit, voir §3.5 et §2.4 pour la restriction fine d'écriture par BU |
+| `stock` | **Stock** (label du module, §3.6) — couvre deux sections : Stock du Jour (saisie/historique quotidien par BU, §3.5) et Mouvement Stock (§3.9). Voir §2.4 pour la restriction fine d'écriture par BU, commune aux deux sections |
 | `prix` | Historique des prix — voir §3.8 ; contrairement aux référentiels ci-dessous, la **lecture** est aussi gated par ce module (donnée jugée sensible), pas seulement l'écriture |
 | `ref_entities`, `ref_sites`, `ref_warehouses`, `ref_machines`, `ref_products`, `ref_product_categories`, `ref_business_units`, `ref_suppliers` | Un par onglet du référentiel — accès fin, pas tout-ou-rien |
 
@@ -334,7 +334,13 @@ Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis contro
 - changer le rôle requis à une étape,
 - changer le comportement en cas de refus (retour vs annulation), par étape.
 
-Un `super_admin` peut éditer ces étapes via une interface (ou directement en base pour la v1, une UI d'administration du workflow n'est pas bloquante pour livrer le module).
+Un `super_admin` édite ces étapes via une interface dédiée (`Admin → Workflow`,
+`frontend/src/pages/Admin/WorkflowConfig.jsx`) : réordonnancement par glisser-déposer, édition de
+nom/rôle requis/comportement si refus/étape de retour. Les 4 codes d'étape correspondant à des
+actions fixes côté serveur (`soumission`, `analyse_achat`, `devis`, `validation_achat` — ancrages
+techniques utilisés par le code, pas de simples étiquettes) sont protégés en écriture : renommer
+l'étape reste possible, pas changer son `code`. Cette même page héberge aussi l'éditeur des
+paramètres applicatifs (§3.3).
 
 ### 3.3 Paramètres applicatifs (`app_settings`)
 
@@ -352,7 +358,7 @@ app_settings
 
 Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key`.
 
-### 3.2bis Documents générés (PDF)
+### 3.3bis Documents générés (PDF)
 
 `backend/src/utils/pdf.js` génère les deux PDF du circuit (demande de devis, bon de commande) à
 partir d'un même module partagé — logo, en-tête entreprise, couleurs et pied de page s'appliquent
@@ -416,14 +422,13 @@ Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, T
 Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
 BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (onglet "Graphiques" : évolution
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
-bord (§3.6).
+bord (§3.6) — livré.
 
 **Navigation à deux niveaux** : le lien principal du menu est **"Stock"** (module `stock`, label
-inchangé en base) ; en dessous, un premier niveau d'onglets nomme la **section** ("Stock du Jour"
-pour l'instant, seule section existante) et un second niveau nomme les **pages** de cette section
-(Saisie du jour / Historique / Graphiques / Analyse détaillée — `StockSectionNav.jsx` puis
-`StockSubnav.jsx`). Préparé pour accueillir un futur **"Mouvement Stock"** comme section sœur,
-sans nouveau renommage du menu principal à ce moment-là.
+inchangé en base) ; en dessous, un premier niveau d'onglets nomme la **section** — "Stock du Jour"
+(Saisie du jour / Historique / Graphiques / Analyse détaillée, via `StockSubnav.jsx`) et
+"Mouvement Stock" (§3.9), toutes deux listées par `StockSectionNav.jsx` — et pour "Stock du Jour"
+un second niveau nomme ses pages.
 
 ### 3.6 Tableau de bord exécutif (onglet "Analyse détaillée")
 
@@ -538,6 +543,36 @@ Décisions de conception :
   plutôt qu'en courbe lissée — le prix ne varie pas continûment, il change par paliers discrets à
   chaque `date_effet`, une interpolation lissée serait trompeuse.
 
+### 3.9 Module Mouvement Stock (module `stock`, base posée — non finalisé)
+
+Journal des mouvements individuels de stock (réceptions, sorties), section sœur de "Stock du Jour"
+sous le même onglet principal **"Stock"** (§3.5) et gardée par le **même module** `stock` — pas de
+module séparé, ni de droit d'accès par Business Unit distinct : un utilisateur qui peut saisir le
+Stock du Jour d'une BU peut aussi y enregistrer des mouvements (§2.4).
+
+```
+stock_movements
+  id, product_id (FK -> products), type_mouvement ('entree'|'sortie'),
+  quantite (NUMERIC, > 0), date_mouvement (DATE), motif (texte, nullable),
+  reference_document (texte, nullable), created_by (FK -> users), created_at
+```
+
+Décisions de conception :
+- **Journal en pur ajout (append-only), comme `product_prices` (§3.8), pas un relevé comme
+  `stock_entries` (§3.6)** — chaque mouvement est un événement daté distinct ; plusieurs mouvements
+  pour le même produit le même jour (ex. une entrée et une sortie) coexistent normalement, aucune
+  contrainte d'unicité ne les fusionne.
+- **La BU n'est jamais dupliquée sur `stock_movements`** — dérivée de `products.business_unit_id`,
+  même principe que pour `stock_entries` et `product_prices`.
+- `type_mouvement` limité à `entree`/`sortie` en base (`CHECK`) — pas encore de type "ajustement"
+  ou "transfert entre BU", à ajouter si le besoin se confirme.
+- Portée volontairement minimale pour cette première version : une seule page (filtres + liste +
+  formulaire d'ajout, `MovementsPage.jsx`), pas de modification/suppression d'un mouvement déjà
+  enregistré (cohérent avec la logique de journal — une correction s'enregistre comme un nouveau
+  mouvement, elle ne réécrit pas l'historique), pas encore de rapprochement automatique avec les
+  quantités de `stock_entries`. À enrichir selon les besoins réels une fois cette base validée par
+  l'utilisateur.
+
 ---
 
 ## 4. Endpoints API
@@ -567,23 +602,28 @@ PUT    /api/users/:id/prix-niveau                 { niveau } (super_admin, §2.6
 
 ### 4.2 Référentiels
 ```
-GET/POST/PUT/DELETE   /api/entities              (super_admin pour écriture)
+GET/POST/PUT/DELETE   /api/entities
 GET/POST/PUT/DELETE   /api/sites
 GET/POST/PUT/DELETE   /api/warehouses
 GET/POST/PUT/DELETE   /api/machines
 GET/POST/PUT/DELETE   /api/products               ?entity_id= filtre
 GET/POST/PUT/DELETE   /api/suppliers               ?entity_id= filtre
 ```
+Écriture gated par module (`ref_entities`/`ref_sites`/`ref_warehouses`/`ref_machines`/
+`ref_products`/`ref_suppliers`, voir §2.3) — pas une restriction super_admin spécifique, un
+utilisateur non-admin avec le module accordé peut écrire, comme sur tout autre référentiel.
 
 ### 4.2bis Employés (module dédié, pas un simple référentiel générique)
 ```
 GET    /api/employees      ?q=&entity_id=&business_unit_id=&statut=&departement=  liste + recherche + filtres
-                            (lecture ouverte à tout utilisateur authentifié)
 GET    /api/employees/:id
-POST   /api/employees      (super_admin)
-PUT    /api/employees/:id  (super_admin)
-DELETE /api/employees/:id  (super_admin)
+POST   /api/employees
+PUT    /api/employees/:id
+DELETE /api/employees/:id
 ```
+Toutes les routes ci-dessus, **lecture comme écriture**, sont gated par le module `rh` (voir §2.3
+— exception explicite : contrairement aux référentiels simples, les fiches employés sont une
+donnée métier sensible, la lecture n'est **pas** ouverte à tout utilisateur authentifié).
 
 ### 4.3 Demandes d'achat
 ```
@@ -651,7 +691,7 @@ GET    /api/kpi/achats       demandes par statut/entité, montants par devise, t
 GET    /api/kpi/rh           effectif actif par BU/entité/statut/contrat, ancienneté moyenne
 GET    /api/kpi/stock        stock par BU (dernière saisie connue par produit), stock global,
                               nombre de produits suivis, produits en rupture (qty=0), produits
-                              sous leur seuil d'alerte (§3.5)
+                              sous leur seuil d'alerte (§3.6)
 ```
 
 ### 4.9 Stock du Jour (module `stock`)
@@ -678,6 +718,18 @@ GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&cat
                                        avec variation vs saisie précédente, alertes rupture/seuil,
                                        top 10 baisses/hausses/stocks élevés, courbe d'évolution,
                                        détail produit par produit pour chaque BU
+```
+
+### 4.9bis Mouvement Stock (module `stock`, base posée — §3.9)
+```
+GET    /api/stock-movements           ?date_from=&date_to=&business_unit_id=&product_id=
+                                       &type_mouvement= -> journal filtrable, mêmes BU visibles
+                                       que Stock du Jour (§2.4)
+POST   /api/stock-movements           { productId, typeMouvement, quantite, dateMouvement,
+                                       motif, referenceDocument } -> 201, ajoute une ligne
+                                       (jamais d'upsert, §3.9) ; 403 si pas d'accès écriture sur
+                                       la BU du produit
+DELETE /api/stock-movements/:id
 ```
 
 ### 4.10 Historique des prix (module `prix`, niveaux §2.6)
@@ -781,13 +833,12 @@ erp-ccg/
 
 ## 6. Hors périmètre pour cette v1 (explicite)
 
-- Saisie des mouvements de stock (module suivant, architecture déjà pensée pour l'accueillir via le même modèle `entities`/`warehouses`/`products`).
+- Mouvement Stock **finalisé** — la base est posée (§3.9 : modèle de données, accès par BU, page minimale), mais le module n'est pas complet (types de mouvement à affiner, rapprochement avec Stock du Jour, etc. — à définir selon les besoins réels).
 - Génération de bons de commande pour les commerciaux et son workflow propre (module suivant, réutilisera le moteur `workflow_steps`).
 - Portail fournisseur (dépôt de devis en ligne par le fournisseur) — v1 = email uniquement, le fournisseur reste hors de l'outil.
 - SSO / Azure AD — v1 = JWT email/mot de passe local ; l'architecture (table `users` séparée d'`employees`) n'empêche pas d'ajouter un SSO plus tard.
 - Conversion automatique de devises / taux de change temps réel — v1 stocke juste devise + montant par demande, pas de consolidation multi-devise automatique.
 - Import/export en masse (Excel/CSV) des référentiels.
-- Interface d'administration graphique du moteur de workflow (v1 : édition en base ou via l'endpoint `PUT /api/workflows/:moduleCode`, pas d'écran dédié WYSIWYG).
 - Validations en parallèle (Contrôle de Gestion et Finances restent strictement séquentiels).
 - Application mobile native.
 - Signature électronique légale des documents (la "validation" est applicative, pas une signature qualifiée au sens juridique).
@@ -837,21 +888,56 @@ Scénario à exécuter (via un script `backend/test/e2e.purchase-request.test.js
 
 Une fois ce scénario automatisé et vert, le module Demande d'achat est considéré fonctionnellement complet pour la v1.
 
+### 7.5 Autres suites e2e (droits d'accès, fraîcheur des permissions)
+
+En complément de `e2e.purchase-request.test.js` (§7.1-7.4), quatre autres suites `node --test`
+couvrent des zones à risque identifiées après coup — notamment la **fraîcheur des droits** (§ tous
+les droits sont relus en base à chaque requête via `requireAuth`, jamais mis en cache dans le JWT,
+pour qu'un changement de permission par un admin s'applique immédiatement sans que l'utilisateur
+concerné ait besoin de se reconnecter) :
+
+- `e2e.stock.test.js` — module Stock du Jour : accès bloqué sans le module, écriture refusée sans
+  octroi de Business Unit, octroi en cours de session débloque l'écriture sans reconnexion,
+  UPSERT vérifié (`stock_entries`, relevé journalier — §2 distinction journal/relevé).
+- `e2e.prices.test.js` — module Prix : les 3 paliers de `user_prix_access` (`consultation` <
+  `ajout` < `edition`, §2.6), et confirmation que `product_prices` est bien un **journal
+  append-only** (pas d'UPSERT, chaque saisie même-jour/même-produit crée une nouvelle ligne).
+- `e2e.user-admin.test.js` — administration des utilisateurs : accès bloqué pour un non-admin,
+  fraîcheur d'un octroi de module en cours de session, désactivation/réactivation d'un compte
+  (§ blocage/rétablissement de connexion), et un token émis avant désactivation est bien rejeté
+  dès la requête suivante (pas seulement au prochain login).
+- `e2e.stock-movements.test.js` — module Mouvement Stock (§3.9) : mêmes règles d'accès par
+  Business Unit que Stock du Jour (même module `stock`), plusieurs mouvements le même jour pour
+  le même produit coexistent (journal, pas un relevé — contrairement à `stock_entries`),
+  quantité négative/nulle et type de mouvement invalide refusés.
+
+Le script `npm test` (`backend/package.json`) lance toutes les suites avec
+`--test-concurrency=1` — nécessaire car chaque suite réinitialise la base entière
+(`DROP SCHEMA CASCADE` dans `resetDatabase()`) avant de se seeder ; en parallèle, deux suites se
+marcheraient dessus.
+
 ---
 
 ## 8. Déploiement Azure & CI/CD
 
-Premier déploiement réel (modules Demande d'achat + Référentiels) : Azure App Service + Azure
-Database for PostgreSQL, deux environnements (dev/prod) via des **slots de déploiement** sur un
-seul App Service (plutôt que deux App Services séparés) — moins cher, bascule instantanée
-possible, au prix d'un même plan tarifaire partagé entre dev et prod.
+Premier déploiement réel (modules Demande d'achat + Référentiels), effectué avec l'utilisateur pas
+à pas via le portail Azure. **Architecture cible** : Azure App Service + Azure Database for
+PostgreSQL, deux environnements (dev/prod) via des **slots de déploiement** sur un seul App
+Service (plutôt que deux App Services séparés) — moins cher, bascule instantanée possible, au prix
+d'un même plan tarifaire partagé entre dev et prod. **Réalité actuelle (§8.1bis)** : un seul
+environnement le temps de finaliser, les slots sont différés.
 
-### 8.1 Architecture
+Ressources Azure réellement créées : groupe de ressources `rg-ccg-flow` (région France Central),
+serveur `ccg-flow-server.postgres.database.azure.com` (Burstable B1ms, ~$18/mois), App Service
+`ccg-flow-app` — nom d'hôte réel (hostname sécurisé unique, suffixe généré par Azure) :
+`ccg-flow-app-fhawaqgehyh5dugu.francecentral-01.azurewebsites.net`.
 
-- **Un seul App Service** (Node.js 20, Linux) sert à la fois l'API (`/api/*`) et le build React —
-  pas de second service/domaine/CORS à gérer (§ décision prise avec l'utilisateur). Le serveur
-  Express (`backend/src/server.js`) sert les fichiers statiques du frontend dès qu'il en trouve un
-  build à l'un de ces deux emplacements :
+### 8.1 Architecture cible (slots dev/prod)
+
+- **Un seul App Service** (Node.js, Linux) sert à la fois l'API (`/api/*`) et le build React — pas
+  de second service/domaine/CORS à gérer (§ décision prise avec l'utilisateur). Le serveur Express
+  (`backend/src/server.js`) sert les fichiers statiques du frontend dès qu'il en trouve un build à
+  l'un de ces deux emplacements :
   - `backend/public` — structure de déploiement : le CI copie `frontend/dist` ici avant de
     packager, pour que le dossier `backend/` déployé soit **autonome** (c'est tout ce qui est
     envoyé à Azure — pas besoin du dossier `frontend/` sur le serveur).
@@ -865,20 +951,40 @@ possible, au prix d'un même plan tarifaire partagé entre dev et prod.
   migrations s'appliquent automatiquement au démarrage (`runMigrations()` dans `db.js`, déjà en
   place), donc rien à faire côté CI pour ça : chaque redémarrage après déploiement les rejoue.
 
+### 8.1bis Réalité actuelle : environnement unique
+
+Les slots de déploiement nécessitent un palier **Standard S1** (~$70/mois) — non supporté par
+Basic, où l'App Service a été créé pour rester économique (~$13/mois) le temps de finaliser. Choix
+fait avec l'utilisateur : **un seul environnement** pour l'instant, pointé sur `erp_ccg_dev` (la
+bascule vers `erp_ccg_prod` se fera juste avant la mise en production réelle — un simple
+changement de l'App Setting `DATABASE_URL`, §8.3).
+
+Conséquence sur les workflows GitHub Actions :
+- `.github/workflows/deploy-prod.yml` déploie **sans `slot-name`** — directement sur le site
+  principal de l'App Service (pas de slot).
+- `.github/workflows/deploy-dev.yml` est **en pause** (déclencheur réduit à `workflow_dispatch`
+  uniquement, pas de push automatique sur `develop`) — à réactiver une fois le plan tarifaire
+  passé en Standard et le slot `dev` créé (commentaires explicites dans les deux fichiers).
+
+**Piège rencontré et corrigé** : le champ `environment:` sur un job GitHub Actions change le `sub`
+du token OIDC envoyé à Azure (`repo:...:environment:X` au lieu de `repo:...:ref:refs/heads/main`),
+qui ne correspond plus à un identifiant fédéré de type "Branch" (§8.4 étape 5) — a provoqué un
+échec `AADSTS70021` au premier déploiement réel. Retiré des deux workflows ; à ne réintroduire que
+si un identifiant fédéré de type "Environment" est aussi créé côté Azure AD.
+
 ### 8.2 Branches et workflows GitHub Actions
 
-| Branche | Slot Azure | Workflow |
-|---|---|---|
-| `develop` | `dev` | `.github/workflows/deploy-dev.yml` |
-| `main` | `production` | `.github/workflows/deploy-prod.yml` |
+| Branche | Cible (architecture cible, §8.1) | Cible (réalité actuelle, §8.1bis) | Workflow |
+|---|---|---|---|
+| `develop` | slot `dev` | *(en pause)* | `.github/workflows/deploy-dev.yml` |
+| `main` | slot `production` | site principal (pas de slot) | `.github/workflows/deploy-prod.yml` |
 
 - `.github/workflows/ci.yml` : sur toute push/PR vers `main`/`develop` — lance la suite de tests
   backend (`npm test`, contre un Postgres éphémère fourni par GitHub Actions) et vérifie que le
   build frontend passe. Ne déploie rien — c'est la porte de qualité avant tout déploiement.
 - Chaque workflow de déploiement : build frontend → copie dans `backend/public` → `npm ci
   --omit=dev` dans `backend/` → authentification Azure par **OIDC** (`azure/login`, pas de secret
-  longue durée stocké dans GitHub) → déploiement du dossier `backend/` sur le slot correspondant
-  (`azure/webapps-deploy`).
+  longue durée stocké dans GitHub) → déploiement du dossier `backend/` (`azure/webapps-deploy`).
 - Déclenchable aussi manuellement (`workflow_dispatch`) sans attendre un push.
 
 ### 8.3 Secrets et variables GitHub à configurer
@@ -890,29 +996,43 @@ Dans **Settings → Secrets and variables → Actions** du repo :
 | `AZURE_CLIENT_ID` | Secret | Application (client) ID de l'App Registration Azure AD |
 | `AZURE_TENANT_ID` | Secret | Tenant ID Azure AD |
 | `AZURE_SUBSCRIPTION_ID` | Secret | ID de l'abonnement Azure |
-| `AZURE_WEBAPP_NAME` | **Variable** (pas secret) | Nom de l'App Service (ex. `ccg-flow-api`) |
+| `AZURE_WEBAPP_NAME` | **Variable** (pas secret) | Nom de l'App Service (`ccg-flow-app`) |
 
-Ces identifiants ne donnent que le droit de déployer (rôle *Contributor* scopé à l'App Service),
-pas d'accès aux données — `DATABASE_URL`, `JWT_SECRET`, `SMTP_*` sont configurés séparément,
-**directement dans Azure** (App Settings par slot, jamais dans GitHub) :
+Ces identifiants ne donnent que le droit de déployer (rôle *Website Contributor* scopé à l'App
+Service, pas à tout l'abonnement), pas d'accès aux données — `DATABASE_URL`, `JWT_SECRET`,
+`SMTP_*` sont configurés séparément, **directement dans Azure** (App Settings, jamais dans
+GitHub) :
 
-- Dans le portail Azure : App Service → Environment variables → onglet du slot concerné.
-- **Cocher "Deployment slot setting"** pour `DATABASE_URL` (et idéalement les autres secrets
-  aussi) — sans ça, un swap manuel de slots ferait pointer le slot de prod vers la base de dev (ou
-  l'inverse). Comme les slots ne sont pas utilisés en mode swap ici (§8.1), l'impact est limité,
-  mais c'est une protection qui ne coûte rien à activer.
+- Dans le portail Azure : App Service → Environment variables.
+- **`DATABASE_URL` doit inclure `?sslmode=require`** — Azure Database for PostgreSQL exige TLS,
+  contrairement au Postgres Docker local. `backend/src/db.js` active `ssl: { rejectUnauthorized:
+  false }` automatiquement dès que ce paramètre est détecté dans la chaîne de connexion (sans
+  effet en local, la chaîne locale ne le contient pas).
+- Une fois les slots créés (§8.1bis), **cocher "Deployment slot setting"** pour `DATABASE_URL` (et
+  idéalement les autres secrets aussi) — sans ça, un swap manuel de slots ferait pointer le slot de
+  prod vers la base de dev (ou l'inverse).
 - Ne **jamais** définir `PORT` dans les App Settings Azure — Azure l'injecte lui-même.
 
-### 8.4 Ce qui reste à faire (guidé pas-à-pas, portail Azure)
+Premier compte utilisateur sur une base neuve : `backend/scripts/create-admin.js` — crée un vrai
+compte `super_admin` (prompts interactifs, mot de passe visible à l'écran en le tapant), à ne
+jamais confondre avec `npm run seed` qui crée des comptes de démo à mot de passe connu
+(`Test1234!`) réservés au développement local, jamais à un environnement destiné à devenir
+production.
 
-1. Groupe de ressources (ex. `rg-ccg-flow`).
-2. Azure Database for PostgreSQL Flexible Server + 2 bases (`erp_ccg_dev`, `erp_ccg_prod`).
-3. App Service Plan (Linux, palier **Standard S1 minimum** — nécessaire pour les slots de
-   déploiement) + Web App (Node 20 LTS) + slot `dev`.
-4. App Settings par slot (`DATABASE_URL`, `JWT_SECRET`, `SMTP_*`), avec "Deployment slot setting"
-   coché pour `DATABASE_URL`.
-5. App Registration Azure AD + identifiant fédéré (federated credential) de confiance GitHub OIDC,
-   scopé au repo et à chaque branche (`develop`, `main`) — évite tout secret Azure stocké côté
-   GitHub.
-6. Rôle *Contributor* de cette App Registration limité à l'App Service (pas à tout l'abonnement).
-7. Créer la branche `develop` et pousser dessus pour valider le premier déploiement dev.
+### 8.4 Étapes réalisées / restantes (portail Azure)
+
+1. ✅ Groupe de ressources `rg-ccg-flow`.
+2. ✅ Azure Database for PostgreSQL Flexible Server (`ccg-flow-server`, Burstable B1ms) + 2 bases
+   (`erp_ccg_dev`, `erp_ccg_prod`).
+3. ✅ App Service Plan Basic (`plan-ccg-flow`) + Web App Linux (`ccg-flow-app`).
+4. ✅ App Settings (`DATABASE_URL` avec `sslmode=require`, `JWT_SECRET`) — `SMTP_*` pas encore
+   configuré (§ SMTP à paramétrer, voir demande utilisateur correspondante).
+5. ✅ App Registration Azure AD (`ccg-flow-github-actions`) + identifiant fédéré (federated
+   credential) de type Branch pour `main`, avec ID d'organisation/repo GitHub immuables (pas les
+   noms — voir "Repository ID"/"Organization ID" dans le formulaire Azure).
+6. ✅ Rôle *Website Contributor* de cette App Registration limité à l'App Service.
+7. ✅ Premier déploiement réel réussi sur `main` (après correction du piège `environment:`, §8.1bis).
+8. ⬜ Créer le vrai premier compte super_admin via `create-admin.js` sur `erp_ccg_dev`.
+9. ⬜ Palier Standard S1 + slot `dev` + réactivation de `deploy-dev.yml` (quand prêt à séparer
+   dev/prod pour de bon, §8.1bis).
+10. ⬜ Bascule finale vers `erp_ccg_prod` avant mise en production réelle.
