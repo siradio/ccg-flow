@@ -68,6 +68,7 @@ const CONFIGS = {
     title: 'Fournisseurs', endpoint: '/suppliers', moduleKey: 'ref_suppliers',
     fields: [
       { key: 'nom', label: 'Nom', required: true },
+      { key: 'code', label: 'Code' },
       { key: 'origine', label: 'Origine', type: 'select', options: ['Import', 'Local'] },
       { key: 'pays', label: 'Pays' },
       { key: 'categorie', label: 'Catégorie' },

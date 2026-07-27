@@ -65,6 +65,7 @@ machines (machines de production)
 
 suppliers (fournisseurs)
   id, nom, contact_nom, contact_email, contact_tel, adresse, actif,
+  code (TEXT, UNIQUE, nullable — code fournisseur externe type FRN-001),
   origine ('Import'|'Local'), pays, categorie, produits_offres,
   mode_paiement, conditions_paiement, a_contrat (BOOLEAN, nullable), commentaires
 

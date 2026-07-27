@@ -40,19 +40,19 @@ router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, n
   try {
     const {
       nom, contact_nom, contact_email, contact_tel, adresse, actif,
-      origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
+      code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
       entity_ids,
     } = req.body || {};
     if (!nom) return res.status(400).json({ error: 'nom obligatoire.' });
     const supplier = await one(
       `INSERT INTO suppliers
          (nom, contact_nom, contact_email, contact_tel, adresse, actif,
-          origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+          code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
         actif === undefined ? true : actif,
-        origine || null, pays || null, categorie || null, produits_offres || null,
+        code || null, origine || null, pays || null, categorie || null, produits_offres || null,
         mode_paiement || null, conditions_paiement || null,
         a_contrat === undefined ? null : a_contrat, commentaires || null,
       ]
@@ -70,15 +70,15 @@ router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res,
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
     const {
       nom, contact_nom, contact_email, contact_tel, adresse, actif,
-      origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
+      code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
       entity_ids,
     } = req.body || {};
     const supplier = await one(
       `UPDATE suppliers SET
          nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6,
-         origine=$7, pays=$8, categorie=$9, produits_offres=$10, mode_paiement=$11,
-         conditions_paiement=$12, a_contrat=$13, commentaires=$14
-       WHERE id=$15 RETURNING *`,
+         code=$7, origine=$8, pays=$9, categorie=$10, produits_offres=$11, mode_paiement=$12,
+         conditions_paiement=$13, a_contrat=$14, commentaires=$15
+       WHERE id=$16 RETURNING *`,
       [
         nom ?? existing.nom,
         contact_nom ?? existing.contact_nom,
@@ -86,6 +86,7 @@ router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res,
         contact_tel ?? existing.contact_tel,
         adresse ?? existing.adresse,
         actif === undefined ? existing.actif : actif,
+        code ?? existing.code,
         origine ?? existing.origine,
         pays ?? existing.pays,
         categorie ?? existing.categorie,
