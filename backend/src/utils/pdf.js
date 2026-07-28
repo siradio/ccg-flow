@@ -168,10 +168,18 @@ function renderFooters(doc) {
   const legal = [COMPANY.raisonSociale, COMPANY.rccm && `RCCM ${COMPANY.rccm}`].filter(Boolean).join(' — ');
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    const bottom = doc.page.height - doc.page.margins.bottom + 15;
+    // Le pied de page s'écrit délibérément DANS la marge basse (sous la zone de contenu) : avec
+    // la marge normale, pdfkit considère un texte écrit au-delà de page.maxY() comme dépassant la
+    // page et ajoute automatiquement une page supplémentaire, même pour un .text() positionné en
+    // coordonnées absolues — d'où deux pages blanches en trop (une par ligne de pied de page) à
+    // chaque document généré. On désactive temporairement la marge basse le temps d'écrire.
+    const originalBottomMargin = doc.page.margins.bottom;
+    const bottom = doc.page.height - originalBottomMargin + 15;
+    doc.page.margins.bottom = 0;
     doc.fontSize(8).font('Helvetica').fillColor(MUTED_GRAY);
     doc.text(legal, 50, bottom, { width: PAGE_WIDTH, align: 'center' });
     doc.text(`Document généré automatiquement — Page ${i - range.start + 1}/${range.count}`, 50, bottom + 11, { width: PAGE_WIDTH, align: 'center' });
+    doc.page.margins.bottom = originalBottomMargin;
   }
 }
 
