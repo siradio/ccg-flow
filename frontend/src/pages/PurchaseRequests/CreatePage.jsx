@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
+import WorkflowTimeline from '../../components/WorkflowTimeline';
+
+// Statut fictif "rien n'a encore démarré" : sert uniquement à faire afficher WorkflowTimeline en
+// mode aperçu (toutes les étapes "à venir") avant même qu'une demande existe.
+const PREVIEW_PR = { status: 'brouillon', approvals: [] };
 
 export default function CreatePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [entities, setEntities] = useState([]);
+  const [steps, setSteps] = useState([]);
   const [form, setForm] = useState({ entityId: '', objet: '', justification: '', devise: 'GNF' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -24,6 +30,10 @@ export default function CreatePage() {
     });
   }, [allowedEntityIds]);
 
+  useEffect(() => {
+    client.get('/workflows/demande_achat').then(res => setSteps(res.data.steps));
+  }, []);
+
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
@@ -40,7 +50,19 @@ export default function CreatePage() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Nouvelle demande d'achat</h1>
+      <h1 className="page-title" style={{ marginBottom: 4 }}>Nouvelle demande d'achat</h1>
+      <p className="page-subtitle" style={{ marginBottom: 20, maxWidth: 500 }}>
+        Une fois soumise, votre demande doit d'abord être validée par la DGA comme{' '}
+        <strong>expression de besoin</strong>, avant que le service achat ne consulte des
+        fournisseurs. Le circuit complet :
+      </p>
+
+      {steps.length > 0 && (
+        <div className="card" style={{ maxWidth: 500 }}>
+          <WorkflowTimeline pr={PREVIEW_PR} steps={steps} />
+        </div>
+      )}
+
       <div className="card" style={{ maxWidth: 500 }}>
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <label className="field">
