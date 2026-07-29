@@ -77,6 +77,16 @@ router.post('/:id/quote-requests/:qrId/send', requireAuth, async (req, res, next
   catch (e) { next(e); }
 });
 
+// Repli manuel quand l'envoi automatique échoue (ex. SMTP tenant bloqué) : le PDF seul, à envoyer
+// soi-même depuis sa messagerie habituelle avec le texte copié depuis l'écran.
+router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, res, next) => {
+  try {
+    const buffer = await service.getQuoteRequestSupplierPdf(req.user, Number(req.params.id), Number(req.params.qrsId));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(buffer);
+  } catch (e) { next(e); }
+});
+
 router.post('/:id/quotes', requireAuth, async (req, res, next) => {
   try {
     const { quoteRequestSupplierId, montant, devise, notes } = req.body || {};

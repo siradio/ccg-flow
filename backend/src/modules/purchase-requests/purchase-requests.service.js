@@ -173,30 +173,65 @@ async function createQuoteRequest(user, prId, { supplierIds, message }) {
   return { ...qr, suppliers: await repo.getQuoteRequestSuppliers(qr.id) };
 }
 
+// Texte par défaut si l'achat n'a pas personnalisé le message à la création de la consultation
+// (§3.1 pt.4) — dupliqué côté frontend (DetailPage.jsx) pour que le texte "à copier" affiché à
+// l'écran soit TOUJOURS identique à celui réellement envoyé par email.
+function defaultQuoteRequestBody(numero) {
+  return `Bonjour,\n\nVeuillez trouver ci-joint notre demande de devis ${numero}.\n\nCordialement.`;
+}
+
 async function sendQuoteRequest(user, prId, quoteRequestId) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'envoyer la demande de devis');
 
+  const qr = await repo.getQuoteRequest(quoteRequestId);
+  const bodyText = qr?.message?.trim() || defaultQuoteRequestBody(pr.numero);
   const lines = await repo.getLines(prId);
   const suppliers = await repo.getQuoteRequestSuppliers(quoteRequestId);
   const results = [];
   for (const s of suppliers) {
     if (s.statut !== 'a_envoyer') { results.push({ supplierId: s.supplier_id, skipped: true }); continue; }
-    const buffer = await pdf.generateQuoteRequestPdf({
-      purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom,
-    });
-    await mailer.sendMail({
-      to: s.supplier_email,
-      subject: `Demande de devis — ${pr.numero}`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint notre demande de devis ${pr.numero}.\n\nCordialement.`,
-      attachments: [{ filename: `demande-devis-${pr.numero}.pdf`, content: buffer }],
-    });
-    await repo.markQuoteRequestSupplierSent(s.id);
-    await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_sent', userId: user.id, details: { supplier: s.supplier_nom } });
-    results.push({ supplierId: s.supplier_id, sent: true });
+    try {
+      const buffer = await pdf.generateQuoteRequestPdf({
+        purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom,
+      });
+      await mailer.sendMail({
+        to: s.supplier_email,
+        subject: `Demande de devis — ${pr.numero}`,
+        text: bodyText,
+        attachments: [{ filename: `demande-devis-${pr.numero}.pdf`, content: buffer }],
+      });
+      await repo.markQuoteRequestSupplierSent(s.id);
+      await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_sent', userId: user.id, details: { supplier: s.supplier_nom } });
+      results.push({ supplierId: s.supplier_id, sent: true });
+    } catch (e) {
+      // Échec isolé par fournisseur (ex. SMTP indisponible/rejeté par le serveur de messagerie) :
+      // ne bloque jamais les autres envois du même lot, et laisse le fournisseur en "a_envoyer"
+      // pour un nouvel essai, ou pour basculer sur le PDF/texte à envoyer manuellement (voir
+      // getQuoteRequestSupplierPdf ci-dessous). Le détail technique reste dans les logs serveur
+      // (console.error via errorHandler ailleurs) — pas exposé tel quel au client.
+      console.error(`Échec envoi devis à ${s.supplier_email} (fournisseur ${s.supplier_nom}) :`, e.message);
+      results.push({ supplierId: s.supplier_id, sent: false, error: "Échec de l'envoi — le serveur de messagerie a refusé le message." });
+    }
   }
   return results;
+}
+
+// Permet de récupérer le PDF d'une demande de devis pour un fournisseur précis sans passer par
+// l'envoi email — sert de repli quand l'envoi automatique échoue (§ ci-dessus) : le service achat
+// télécharge le PDF et envoie lui-même le message (texte copiable via getQuoteRequestEmailPreview)
+// depuis sa propre messagerie.
+async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (!hasAnyRoleOnEntity(user, pr.entity_id) && pr.requester_user_id !== user.id) {
+    throw httpError(403, "Vous n'avez pas accès à cette demande.");
+  }
+  const supplier = await repo.getQuoteRequestSupplier(qrsId);
+  if (!supplier) throw httpError(404, 'Fournisseur sollicité introuvable.');
+  const lines = await repo.getLines(prId);
+  return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom });
 }
 
 async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }) {
@@ -397,6 +432,6 @@ async function listForUser(user, { entityId, status, mine, pendingAction }) {
 
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
-  quickAddSupplier, createQuoteRequest, sendQuoteRequest, addQuote, selectQuote,
+  quickAddSupplier, createQuoteRequest, sendQuoteRequest, getQuoteRequestSupplierPdf, addQuote, selectQuote,
   validateStep, rejectStep, listForUser,
 };

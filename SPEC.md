@@ -333,7 +333,7 @@ alors automatiquement dès la validation Finances.
 1. **Création (`brouillon`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site.
 2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. La DGA (ou toute personne détenant aussi le rôle `dga` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
 3. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
-4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut). Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le module `ref_suppliers`.
+4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), rédige éventuellement un message personnalisé (sinon un texte par défaut est utilisé), et l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut) et **isolé par fournisseur** : l'échec d'un envoi (ex. serveur de messagerie indisponible ou qui rejette l'authentification) n'empêche jamais les autres envois du même lot de partir, et reste visible sur l'écran avec un repli manuel — bouton "PDF" (télécharge le document seul) et "Copier le texte" (même texte que celui réellement envoyé) pour que le fournisseur concerné puisse être recontacté depuis la messagerie personnelle de l'utilisateur. Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le module `ref_suppliers`.
 5. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
 6. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
 7. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
@@ -697,7 +697,15 @@ POST   /api/purchase-requests/:id/quick-supplier    mêmes champs que POST /api/
                                                      consultation le temps qu'un fournisseur manquant soit
                                                      ajouté au référentiel complet)
 POST   /api/purchase-requests/:id/quote-requests           créer demande de devis + liste fournisseurs sollicités
-POST   /api/purchase-requests/:id/quote-requests/:qrId/send   envoie l'email à chaque fournisseur sollicité
+                                                             ({ supplierIds, message? } — message devient le corps
+                                                             de l'email envoyé, texte par défaut sinon, §3.1bis)
+POST   /api/purchase-requests/:id/quote-requests/:qrId/send   envoie l'email à chaque fournisseur sollicité —
+                                                             200 toujours (jamais 500 pour un échec d'envoi isolé) :
+                                                             chaque fournisseur renvoie { sent: true } ou
+                                                             { sent: false, error } indépendamment des autres
+GET    /api/purchase-requests/:id/quote-requests/suppliers/:qrsId/pdf
+                                                             PDF seul (sans envoi) — repli manuel si l'envoi
+                                                             échoue, voir §3.1bis
 POST   /api/purchase-requests/:id/quotes                    enregistrer un devis reçu (+ pièce jointe)
 POST   /api/purchase-requests/:id/quotes/:quoteId/select     sélectionner le devis retenu -> répercute les prix
 
@@ -1085,8 +1093,17 @@ production.
 2. ✅ Azure Database for PostgreSQL Flexible Server (`ccg-flow-server`, Burstable B1ms) + 2 bases
    (`erp_ccg_dev`, `erp_ccg_prod`).
 3. ✅ App Service Plan Basic (`plan-ccg-flow`) + Web App Linux (`ccg-flow-app`).
-4. ✅ App Settings (`DATABASE_URL` avec `sslmode=require`, `JWT_SECRET`) — `SMTP_*` pas encore
-   configuré (§ SMTP à paramétrer, voir demande utilisateur correspondante).
+4. ✅ App Settings (`DATABASE_URL` avec `sslmode=require`, `JWT_SECRET`) — `SMTP_*` configuré avec
+   un compte Microsoft 365 (`smtp.office365.com`), mais **l'envoi échoue actuellement** :
+   `535 5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Tenant`
+   — Microsoft désactive l'authentification SMTP classique (mot de passe) par défaut depuis 2022,
+   au niveau du tenant entier, indépendamment de l'application. À corriger côté administration
+   Microsoft 365 (pas un bug applicatif) : soit réactiver l'authentification SMTP pour la boîte
+   `achats@ccg-guinee.com` précisément (Centre d'admin Exchange → boîte aux lettres →
+   "Authenticated SMTP"), soit passer à une authentification OAuth2 (app registration + Graph
+   API), soit utiliser un relais SMTP tiers (SendGrid, Mailgun, etc.) non soumis à cette
+   politique. En attendant, chaque échec d'envoi (demande de devis) reste isolé par fournisseur et
+   propose un repli manuel (PDF + texte à copier) — voir §3.1 pt.4.
 5. ✅ App Registration Azure AD (`ccg-flow-github-actions`) + identifiant fédéré (federated
    credential) de type Branch pour `main`, avec ID d'organisation/repo GitHub immuables (pas les
    noms — voir "Repository ID"/"Organization ID" dans le formulaire Azure).

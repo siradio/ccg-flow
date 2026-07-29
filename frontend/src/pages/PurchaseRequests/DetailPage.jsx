@@ -184,6 +184,12 @@ function defaultNewSupplier(entityId) {
   return { ...emptyForm(SUPPLIER_FIELDS), entity_ids: [entityId] };
 }
 
+// Même texte par défaut que sendQuoteRequest() côté serveur (purchase-requests.service.js) — pour
+// que "Copier le texte" affiche toujours exactement ce qui serait/a été réellement envoyé.
+function defaultQuoteRequestBody(numero) {
+  return `Bonjour,\n\nVeuillez trouver ci-joint notre demande de devis ${numero}.\n\nCordialement.`;
+}
+
 function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier, entities }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
@@ -193,6 +199,22 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   const [newSupplier, setNewSupplier] = useState(() => defaultNewSupplier(pr.entity_id));
   const [addError, setAddError] = useState('');
   const [adding, setAdding] = useState(false);
+  const [sendResults, setSendResults] = useState({}); // { [quoteRequestSupplierId]: { sent, error } }
+  const [copiedId, setCopiedId] = useState(null);
+
+  function copyEmailText(qr, s) {
+    const subject = `Demande de devis — ${pr.numero}`;
+    const body = qr.message?.trim() || defaultQuoteRequestBody(pr.numero);
+    navigator.clipboard.writeText(`Objet : ${subject}\n\n${body}`).then(() => {
+      setCopiedId(s.id);
+      setTimeout(() => setCopiedId(id => (id === s.id ? null : id)), 2000);
+    });
+  }
+
+  async function sendQuoteRequestBatch(qrId) {
+    const res = await client.post(`/purchase-requests/${pr.id}/quote-requests/${qrId}/send`);
+    setSendResults(r => ({ ...r, ...Object.fromEntries(res.data.map(x => [x.supplierId, x])) }));
+  }
 
   const canCreate = canAct && ['soumise', 'en_analyse_achat'].includes(pr.status);
 
@@ -254,8 +276,11 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
             </form>
           )}
 
-          <textarea placeholder="Message aux fournisseurs" value={message} onChange={e => setMessage(e.target.value)}
+          <textarea placeholder="Message aux fournisseurs (laisser vide pour le texte par défaut)" value={message} onChange={e => setMessage(e.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 8 }} />
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
+            Ce texte sera le corps de l'email envoyé (et celui proposé au "copier" ci-dessous) — modifiable jusqu'à l'envoi.
+          </p>
           <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }))}>
             Lancer la consultation
@@ -266,16 +291,39 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
       {pr.quote_requests.map(qr => (
         <div key={qr.id} style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '4px 0' }}>Consultation du {new Date(qr.created_at).toLocaleDateString('fr-FR')}</p>
-          <ul style={{ margin: 0 }}>
-            {qr.suppliers.map(s => (
-              <li key={s.id}>{s.supplier_nom} — {s.statut}</li>
-            ))}
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {qr.suppliers.map(s => {
+              const result = sendResults[s.supplier_id];
+              return (
+                <li key={s.id} style={{ marginBottom: 4 }}>
+                  {s.supplier_nom} — {s.statut}
+                  {result?.sent === false && (
+                    <span style={{ color: 'var(--color-danger)' }}> — {result.error}</span>
+                  )}
+                  {' '}
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
+                    onClick={() => openAuthenticatedFile(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/pdf`)}>
+                    PDF
+                  </button>
+                  {' '}
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
+                    onClick={() => copyEmailText(qr, s)}>
+                    {copiedId === s.id ? 'Copié ✓' : 'Copier le texte'}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           {canAct && qr.suppliers.some(s => s.statut === 'a_envoyer') && (
-            <button className="btn btn-secondary" style={{ marginTop: 8 }}
-              onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests/${qr.id}/send`))}>
-              Envoyer les demandes de devis
-            </button>
+            <>
+              <button className="btn btn-secondary" style={{ marginTop: 8 }}
+                onClick={() => guarded(() => sendQuoteRequestBatch(qr.id))}>
+                Envoyer les demandes de devis
+              </button>
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
+                Si l'envoi échoue (ex. messagerie indisponible), utilisez "PDF" + "Copier le texte" pour l'envoyer vous-même depuis votre propre messagerie.
+              </p>
+            </>
           )}
         </div>
       ))}
