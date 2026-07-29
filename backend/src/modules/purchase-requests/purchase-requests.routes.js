@@ -57,6 +57,13 @@ router.delete('/:id/lines/:lineId', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.post('/:id/quick-supplier', requireAuth, async (req, res, next) => {
+  try {
+    const { nom, contactNom, contactEmail, contactTel } = req.body || {};
+    res.status(201).json(await service.quickAddSupplier(req.user, Number(req.params.id), { nom, contactNom, contactEmail, contactTel }));
+  } catch (e) { next(e); }
+});
+
 router.post('/:id/quote-requests', requireAuth, async (req, res, next) => {
   try {
     const { supplierIds, message } = req.body || {};

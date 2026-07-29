@@ -45,6 +45,14 @@ export default function DetailPage() {
     catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue.'); }
   }
 
+  // Le service achat peut créer un fournisseur à la volée pendant le traitement de la demande
+  // (voir QuoteRequestSection) — ajouté directement à la liste locale, pas de rechargement complet.
+  async function addSupplier(fields) {
+    const res = await client.post(`/purchase-requests/${pr.id}/quick-supplier`, fields);
+    setSuppliers(s => [...s, res.data]);
+    return res.data;
+  }
+
   if (!pr) return <p>Chargement…</p>;
   const isRequester = pr.requester_user_id === user.id;
 
@@ -84,7 +92,7 @@ export default function DetailPage() {
         </section>
       )}
 
-      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} />
+      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} />
       <QuotesSection pr={pr} guarded={guarded} />
       <ValidationSection pr={pr} guarded={guarded} />
 
@@ -166,15 +174,36 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   );
 }
 
-function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers }) {
+function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [selected, setSelected] = useState([]);
   const [message, setMessage] = useState('');
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({ nom: '', contactNom: '', contactEmail: '', contactTel: '' });
+  const [addError, setAddError] = useState('');
+  const [adding, setAdding] = useState(false);
 
   const canCreate = canAct && ['soumise', 'en_analyse_achat'].includes(pr.status);
 
   if (!canAct && pr.quote_requests.length === 0) return null;
+
+  async function submitNewSupplier(e) {
+    e.preventDefault();
+    if (!newSupplier.nom.trim()) return;
+    setAddError('');
+    setAdding(true);
+    try {
+      const created = await addSupplier(newSupplier);
+      setSelected(sel => [...sel, created.id]);
+      setNewSupplier({ nom: '', contactNom: '', contactEmail: '', contactTel: '' });
+      setShowAddSupplier(false);
+    } catch (err) {
+      setAddError(err.response?.data?.error || "Erreur lors de l'ajout du fournisseur.");
+    } finally {
+      setAdding(false);
+    }
+  }
 
   return (
     <section className="card">
@@ -194,9 +223,31 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers }) {
           {suppliers.length < minSuppliers && (
             <p className="alert alert-danger" style={{ marginTop: 8 }}>
               Cette entité n'a que {suppliers.length} fournisseur(s) référencé(s), il en faut au moins {minSuppliers}.
-              Ajoutez-en via Référentiels → Fournisseurs, ou baissez le seuil dans Workflow → Paramètres.
+              Ajoutez-en un ci-dessous, via Référentiels → Fournisseurs, ou baissez le seuil dans Workflow → Paramètres.
             </p>
           )}
+
+          {!showAddSupplier ? (
+            <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => setShowAddSupplier(true)}>
+              + Ajouter un fournisseur
+            </button>
+          ) : (
+            <form onSubmit={submitNewSupplier} className="form-inline" style={{ marginTop: 10, padding: 10, background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
+              <input placeholder="Nom *" required value={newSupplier.nom}
+                onChange={e => setNewSupplier({ ...newSupplier, nom: e.target.value })} style={{ width: 160 }} />
+              <input placeholder="Contact" value={newSupplier.contactNom}
+                onChange={e => setNewSupplier({ ...newSupplier, contactNom: e.target.value })} style={{ width: 140 }} />
+              <input placeholder="Email" type="email" value={newSupplier.contactEmail}
+                onChange={e => setNewSupplier({ ...newSupplier, contactEmail: e.target.value })} style={{ width: 180 }} />
+              <input placeholder="Téléphone" value={newSupplier.contactTel}
+                onChange={e => setNewSupplier({ ...newSupplier, contactTel: e.target.value })} style={{ width: 130 }} />
+              <button type="submit" className="btn btn-primary btn-sm" disabled={adding}>{adding ? '…' : 'Ajouter'}</button>
+              <button type="button" className="btn btn-secondary btn-sm"
+                onClick={() => { setShowAddSupplier(false); setAddError(''); }}>Annuler</button>
+              {addError && <div className="alert alert-danger" style={{ width: '100%' }}>{addError}</div>}
+            </form>
+          )}
+
           <textarea placeholder="Message aux fournisseurs" value={message} onChange={e => setMessage(e.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 8 }} />
           <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}

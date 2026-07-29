@@ -1,4 +1,4 @@
-const { one } = require('../../db');
+const { one, run } = require('../../db');
 const repo = require('./purchase-requests.repository');
 const poRepo = require('../purchase-orders/purchase-orders.repository');
 const workflowEngine = require('../workflow/workflow.engine');
@@ -124,6 +124,27 @@ async function submit(user, prId) {
     `La demande ${pr.numero} (${pr.objet}) attend la validation de l'expression de besoin.`, `/purchase-requests/${prId}`
   );
   return getFullDetail(prId);
+}
+
+// Permet au service achat de créer un fournisseur à la volée depuis l'écran de traitement d'une
+// demande, sans passer par Référentiels → Fournisseurs (qui exige le module ref_suppliers, une
+// permission distincte) — autorisé ici via le même rôle service_achat déjà requis pour consulter
+// des fournisseurs sur cette demande, pas via le module référentiel complet. Champs volontairement
+// réduits au strict nécessaire pour lancer une consultation (nom + contact) ; le reste (origine,
+// pays, conditions de paiement, etc. — voir SPEC.md §1.1) se complète ensuite via le référentiel.
+async function quickAddSupplier(user, prId, { nom, contactNom, contactEmail, contactTel }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'ajouter un fournisseur');
+  if (!nom) throw httpError(400, 'nom obligatoire.');
+
+  const supplier = await one(
+    'INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ($1,$2,$3,$4) RETURNING *',
+    [nom, contactNom || null, contactEmail || null, contactTel || null]
+  );
+  await run('INSERT INTO supplier_entities (supplier_id, entity_id) VALUES ($1,$2)', [supplier.id, pr.entity_id]);
+  await audit.logAction({ tableName: 'suppliers', recordId: supplier.id, purchaseRequestId: prId, action: 'quick_add_supplier', userId: user.id, details: { nom } });
+  return { ...supplier, entity_ids: [pr.entity_id] };
 }
 
 // Le service achat crée la demande de devis : ceci fait à la fois office d'"analyse" (SPEC §3.1 pt.2)
@@ -373,6 +394,6 @@ async function listForUser(user, { entityId, status, mine, pendingAction }) {
 
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
-  createQuoteRequest, sendQuoteRequest, addQuote, selectQuote,
+  quickAddSupplier, createQuoteRequest, sendQuoteRequest, addQuote, selectQuote,
   validateStep, rejectStep, listForUser,
 };
