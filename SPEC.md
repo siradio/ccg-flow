@@ -333,7 +333,7 @@ alors automatiquement dès la validation Finances.
 1. **Création (`brouillon`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site.
 2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. La DGA (ou toute personne détenant aussi le rôle `dga` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
 3. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
-4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut). Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran (nom + contact minimal, immédiatement lié à l'entité de la demande) sans devoir passer par Référentiels → Fournisseurs ni détenir le module `ref_suppliers`.
+4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut). Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le module `ref_suppliers`.
 5. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
 6. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
 7. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
@@ -682,12 +682,20 @@ POST   /api/purchase-requests/:id/lines            ajouter une ligne
 PUT    /api/purchase-requests/:id/lines/:lineId
 DELETE /api/purchase-requests/:id/lines/:lineId
 
-POST   /api/purchase-requests/:id/quick-supplier    { nom, contactNom?, contactEmail?, contactTel? } -> 201
-                                                     crée un fournisseur et le lie directement à l'entité
-                                                     de la demande — rôle service_achat requis sur cette
-                                                     entité (pas le module ref_suppliers : évite de bloquer
-                                                     le service achat en pleine consultation le temps qu'un
-                                                     fournisseur manquant soit ajouté au référentiel complet)
+POST   /api/purchase-requests/:id/quick-supplier    mêmes champs que POST /api/suppliers (§1.1 : nom,
+                                                     code, origine, pays, catégorie, produits_offres,
+                                                     contact_*, adresse, mode/conditions de paiement,
+                                                     a_contrat, actif, commentaires, entity_ids) -> 201.
+                                                     Logique de création partagée avec le référentiel
+                                                     complet (suppliers.service.js) — un fournisseur créé
+                                                     ici est en tout point identique à un ajout via
+                                                     Référentiels → Fournisseurs, pas une fiche au rabais.
+                                                     Si entity_ids est vide/absent, rattache par défaut à
+                                                     l'entité de la demande en cours. Rôle service_achat
+                                                     requis sur cette entité (pas le module ref_suppliers :
+                                                     évite de bloquer le service achat en pleine
+                                                     consultation le temps qu'un fournisseur manquant soit
+                                                     ajouté au référentiel complet)
 POST   /api/purchase-requests/:id/quote-requests           créer demande de devis + liste fournisseurs sollicités
 POST   /api/purchase-requests/:id/quote-requests/:qrId/send   envoie l'email à chaque fournisseur sollicité
 POST   /api/purchase-requests/:id/quotes                    enregistrer un devis reçu (+ pièce jointe)

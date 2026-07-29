@@ -1,6 +1,7 @@
-const { one, run } = require('../../db');
+const { one } = require('../../db');
 const repo = require('./purchase-requests.repository');
 const poRepo = require('../purchase-orders/purchase-orders.repository');
+const suppliersService = require('../referentials/suppliers.service');
 const workflowEngine = require('../workflow/workflow.engine');
 const audit = require('../audit/audit.service');
 const notifications = require('../notifications/notifications.service');
@@ -129,22 +130,24 @@ async function submit(user, prId) {
 // Permet au service achat de créer un fournisseur à la volée depuis l'écran de traitement d'une
 // demande, sans passer par Référentiels → Fournisseurs (qui exige le module ref_suppliers, une
 // permission distincte) — autorisé ici via le même rôle service_achat déjà requis pour consulter
-// des fournisseurs sur cette demande, pas via le module référentiel complet. Champs volontairement
-// réduits au strict nécessaire pour lancer une consultation (nom + contact) ; le reste (origine,
-// pays, conditions de paiement, etc. — voir SPEC.md §1.1) se complète ensuite via le référentiel.
-async function quickAddSupplier(user, prId, { nom, contactNom, contactEmail, contactTel }) {
+// des fournisseurs sur cette demande. Mêmes champs que le référentiel complet (suppliers.service.js,
+// une seule liste de champs partagée), entity_ids compris : un fournisseur créé ici n'est pas une
+// fiche au rabais, il se retrouve à l'identique dans Référentiels → Fournisseurs. Si le formulaire
+// ne coche aucune entité, on rattache par défaut à l'entité de la demande en cours (sinon le
+// fournisseur créé n'apparaîtrait dans aucune liste filtrée par entité, y compris celle-ci).
+async function quickAddSupplier(user, prId, fields) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'ajouter un fournisseur');
-  if (!nom) throw httpError(400, 'nom obligatoire.');
 
-  const supplier = await one(
-    'INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ($1,$2,$3,$4) RETURNING *',
-    [nom, contactNom || null, contactEmail || null, contactTel || null]
-  );
-  await run('INSERT INTO supplier_entities (supplier_id, entity_id) VALUES ($1,$2)', [supplier.id, pr.entity_id]);
-  await audit.logAction({ tableName: 'suppliers', recordId: supplier.id, purchaseRequestId: prId, action: 'quick_add_supplier', userId: user.id, details: { nom } });
-  return { ...supplier, entity_ids: [pr.entity_id] };
+  const { entity_ids, ...supplierFields } = fields;
+  const supplier = await suppliersService.createSupplier(supplierFields);
+  const linkedEntityIds = entity_ids && entity_ids.length ? entity_ids : [pr.entity_id];
+  for (const entityId of linkedEntityIds) {
+    await suppliersService.linkSupplierToEntity(supplier.id, entityId);
+  }
+  await audit.logAction({ tableName: 'suppliers', recordId: supplier.id, purchaseRequestId: prId, action: 'quick_add_supplier', userId: user.id, details: { nom: supplierFields.nom } });
+  return { ...supplier, entity_ids: linkedEntityIds };
 }
 
 // Le service achat crée la demande de devis : ceci fait à la fois office d'"analyse" (SPEC §3.1 pt.2)

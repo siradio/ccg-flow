@@ -4,6 +4,28 @@ import client from '../../api/client';
 import { useAuth, hasModule } from '../../auth/AuthContext';
 import ReferentialPage from './ReferentialPage';
 
+// Exporté séparément pour être réutilisé tel quel par l'ajout rapide de fournisseur depuis une
+// demande d'achat (DetailPage.jsx) — même structure, mêmes champs, entity_ids inclus, que le
+// référentiel complet (la case de l'entité de la demande en cours est simplement pré-cochée).
+export const SUPPLIER_FIELDS = [
+  { key: 'nom', label: 'Nom', required: true },
+  { key: 'code', label: 'Code' },
+  { key: 'origine', label: 'Origine', type: 'select', options: ['Import', 'Local'] },
+  { key: 'pays', label: 'Pays' },
+  { key: 'categorie', label: 'Catégorie' },
+  { key: 'produits_offres', label: 'Produits / Offres' },
+  { key: 'contact_nom', label: 'Contact' },
+  { key: 'contact_email', label: 'Email' },
+  { key: 'contact_tel', label: 'Téléphone' },
+  { key: 'adresse', label: 'Adresse' },
+  { key: 'mode_paiement', label: 'Mode de paiement' },
+  { key: 'conditions_paiement', label: 'Conditions de paiement' },
+  { key: 'a_contrat', label: 'Contrat en place', type: 'checkbox' },
+  { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+  { key: 'commentaires', label: 'Commentaires', type: 'textarea' },
+  { key: 'entity_ids', label: 'Entités', type: 'multiEntity' },
+];
+
 const CONFIGS = {
   entities: {
     title: 'Entités du groupe', endpoint: '/entities', moduleKey: 'ref_entities',
@@ -75,24 +97,7 @@ const CONFIGS = {
   },
   suppliers: {
     title: 'Fournisseurs', endpoint: '/suppliers', moduleKey: 'ref_suppliers',
-    fields: [
-      { key: 'nom', label: 'Nom', required: true },
-      { key: 'code', label: 'Code' },
-      { key: 'origine', label: 'Origine', type: 'select', options: ['Import', 'Local'] },
-      { key: 'pays', label: 'Pays' },
-      { key: 'categorie', label: 'Catégorie' },
-      { key: 'produits_offres', label: 'Produits / Offres' },
-      { key: 'contact_nom', label: 'Contact' },
-      { key: 'contact_email', label: 'Email' },
-      { key: 'contact_tel', label: 'Téléphone' },
-      { key: 'adresse', label: 'Adresse' },
-      { key: 'mode_paiement', label: 'Mode de paiement' },
-      { key: 'conditions_paiement', label: 'Conditions de paiement' },
-      { key: 'a_contrat', label: 'Contrat en place', type: 'checkbox' },
-      { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
-      { key: 'commentaires', label: 'Commentaires', type: 'textarea' },
-      { key: 'entity_ids', label: 'Entités', type: 'multiEntity' },
-    ],
+    fields: SUPPLIER_FIELDS,
   },
 };
 

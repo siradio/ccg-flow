@@ -57,10 +57,11 @@ router.delete('/:id/lines/:lineId', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Mêmes clés (snake_case) que le formulaire du référentiel Fournisseurs — voir
+// suppliersService.createSupplier() et frontend/.../ReferentialsIndex.jsx (config `suppliers`).
 router.post('/:id/quick-supplier', requireAuth, async (req, res, next) => {
   try {
-    const { nom, contactNom, contactEmail, contactTel } = req.body || {};
-    res.status(201).json(await service.quickAddSupplier(req.user, Number(req.params.id), { nom, contactNom, contactEmail, contactTel }));
+    res.status(201).json(await service.quickAddSupplier(req.user, Number(req.params.id), req.body || {}));
   } catch (e) { next(e); }
 });
 

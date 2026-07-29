@@ -87,7 +87,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
   );
 }
 
-function emptyForm(fields) {
+export function emptyForm(fields) {
   const f = {};
   for (const field of fields) f[field.key] = field.type === 'multiEntity' ? [] : field.type === 'checkbox' ? !!field.default : '';
   return f;
@@ -103,7 +103,7 @@ function renderValue(field, item, entities, sites, lists = {}) {
   return value;
 }
 
-function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
+export function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
   if (field.type === 'entitySelect') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(Number(e.target.value))}>

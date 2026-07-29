@@ -4,6 +4,8 @@ import client from '../../api/client';
 import { useAuth, hasRoleOnEntity } from '../../auth/AuthContext';
 import WorkflowTimeline from '../../components/WorkflowTimeline';
 import { StatusBadge } from './statusLabels.jsx';
+import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
+import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
 
 // Les téléchargements passent par l'API JWT : un <a href> direct n'enverrait pas le header
 // d'autorisation, d'où un fetch authentifié suivi de l'ouverture d'une blob URL.
@@ -20,6 +22,7 @@ export default function DetailPage() {
   const [steps, setSteps] = useState([]);
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [entities, setEntities] = useState([]);
   const [minSuppliers, setMinSuppliers] = useState(2);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
@@ -32,6 +35,7 @@ export default function DetailPage() {
   useEffect(() => {
     client.get('/workflows/demande_achat').then(res => setSteps(res.data.steps));
     client.get('/settings').then(res => setMinSuppliers(Number(res.data.min_suppliers_devis) || 1));
+    client.get('/entities').then(res => setEntities(res.data));
   }, []);
   useEffect(() => {
     if (!pr) return;
@@ -92,7 +96,7 @@ export default function DetailPage() {
         </section>
       )}
 
-      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} />
+      <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} entities={entities} />
       <QuotesSection pr={pr} guarded={guarded} />
       <ValidationSection pr={pr} guarded={guarded} />
 
@@ -174,13 +178,19 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   );
 }
 
-function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier }) {
+// Formulaire d'ajout rapide de fournisseur pré-rempli avec l'entité de la demande déjà cochée —
+// modifiable comme n'importe quel autre champ, ce n'est qu'une valeur de départ pratique.
+function defaultNewSupplier(entityId) {
+  return { ...emptyForm(SUPPLIER_FIELDS), entity_ids: [entityId] };
+}
+
+function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier, entities }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [selected, setSelected] = useState([]);
   const [message, setMessage] = useState('');
   const [showAddSupplier, setShowAddSupplier] = useState(false);
-  const [newSupplier, setNewSupplier] = useState({ nom: '', contactNom: '', contactEmail: '', contactTel: '' });
+  const [newSupplier, setNewSupplier] = useState(() => defaultNewSupplier(pr.entity_id));
   const [addError, setAddError] = useState('');
   const [adding, setAdding] = useState(false);
 
@@ -190,13 +200,13 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
 
   async function submitNewSupplier(e) {
     e.preventDefault();
-    if (!newSupplier.nom.trim()) return;
+    if (!newSupplier.nom?.trim()) return;
     setAddError('');
     setAdding(true);
     try {
       const created = await addSupplier(newSupplier);
       setSelected(sel => [...sel, created.id]);
-      setNewSupplier({ nom: '', contactNom: '', contactEmail: '', contactTel: '' });
+      setNewSupplier(defaultNewSupplier(pr.entity_id));
       setShowAddSupplier(false);
     } catch (err) {
       setAddError(err.response?.data?.error || "Erreur lors de l'ajout du fournisseur.");
@@ -233,14 +243,10 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
             </button>
           ) : (
             <form onSubmit={submitNewSupplier} className="form-inline" style={{ marginTop: 10, padding: 10, background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
-              <input placeholder="Nom *" required value={newSupplier.nom}
-                onChange={e => setNewSupplier({ ...newSupplier, nom: e.target.value })} style={{ width: 160 }} />
-              <input placeholder="Contact" value={newSupplier.contactNom}
-                onChange={e => setNewSupplier({ ...newSupplier, contactNom: e.target.value })} style={{ width: 140 }} />
-              <input placeholder="Email" type="email" value={newSupplier.contactEmail}
-                onChange={e => setNewSupplier({ ...newSupplier, contactEmail: e.target.value })} style={{ width: 180 }} />
-              <input placeholder="Téléphone" value={newSupplier.contactTel}
-                onChange={e => setNewSupplier({ ...newSupplier, contactTel: e.target.value })} style={{ width: 130 }} />
+              <strong style={{ width: '100%', fontSize: 13 }}>Nouveau fournisseur — mêmes champs que le référentiel</strong>
+              {SUPPLIER_FIELDS.map(f => (
+                <FieldInput key={f.key} field={f} value={newSupplier[f.key]} onChange={v => setNewSupplier({ ...newSupplier, [f.key]: v })} entities={entities} />
+              ))}
               <button type="submit" className="btn btn-primary btn-sm" disabled={adding}>{adding ? '…' : 'Ajouter'}</button>
               <button type="button" className="btn btn-secondary btn-sm"
                 onClick={() => { setShowAddSupplier(false); setAddError(''); }}>Annuler</button>

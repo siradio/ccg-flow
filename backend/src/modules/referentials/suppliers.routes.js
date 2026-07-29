@@ -2,13 +2,10 @@ const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
 const { requireModule } = require('../../middleware/permissions');
+const suppliersService = require('./suppliers.service');
 
 const router = express.Router();
-
-async function withEntityIds(supplier) {
-  const rows = await all('SELECT entity_id FROM supplier_entities WHERE supplier_id = $1', [supplier.id]);
-  return { ...supplier, entity_ids: rows.map(r => r.entity_id) };
-}
+const { withEntityIds } = suppliersService;
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -38,27 +35,10 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 
 router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
   try {
-    const {
-      nom, contact_nom, contact_email, contact_tel, adresse, actif,
-      code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
-      entity_ids,
-    } = req.body || {};
-    if (!nom) return res.status(400).json({ error: 'nom obligatoire.' });
-    const supplier = await one(
-      `INSERT INTO suppliers
-         (nom, contact_nom, contact_email, contact_tel, adresse, actif,
-          code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [
-        nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
-        actif === undefined ? true : actif,
-        code || null, origine || null, pays || null, categorie || null, produits_offres || null,
-        mode_paiement || null, conditions_paiement || null,
-        a_contrat === undefined ? null : a_contrat, commentaires || null,
-      ]
-    );
+    const { entity_ids, ...fields } = req.body || {};
+    const supplier = await suppliersService.createSupplier(fields);
     for (const entityId of entity_ids || []) {
-      await run('INSERT INTO supplier_entities (supplier_id, entity_id) VALUES ($1,$2)', [supplier.id, entityId]);
+      await suppliersService.linkSupplierToEntity(supplier.id, entityId);
     }
     res.status(201).json(await withEntityIds(supplier));
   } catch (e) { next(e); }
