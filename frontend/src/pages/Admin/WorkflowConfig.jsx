@@ -14,7 +14,7 @@ const ROLE_OPTIONS = ['service_achat', 'controle_gestion', 'finances', 'dga'];
 export default function WorkflowConfig() {
   const [template, setTemplate] = useState(null);
   const [steps, setSteps] = useState([]);
-  const [saved, setSaved] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
   const [error, setError] = useState('');
   const [draggingId, setDraggingId] = useState(null);
   const [overId, setOverId] = useState(null);
@@ -34,7 +34,7 @@ export default function WorkflowConfig() {
 
   function updateStep(id, field, value) {
     setSteps(steps.map(s => s.id === id ? { ...s, [field]: value } : s));
-    setSaved(false);
+    setSavedMessage('');
   }
 
   function deleteStep(id) {
@@ -46,10 +46,10 @@ export default function WorkflowConfig() {
       setError(`Impossible de supprimer "${target.nom}" : l'étape "${orphaned.nom}" y revient en cas de refus. Change d'abord son "Retour vers".`);
       return;
     }
-    if (!window.confirm(`Supprimer l'étape "${target.nom}" ? Cette action n'est effective qu'après avoir cliqué sur Enregistrer.`)) return;
+    if (!window.confirm(`Supprimer l'étape "${target.nom}" ? Cette action n'est effective qu'après avoir cliqué sur Enregistrer. Si des demandes d'achat sont déjà passées par cette étape, une nouvelle version du circuit sera créée automatiquement : elles continueront sur l'ancien circuit, les nouvelles demandes utiliseront celui-ci.`)) return;
     const remaining = steps.filter(s => s.id !== id).sort((a, b) => a.ordre - b.ordre);
     setSteps(remaining.map((s, i) => ({ ...s, ordre: i + 1 })));
-    setSaved(false);
+    setSavedMessage('');
   }
 
   function moveStep(fromId, toId) {
@@ -61,19 +61,22 @@ export default function WorkflowConfig() {
     const [moved] = ordered.splice(fromIdx, 1);
     ordered.splice(toIdx, 0, moved);
     setSteps(ordered.map((s, i) => ({ ...s, ordre: i + 1 })));
-    setSaved(false);
+    setSavedMessage('');
   }
 
   async function save() {
     setError('');
-    setSaved(false);
+    setSavedMessage('');
     const codes = steps.map(s => s.code.trim());
     if (codes.some(c => !c)) return setError('Chaque étape doit avoir un code non vide.');
     if (new Set(codes).size !== codes.length) return setError('Les codes des étapes doivent être uniques.');
     try {
       const res = await client.put('/workflows/demande_achat', { steps });
       setSteps(res.data.steps);
-      setSaved(true);
+      setTemplate(res.data);
+      setSavedMessage(res.data.versioned
+        ? 'Nouvelle version du circuit créée : les demandes déjà en cours continuent sur l\'ancien, les nouvelles utiliseront celui-ci.'
+        : 'Enregistré.');
     } catch (err) {
       setError(err.response?.data?.error || 'Une erreur est survenue.');
     }
@@ -171,7 +174,7 @@ export default function WorkflowConfig() {
       </div>
       <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={save} className="btn btn-primary">Enregistrer</button>
-        {saved && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>Enregistré.</span>}
+        {savedMessage && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>{savedMessage}</span>}
         {error && <span style={{ color: 'var(--color-danger)', fontSize: 13 }}>{error}</span>}
       </div>
     </div>
