@@ -26,6 +26,7 @@ export default function DetailPage() {
   const [minSuppliers, setMinSuppliers] = useState(2);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
+  const [toast, setToast] = useState(null);
 
   const reload = useCallback(() => {
     return client.get(`/purchase-requests/${id}`).then(res => setPr(res.data));
@@ -33,7 +34,6 @@ export default function DetailPage() {
 
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
-    client.get('/workflows/demande_achat').then(res => setSteps(res.data.steps));
     client.get('/settings').then(res => setMinSuppliers(Number(res.data.min_suppliers_devis) || 1));
     client.get('/entities').then(res => setEntities(res.data));
   }, []);
@@ -42,11 +42,37 @@ export default function DetailPage() {
     client.get('/products', { params: { entity_id: pr.entity_id } }).then(res => setProducts(res.data));
     client.get('/suppliers', { params: { entity_id: pr.entity_id } }).then(res => setSuppliers(res.data));
   }, [pr?.entity_id]);
+  // Le circuit affiché est celui réellement suivi par CETTE demande (workflow_template_id), pas
+  // forcément le circuit actif aujourd'hui — une demande en cours doit continuer à afficher son
+  // propre circuit même après qu'une étape a été supprimée et versionnée pour les nouvelles (§3.2).
+  useEffect(() => {
+    if (!pr) return;
+    client.get(`/workflows/by-id/${pr.workflow_template_id}`).then(res => setSteps(res.data.steps));
+  }, [pr?.workflow_template_id]);
 
-  async function guarded(action) {
+  // Confirmation visible immédiatement, peu importe où sur la page l'action a été déclenchée — le
+  // statut change dans l'en-tête tout en haut, ce qui n'est pas visible sans remonter la page si on
+  // vient de cliquer un bouton de validation plus bas (ex. ValidationSection, QuotesSection).
+  function showToast(message) {
+    setToast(message);
+    setTimeout(() => setToast(t => (t === message ? null : t)), 3500);
+  }
+
+  // Retourne true/false selon le résultat — les appelants qui enchaînent une remise à zéro de
+  // formulaire après l'appel (ex. QuotesSection, LinesSection) doivent le faire seulement si ok,
+  // sinon un échec (ex. "montant requis") effacerait silencieusement ce que l'utilisateur a saisi.
+  async function guarded(action, successMessage) {
     setError('');
-    try { await action(); await reload(); setVersion(v => v + 1); }
-    catch (err) { setError(err.response?.data?.error || 'Une erreur est survenue.'); }
+    try {
+      await action();
+      await reload();
+      setVersion(v => v + 1);
+      if (successMessage) showToast(successMessage);
+      return true;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Une erreur est survenue.');
+      return false;
+    }
   }
 
   // Le service achat peut créer un fournisseur à la volée pendant le traitement de la demande
@@ -62,6 +88,11 @@ export default function DetailPage() {
 
   return (
     <div>
+      {toast && (
+        <div className="alert alert-success" style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+          {toast}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h1 className="page-title">{pr.numero}</h1>
@@ -90,7 +121,7 @@ export default function DetailPage() {
       {pr.status === 'brouillon' && isRequester && (
         <section className="card">
           <button className="btn btn-primary" disabled={pr.lines.length === 0}
-            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`))}>
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), "Demande soumise à la DGA pour validation de l'expression de besoin.")}>
             Soumettre l'expression de besoin
           </button>
         </section>
@@ -110,7 +141,6 @@ export default function DetailPage() {
         </section>
       )}
 
-      <AttachmentsSection pr={pr} guarded={guarded} />
       <HistorySection key={version} prId={pr.id} />
     </div>
   );
@@ -122,11 +152,11 @@ function LinesSection({ pr, products, isRequester, guarded }) {
 
   async function addLine(e) {
     e.preventDefault();
-    await guarded(() => client.post(`/purchase-requests/${pr.id}/lines`, {
+    const ok = await guarded(() => client.post(`/purchase-requests/${pr.id}/lines`, {
       productId: form.productId || null, descriptionLibre: form.descriptionLibre || null,
       quantite: Number(form.quantite), unite: form.unite,
     }));
-    setForm({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
+    if (ok) setForm({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   }
 
   return (
@@ -282,7 +312,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
             Ce texte sera le corps de l'email envoyé (et celui proposé au "copier" ci-dessous) — modifiable jusqu'à l'envoi.
           </p>
           <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
-            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }))}>
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }), 'Consultation lancée auprès des fournisseurs sélectionnés.')}>
             Lancer la consultation
           </button>
         </div>
@@ -317,7 +347,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
           {canAct && qr.suppliers.some(s => s.statut === 'a_envoyer') && (
             <>
               <button className="btn btn-secondary" style={{ marginTop: 8 }}
-                onClick={() => guarded(() => sendQuoteRequestBatch(qr.id))}>
+                onClick={() => guarded(() => sendQuoteRequestBatch(qr.id), 'Demandes de devis envoyées.')}>
                 Envoyer les demandes de devis
               </button>
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
@@ -334,7 +364,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
 function QuotesSection({ pr, guarded }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
-  const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', notes: '' });
+  const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', notes: '', file: null });
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
@@ -343,22 +373,40 @@ function QuotesSection({ pr, guarded }) {
 
   if (pr.quotes.length === 0 && withoutQuote.length === 0) return null;
 
+  function submitQuote(e) {
+    e.preventDefault();
+    const data = new FormData();
+    data.append('quoteRequestSupplierId', form.quoteRequestSupplierId);
+    data.append('montant', form.montant);
+    data.append('devise', pr.devise);
+    if (form.file) data.append('file', form.file);
+    guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), 'Devis enregistré.')
+      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', notes: '', file: null }); });
+  }
+
   return (
     <section className="card">
       <h2>Devis reçus</h2>
       <div className="table-wrap" style={{ marginBottom: 12 }}>
         <table>
-          <thead><tr><th>Fournisseur</th><th>Montant</th><th>Devise</th><th>Retenu</th>{canSelect && <th />}</tr></thead>
+          <thead><tr><th>Fournisseur</th><th>Montant</th><th>Devise</th><th>Devis (PDF)</th><th>Retenu</th>{canSelect && <th />}</tr></thead>
           <tbody>
             {pr.quotes.map(q => (
               <tr key={q.id}>
                 <td>{q.supplier_nom}</td>
                 <td>{q.montant}</td>
                 <td>{q.devise}</td>
+                <td>
+                  {q.attachment_id ? (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => openAuthenticatedFile(`/attachments/${q.attachment_id}`)}>
+                      Voir
+                    </button>
+                  ) : '—'}
+                </td>
                 <td>{q.selectionne ? '✓' : ''}</td>
                 {canSelect && !q.selectionne && (
                   <td><button className="btn btn-primary btn-sm"
-                    onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`))}>
+                    onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), 'Devis retenu comme offre sélectionnée.')}>
                     Sélectionner
                   </button></td>
                 )}
@@ -368,17 +416,16 @@ function QuotesSection({ pr, guarded }) {
         </table>
       </div>
       {canAddQuote && withoutQuote.length > 0 && (
-        <form onSubmit={e => {
-          e.preventDefault();
-          guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, {
-            quoteRequestSupplierId: Number(form.quoteRequestSupplierId), montant: Number(form.montant), devise: pr.devise, notes: form.notes,
-          })).then(() => setForm({ quoteRequestSupplierId: '', montant: '', notes: '' }));
-        }} className="form-inline">
+        <form onSubmit={submitQuote} className="form-inline">
           <select required value={form.quoteRequestSupplierId} onChange={e => setForm({ ...form, quoteRequestSupplierId: e.target.value })}>
             <option value="">Fournisseur…</option>
             {withoutQuote.map(s => <option key={s.id} value={s.id}>{s.supplier_nom}</option>)}
           </select>
           <input placeholder="Montant" type="number" required value={form.montant} onChange={e => setForm({ ...form, montant: e.target.value })} style={{ width: 140 }} />
+          <label className="field" style={{ minWidth: 220 }}>
+            Devis du fournisseur (PDF, optionnel)
+            <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
+          </label>
           <button type="submit" className="btn btn-primary">Enregistrer le devis</button>
         </form>
       )}
@@ -408,49 +455,15 @@ function ValidationSection({ pr, guarded }) {
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/validate-step`, { comment }))}>
+        <button className="btn btn-primary" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/validate-step`, { comment }), 'Étape validée.')}>
           Valider
         </button>
         {canReject && (
-          <button className="btn btn-danger" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/reject-step`, { comment }))}>
+          <button className="btn btn-danger" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/reject-step`, { comment }), 'Demande refusée.')}>
             Refuser
           </button>
         )}
       </div>
-    </section>
-  );
-}
-
-function AttachmentsSection({ pr, guarded }) {
-  const [file, setFile] = useState(null);
-
-  async function upload(e) {
-    e.preventDefault();
-    if (!file) return;
-    const data = new FormData();
-    data.append('file', file);
-    await guarded(() => client.post(`/purchase-requests/${pr.id}/attachments`, data, { headers: { 'Content-Type': 'multipart/form-data' } }));
-    setFile(null);
-  }
-
-  return (
-    <section className="card">
-      <h2>Pièces jointes</h2>
-      <ul style={{ paddingLeft: 0, listStyle: 'none', margin: '0 0 12px' }}>
-        {pr.attachments.map(a => (
-          <li key={a.id} style={{ marginBottom: 6 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => openAuthenticatedFile(`/attachments/${a.id}`)}>
-              {a.filename}
-            </button>
-            {' '}<span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>({Math.round(a.taille / 1024)} Ko)</span>
-          </li>
-        ))}
-        {pr.attachments.length === 0 && <li className="empty-row">Aucune pièce jointe.</li>}
-      </ul>
-      <form onSubmit={upload} className="form-inline">
-        <input type="file" onChange={e => setFile(e.target.files[0])} />
-        <button type="submit" className="btn btn-secondary" disabled={!file}>Téléverser</button>
-      </form>
     </section>
   );
 }

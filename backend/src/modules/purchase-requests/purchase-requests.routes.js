@@ -87,10 +87,12 @@ router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, 
   } catch (e) { next(e); }
 });
 
-router.post('/:id/quotes', requireAuth, async (req, res, next) => {
+// upload.single('file') n'exige pas de fichier (contrairement à /:id/attachments) : le devis peut
+// être saisi sans PDF joint, le fichier n'est que optionnel ici.
+router.post('/:id/quotes', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     const { quoteRequestSupplierId, montant, devise, notes } = req.body || {};
-    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes }));
+    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes }, req.file));
   } catch (e) { next(e); }
 });
 

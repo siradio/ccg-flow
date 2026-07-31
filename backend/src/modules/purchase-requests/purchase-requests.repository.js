@@ -258,11 +258,15 @@ async function getQuote(id) {
 
 async function getQuotesForPR(prId) {
   return all(
-    `SELECT q.*, qrs.supplier_id, s.nom AS supplier_nom
+    `SELECT q.*, qrs.supplier_id, s.nom AS supplier_nom,
+       a.id AS attachment_id, a.filename AS attachment_filename
      FROM quotes q
      JOIN quote_request_suppliers qrs ON qrs.id = q.quote_request_supplier_id
      JOIN quote_requests qr ON qr.id = qrs.quote_request_id
      JOIN suppliers s ON s.id = qrs.supplier_id
+     LEFT JOIN LATERAL (
+       SELECT id, filename FROM attachments WHERE quote_id = q.id ORDER BY uploaded_at DESC LIMIT 1
+     ) a ON true
      WHERE qr.purchase_request_id = $1
      ORDER BY q.recu_le`,
     [prId]

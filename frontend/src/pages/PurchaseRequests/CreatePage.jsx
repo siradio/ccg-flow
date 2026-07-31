@@ -13,7 +13,7 @@ export default function CreatePage() {
   const navigate = useNavigate();
   const [entities, setEntities] = useState([]);
   const [steps, setSteps] = useState([]);
-  const [form, setForm] = useState({ entityId: '', objet: '', justification: '', devise: 'GNF' });
+  const [form, setForm] = useState({ entityId: '', objet: '', justification: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -79,14 +79,6 @@ export default function CreatePage() {
           <label className="field">
             Justification
             <textarea value={form.justification} onChange={e => setForm({ ...form, justification: e.target.value })} style={{ minHeight: 80 }} />
-          </label>
-          <label className="field">
-            Devise
-            <select value={form.devise} onChange={e => setForm({ ...form, devise: e.target.value })}>
-              <option value="GNF">GNF</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
           </label>
           {error && <div className="alert alert-danger">{error}</div>}
           <button type="submit" disabled={saving} className="btn btn-primary" style={{ alignSelf: 'start' }}>

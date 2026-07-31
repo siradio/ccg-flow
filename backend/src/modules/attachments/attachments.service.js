@@ -23,6 +23,19 @@ async function uploadForPurchaseRequest(user, prId, file) {
   return row;
 }
 
+// Pas de vérification de rôle ni de journal d'audit ici : appelée depuis
+// purchase-requests.service.js#addQuote, qui a déjà validé le rôle service_achat et journalise
+// lui-même (avec le purchase_request_id, pour que l'action apparaisse dans l'historique de la
+// demande — un log rattaché seulement au quote_id n'y apparaîtrait pas, voir audit.service.js).
+async function attachToQuote(quoteId, file, userId) {
+  return one(
+    `INSERT INTO attachments (quote_id, filename, mimetype, content, taille, uploaded_by)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     RETURNING id, filename, mimetype, taille, uploaded_by, uploaded_at`,
+    [quoteId, file.originalname, file.mimetype, file.buffer, file.size, userId]
+  );
+}
+
 // Résout l'entity_id derrière une pièce jointe, qu'elle soit rattachée à une demande, un devis ou un BC.
 async function getEntityIdForAttachment(attachment) {
   if (attachment.purchase_request_id) {
@@ -61,4 +74,4 @@ async function download(user, attachmentId) {
   return attachment;
 }
 
-module.exports = { uploadForPurchaseRequest, download };
+module.exports = { uploadForPurchaseRequest, attachToQuote, download };

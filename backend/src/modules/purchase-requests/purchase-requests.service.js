@@ -2,6 +2,7 @@ const { one } = require('../../db');
 const repo = require('./purchase-requests.repository');
 const poRepo = require('../purchase-orders/purchase-orders.repository');
 const suppliersService = require('../referentials/suppliers.service');
+const attachmentsService = require('../attachments/attachments.service');
 const workflowEngine = require('../workflow/workflow.engine');
 const audit = require('../audit/audit.service');
 const notifications = require('../notifications/notifications.service');
@@ -234,7 +235,7 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom });
 }
 
-async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }) {
+async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
@@ -243,6 +244,14 @@ async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, n
 
   const quote = await repo.createQuote(quoteRequestSupplierId, montant, devise || pr.devise, notes);
   await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant, devise } });
+  // Le devis PDF du fournisseur s'attache ici, directement au moment de la saisie du montant —
+  // remplace l'ancien flux à deux étapes (saisir le devis, puis chercher la pièce jointe générique
+  // plus bas sur la page) par un seul geste, et rattache le fichier à CE devis précis (quote_id),
+  // pas à la demande entière, pour qu'il suive le bon fournisseur si plusieurs devis sont reçus.
+  if (file) {
+    const attachment = await attachmentsService.attachToQuote(quote.id, file, user.id);
+    await audit.logAction({ tableName: 'attachments', recordId: attachment.id, purchaseRequestId: prId, action: 'attachment_uploaded', userId: user.id, details: { filename: file.originalname, quoteId: quote.id } });
+  }
   return quote;
 }
 
