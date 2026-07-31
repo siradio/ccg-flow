@@ -265,6 +265,19 @@ input[type="checkbox"] {
   overflow-x: auto;
 }
 
+/* Colonne d'actions (Éditer/Supprimer) épinglée à droite — sans ça, sur un tableau large (ex.
+   Fournisseurs, ~17 colonnes), les boutons ne sont visibles qu'après avoir défilé tout à droite,
+   et passent facilement pour "absents" alors qu'ils sont juste hors champ. */
+.sticky-col {
+  position: sticky;
+  right: 0;
+  background: var(--color-surface);
+  box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.35);
+}
+tbody tr:hover .sticky-col {
+  background: var(--color-hover);
+}
+
 .empty-row {
   color: var(--color-text-muted);
   font-style: italic;

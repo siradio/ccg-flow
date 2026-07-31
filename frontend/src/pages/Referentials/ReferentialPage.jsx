@@ -25,6 +25,10 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
     const next = {};
     for (const f of fields) next[f.key] = item[f.key] ?? (f.type === 'multiEntity' ? [] : '');
     setForm(next);
+    // Le formulaire est en bas de page, après le tableau — sans ça, cliquer "Éditer" sur une
+    // ligne du haut d'une longue liste (ex. Fournisseurs) ne montre visuellement aucun effet tant
+    // qu'on n'a pas fait défiler manuellement jusqu'en bas (même pattern que Prices/HistoryPage.jsx).
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
 
   async function onSubmit(e) {
@@ -57,7 +61,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
             <thead>
               <tr>
                 {fields.map(f => <th key={f.key}>{f.label}</th>)}
-                {canEdit && <th />}
+                {canEdit && <th className="sticky-col" />}
               </tr>
             </thead>
             <tbody>
@@ -65,7 +69,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists)}</td>)}
                   {canEdit && (
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
                       <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
                       <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">Supprimer</button>
                     </td>
