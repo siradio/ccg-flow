@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import client from '../../api/client';
 
 // Éditeur simple des étapes du workflow "demande_achat" — voir SPEC.md §3.2 : le moteur lit
@@ -20,6 +20,9 @@ export default function WorkflowConfig() {
   const [overId, setOverId] = useState(null);
   const [minSuppliers, setMinSuppliers] = useState('');
   const [minSuppliersSaved, setMinSuppliersSaved] = useState(false);
+  // Id négatif purement local, jamais envoyé tel quel en base — le backend traite tout id absent
+  // de ses lignes existantes comme une étape à créer (voir PUT /workflows/:moduleCode).
+  const nextTempId = useRef(-1);
 
   useEffect(() => {
     client.get('/workflows/demande_achat').then(res => { setTemplate(res.data); setSteps(res.data.steps); });
@@ -52,6 +55,34 @@ export default function WorkflowConfig() {
     setSavedMessage('');
   }
 
+  // Nouvelle étape de validation générique — sur le même modèle que Contrôle de Gestion/Finances/
+  // DGA (seules étapes librement configurables du circuit, voir PROTECTED_CODES) : un rôle requis,
+  // et par défaut un retour vers "validation_achat" en cas de refus, comme ses semblables. Insérée
+  // juste avant l'étape système finale (génération du BC) — c'est la seule zone du circuit que le
+  // moteur générique parcourt dynamiquement par ordre (purchase-requests.service.js#validateStep),
+  // donc la seule où une étape ajoutée ici sera réellement prise en compte.
+  function addStep() {
+    setError('');
+    const sorted = [...steps].sort((a, b) => a.ordre - b.ordre);
+    // === null (pas juste falsy) : ne pas confondre avec une étape déjà ajoutée mais encore non
+    // configurée ('' en attente d'un rôle), qui apparaîtrait sinon avant la vraie étape système.
+    const systemIdx = sorted.findIndex(s => s.role_code_requis === null);
+    const insertAt = systemIdx === -1 ? sorted.length : systemIdx;
+    const newStep = {
+      id: nextTempId.current--,
+      ordre: 0, // recalculé juste après par la renumérotation
+      code: '',
+      nom: 'Nouvelle étape',
+      role_code_requis: '',
+      commentaire_obligatoire_si_refus: true,
+      comportement_si_refus: 'retour_etape_precedente',
+      retour_step_code: 'validation_achat',
+    };
+    sorted.splice(insertAt, 0, newStep);
+    setSteps(sorted.map((s, i) => ({ ...s, ordre: i + 1 })));
+    setSavedMessage('');
+  }
+
   function moveStep(fromId, toId) {
     if (fromId === toId) return;
     const ordered = [...steps].sort((a, b) => a.ordre - b.ordre);
@@ -70,6 +101,13 @@ export default function WorkflowConfig() {
     const codes = steps.map(s => s.code.trim());
     if (codes.some(c => !c)) return setError('Chaque étape doit avoir un code non vide.');
     if (new Set(codes).size !== codes.length) return setError('Les codes des étapes doivent être uniques.');
+    // '' (chaîne vide, jamais produite que par addStep()) = pas encore configurée — un vrai
+    // "— (étape système)" choisi explicitement vaut null, jamais ''. Une seule étape système (sans
+    // rôle) doit exister au final : c'est la génération automatique du bon de commande, qui
+    // termine le circuit ; une étape de validation laissée sans rôle serait prise à tort pour cette
+    // étape terminale et court-circuiterait tout ce qui suit.
+    const missingRole = steps.find(s => s.role_code_requis === '');
+    if (missingRole) return setError(`L'étape "${missingRole.nom || missingRole.code}" doit avoir un rôle requis.`);
     try {
       const res = await client.put('/workflows/demande_achat', { steps });
       setSteps(res.data.steps);
@@ -102,9 +140,13 @@ export default function WorkflowConfig() {
         </div>
       </section>
 
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0, marginBottom: 20 }}>
-        Glissez une ligne par sa poignée (⠿) pour changer son ordre dans le circuit.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>
+          Glissez une ligne par sa poignée (⠿) pour changer son ordre dans le circuit. Les étapes
+          fixes (🔒) et l'étape système finale ne se déplacent pas.
+        </p>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={addStep}>+ Ajouter une étape</button>
+      </div>
       <div className="card" style={{ padding: 0 }}>
         <div className="table-wrap">
           <table>
@@ -118,21 +160,26 @@ export default function WorkflowConfig() {
             <tbody>
               {sortedSteps.map(s => {
                 const protectedCode = PROTECTED_CODES.includes(s.code);
-                const systemStep = !s.role_code_requis; // ex. génération auto du BC — jamais supprimable
+                // strictement null (pas '') : '' ne veut dire que "pas encore configurée" pour une étape
+                // fraîchement ajoutée (addStep()), à ne pas confondre avec la vraie étape système.
+                const systemStep = !protectedCode && s.role_code_requis === null; // génération auto du BC — jamais supprimable ni déplaçable
+                const locked = protectedCode || systemStep;
                 return (
                   <tr
                     key={s.id}
-                    draggable
-                    onDragStart={() => setDraggingId(s.id)}
+                    draggable={!locked}
+                    onDragStart={() => !locked && setDraggingId(s.id)}
                     onDragEnd={() => { setDraggingId(null); setOverId(null); }}
-                    onDragOver={e => { e.preventDefault(); if (draggingId !== null && s.id !== overId) setOverId(s.id); }}
-                    onDrop={e => { e.preventDefault(); if (draggingId !== null) moveStep(draggingId, s.id); setDraggingId(null); setOverId(null); }}
+                    onDragOver={e => { if (locked) return; e.preventDefault(); if (draggingId !== null && s.id !== overId) setOverId(s.id); }}
+                    onDrop={e => { if (locked) return; e.preventDefault(); if (draggingId !== null) moveStep(draggingId, s.id); setDraggingId(null); setOverId(null); }}
                     style={{
                       opacity: draggingId === s.id ? 0.4 : 1,
                       borderTop: overId === s.id && draggingId !== s.id ? '2px solid var(--color-primary)' : '2px solid transparent',
                     }}
                   >
-                    <td style={{ cursor: 'grab', color: 'var(--color-text-faint)', fontSize: 16 }} title="Glisser pour réordonner">⠿</td>
+                    <td style={locked ? undefined : { cursor: 'grab', color: 'var(--color-text-faint)', fontSize: 16 }} title={locked ? 'Étape fixe : position non modifiable.' : 'Glisser pour réordonner'}>
+                      {locked ? '' : '⠿'}
+                    </td>
                     <td>{s.ordre}</td>
                     <td>
                       {protectedCode
@@ -141,10 +188,14 @@ export default function WorkflowConfig() {
                     </td>
                     <td><input value={s.nom} onChange={e => updateStep(s.id, 'nom', e.target.value)} /></td>
                     <td>
-                      <select value={s.role_code_requis || ''} onChange={e => updateStep(s.id, 'role_code_requis', e.target.value || null)}>
-                        <option value="">— (étape système)</option>
-                        {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
+                      {locked
+                        ? <span style={{ color: 'var(--color-text-muted)' }} title="Étape fixe : rôle non modifiable.">{s.role_code_requis || '— (étape système)'}</span>
+                        : (
+                          <select value={s.role_code_requis} onChange={e => updateStep(s.id, 'role_code_requis', e.target.value)}>
+                            <option value="" disabled>Choisir…</option>
+                            {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        )}
                     </td>
                     <td><input type="checkbox" checked={!!s.commentaire_obligatoire_si_refus} onChange={e => updateStep(s.id, 'commentaire_obligatoire_si_refus', e.target.checked)} /></td>
                     <td>

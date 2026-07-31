@@ -66,6 +66,13 @@ router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next
   if (codes.some(c => !c) || new Set(codes).size !== codes.length) {
     return res.status(400).json({ error: 'Chaque étape doit avoir un code non vide et unique.' });
   }
+  // Une seule étape "système" (role_code_requis vide) est autorisée : c'est elle que le moteur
+  // générique traite comme le terminus du circuit (génération auto du BC dès qu'il n'y a plus de
+  // rôle à valider, purchase-requests.service.js#validateStep) — vérifié aussi côté serveur, pas
+  // seulement dans l'éditeur (frontend/.../WorkflowConfig.jsx), qui bloque déjà ce cas en amont.
+  if (steps.filter(s => !s.role_code_requis).length > 1) {
+    return res.status(400).json({ error: "Une seule étape système (sans rôle requis) est autorisée dans le circuit." });
+  }
 
   const client = await pool.connect();
   try {
