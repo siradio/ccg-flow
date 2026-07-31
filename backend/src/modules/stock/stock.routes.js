@@ -1,16 +1,24 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModule, hasSubModuleLevel } = require('../../middleware/permissions');
 const service = require('./stock.service');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('stock'));
 
+// Utilitaire partagé par Stock du Jour ET Mouvement Stock (menu déroulant des deux écrans) —
+// accessible dès qu'on a l'un des deux sous-modules, pas seulement Stock du Jour.
 router.get('/business-units', async (req, res, next) => {
+  if (!hasSubModuleLevel(req.user, 'stock.saisie_jour') && !hasSubModuleLevel(req.user, 'stock.mouvements')) {
+    return res.status(403).json({ error: 'Accès refusé.' });
+  }
   try { res.json(await service.businessUnitsVisibleTo(req.user)); }
   catch (e) { next(e); }
 });
+
+// Le reste de ce routeur est spécifique à Stock du Jour (§2.3/§3.9 SPEC.md) — Mouvement Stock a
+// son propre routeur (stock-movements.routes.js) et son propre sous-module.
+router.use(requireSubModule('stock.saisie_jour'));
 
 router.get('/day', async (req, res, next) => {
   try {

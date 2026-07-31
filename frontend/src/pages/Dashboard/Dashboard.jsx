@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
-import { useAuth, hasModule } from '../../auth/AuthContext';
+import { useAuth, hasModuleAccess } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
@@ -54,7 +54,7 @@ function StatusBars({ byStatus }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const canSeeAchats = hasModule(user, 'achats');
+  const canSeeAchats = hasModuleAccess(user, 'achats');
   const [data, setData] = useState(null);
 
   useEffect(() => {

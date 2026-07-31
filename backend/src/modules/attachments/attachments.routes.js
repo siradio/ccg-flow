@@ -1,11 +1,11 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModule } = require('../../middleware/permissions');
 const service = require('./attachments.service');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('achats'));
+router.use(requireSubModule('achats'));
 
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {

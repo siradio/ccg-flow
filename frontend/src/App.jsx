@@ -27,20 +27,20 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
-        <Route path="purchase-requests" element={<RequireModule module="achats"><ListPage /></RequireModule>} />
-        <Route path="purchase-requests/new" element={<RequireModule module="achats"><CreatePage /></RequireModule>} />
-        <Route path="purchase-requests/:id" element={<RequireModule module="achats"><DetailPage /></RequireModule>} />
-        <Route path="employees" element={<RequireModule module="rh"><EmployeesListPage /></RequireModule>} />
-        <Route path="employees/new" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
-        <Route path="employees/:id" element={<RequireModule module="rh"><EmployeesFormPage /></RequireModule>} />
-        <Route path="kpi" element={<RequireModule module="kpi"><KpiPage /></RequireModule>} />
-        <Route path="stock/saisie" element={<RequireModule module="stock"><StockEntryPage /></RequireModule>} />
-        <Route path="stock/historique" element={<RequireModule module="stock"><StockHistoryPage /></RequireModule>} />
-        <Route path="stock/graphiques" element={<RequireModule module="stock"><StockChartsPage /></RequireModule>} />
-        <Route path="stock/dashboard-dg" element={<RequireModule module="stock"><StockDgDashboardPage /></RequireModule>} />
-        <Route path="stock/mouvements" element={<RequireModule module="stock"><StockMovementsPage /></RequireModule>} />
-        <Route path="prices/historique" element={<RequireModule module="prix"><PricesHistoryPage /></RequireModule>} />
-        <Route path="prices/graphique" element={<RequireModule module="prix"><PricesChartPage /></RequireModule>} />
+        <Route path="purchase-requests" element={<RequireModule subModule="achats"><ListPage /></RequireModule>} />
+        <Route path="purchase-requests/new" element={<RequireModule subModule="achats"><CreatePage /></RequireModule>} />
+        <Route path="purchase-requests/:id" element={<RequireModule subModule="achats"><DetailPage /></RequireModule>} />
+        <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
+        <Route path="employees/new" element={<RequireModule subModule="rh" minNiveau="ajout"><EmployeesFormPage /></RequireModule>} />
+        <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
+        <Route path="kpi" element={<RequireModule subModule="kpi"><KpiPage /></RequireModule>} />
+        <Route path="stock/saisie" element={<RequireModule subModule="stock.saisie_jour"><StockEntryPage /></RequireModule>} />
+        <Route path="stock/historique" element={<RequireModule subModule="stock.saisie_jour"><StockHistoryPage /></RequireModule>} />
+        <Route path="stock/graphiques" element={<RequireModule subModule="stock.saisie_jour"><StockChartsPage /></RequireModule>} />
+        <Route path="stock/dashboard-dg" element={<RequireModule subModule="stock.saisie_jour"><StockDgDashboardPage /></RequireModule>} />
+        <Route path="stock/mouvements" element={<RequireModule subModule="stock.mouvements"><StockMovementsPage /></RequireModule>} />
+        <Route path="prices/historique" element={<RequireModule subModule="prix"><PricesHistoryPage /></RequireModule>} />
+        <Route path="prices/graphique" element={<RequireModule subModule="prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />

@@ -1,13 +1,13 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { hasAnyRoleOnEntity, requireModule } = require('../../middleware/permissions');
+const { hasAnyRoleOnEntity, requireSubModule } = require('../../middleware/permissions');
 const repo = require('./purchase-orders.repository');
 const prRepo = require('../purchase-requests/purchase-requests.repository');
 const pdf = require('../../utils/pdf');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('achats'));
+router.use(requireSubModule('achats'));
 
 async function loadAuthorized(req) {
   const po = await repo.getById(Number(req.params.id));

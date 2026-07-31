@@ -1,7 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSuperAdmin } = require('../../middleware/permissions');
-const { MODULES, MODULE_KEYS } = require('../../config/modules');
+const { requireSuperAdmin, NIVEAUX } = require('../../middleware/permissions');
+const { MODULES, SUB_MODULE_KEYS } = require('../../config/modules');
 const usersService = require('./users.service');
 
 const router = express.Router();
@@ -50,24 +50,29 @@ router.delete('/:id/roles/:roleId', requireAuth, requireSuperAdmin, async (req, 
   } catch (e) { next(e); }
 });
 
-router.get('/module-catalog', requireAuth, requireSuperAdmin, (req, res) => {
+router.get('/sub-module-catalog', requireAuth, requireSuperAdmin, (req, res) => {
   res.json(MODULES);
 });
 
-router.post('/:id/modules', requireAuth, requireSuperAdmin, async (req, res, next) => {
+// Upsert : une seule ligne par (user, sous-module), le niveau est fourni dès l'octroi — plus
+// d'état intermédiaire "accordé mais niveau par défaut" (voir SPEC.md §2.3).
+router.put('/:id/sub-modules/:key', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try {
-    const { module_key } = req.body || {};
-    if (!MODULE_KEYS.includes(module_key)) {
-      return res.status(400).json({ error: 'module_key invalide.' });
+    const { niveau } = req.body || {};
+    if (!SUB_MODULE_KEYS.includes(req.params.key)) {
+      return res.status(400).json({ error: 'Sous-module invalide.' });
     }
-    await usersService.grantModule(Number(req.params.id), module_key);
+    if (!NIVEAUX.includes(niveau)) {
+      return res.status(400).json({ error: `niveau invalide, attendu: ${NIVEAUX.join('|')}.` });
+    }
+    await usersService.setSubModuleAccess(Number(req.params.id), req.params.key, niveau);
     res.status(201).json(await usersService.loadUserWithRoles(Number(req.params.id)));
   } catch (e) { next(e); }
 });
 
-router.delete('/:id/modules/:accessId', requireAuth, requireSuperAdmin, async (req, res, next) => {
+router.delete('/:id/sub-modules/:key', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try {
-    await usersService.revokeModule(Number(req.params.id), Number(req.params.accessId));
+    await usersService.revokeSubModuleAccess(Number(req.params.id), req.params.key);
     res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
   } catch (e) { next(e); }
 });
@@ -84,19 +89,6 @@ router.post('/:id/business-units', requireAuth, requireSuperAdmin, async (req, r
 router.delete('/:id/business-units/:accessId', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try {
     await usersService.revokeBusinessUnit(Number(req.params.id), Number(req.params.accessId));
-    res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
-  } catch (e) { next(e); }
-});
-
-const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
-
-router.put('/:id/prix-niveau', requireAuth, requireSuperAdmin, async (req, res, next) => {
-  try {
-    const { niveau } = req.body || {};
-    if (!PRIX_LEVELS.includes(niveau)) {
-      return res.status(400).json({ error: `niveau invalide, attendu: ${PRIX_LEVELS.join('|')}.` });
-    }
-    await usersService.setPrixNiveau(Number(req.params.id), niveau);
     res.json(await usersService.loadUserWithRoles(Number(req.params.id)));
   } catch (e) { next(e); }
 });

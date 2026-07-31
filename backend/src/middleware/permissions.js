@@ -6,6 +6,8 @@
 // requireAuth (middleware/auth.js) — jamais depuis le JWT, pour que les changements de droits
 // prennent effet immédiatement sans attendre une reconnexion.
 
+const { MODULES } = require('../config/modules');
+
 const PERMS = {
   super_admin:       ['all'],
   demandeur:         ['pa_create', 'pa_view_own'],
@@ -58,24 +60,55 @@ function requireRoleOnEntity(roleCode, entityId) {
   };
 }
 
-// Accès par module (RH, Achats, un référentiel précis...) — couche indépendante des rôles
-// métier ci-dessus. req.user.modules est relu en base à chaque requête (voir requireAuth).
-// Un super_admin a toujours accès à tout, sans avoir besoin d'un octroi explicite.
-function hasModule(user, moduleKey) {
-  if (isSuperAdmin(user)) return true;
-  return (user.modules || []).includes(moduleKey);
+// Accès par sous-module (RH, Achats, Stock du Jour, Mouvement Stock, un référentiel précis...) —
+// couche indépendante des rôles métier ci-dessus, remplace l'ancien accès binaire par module
+// (SPEC.md §2.3) : chaque sous-module a un niveau consultation < ajout < edition, réutilisant le
+// vocabulaire déjà en place pour Prix plutôt que d'en inventer un nouveau. req.user.subModules
+// (relu en base à chaque requête, voir requireAuth) = [{ sub_module_key, niveau }, ...].
+// Un super_admin a toujours le niveau le plus élevé partout, sans octroi explicite.
+const NIVEAUX = ['consultation', 'ajout', 'edition'];
+
+function subModuleNiveau(user, subModuleKey) {
+  if (isSuperAdmin(user)) return 'edition';
+  const row = (user.subModules || []).find(s => s.sub_module_key === subModuleKey);
+  return row ? row.niveau : null;
 }
 
-function requireModule(moduleKey) {
+function hasSubModuleLevel(user, subModuleKey, minNiveau = 'consultation') {
+  const niveau = subModuleNiveau(user, subModuleKey);
+  if (!niveau) return false;
+  return NIVEAUX.indexOf(niveau) >= NIVEAUX.indexOf(minNiveau);
+}
+
+function requireSubModule(subModuleKey, minNiveau = 'consultation') {
   return (req, res, next) => {
-    if (!hasModule(req.user, moduleKey)) {
-      return res.status(403).json({ error: `Accès refusé : ce module (${moduleKey}) ne vous a pas été accordé.` });
+    if (!hasSubModuleLevel(req.user, subModuleKey, minNiveau)) {
+      return res.status(403).json({ error: `Accès refusé : niveau "${minNiveau}" requis sur "${subModuleKey}".` });
     }
     next();
   };
 }
 
-// Accès par Business Unit (module Stock du Jour) — couche encore plus fine que hasModule('stock') :
+// Paire create/edit réutilisée par tous les référentiels (via crud.factory.js, ou câblée à la
+// main pour ceux qui n'y passent pas — products.routes.js, suppliers.routes.js) : ajout >=
+// 'ajout', modification/suppression >= 'edition'.
+function requireSubModuleWrite(subModuleKey) {
+  return { create: requireSubModule(subModuleKey, 'ajout'), edit: requireSubModule(subModuleKey, 'edition') };
+}
+
+// Dérivé du catalogue (config/modules.js) : vrai si l'utilisateur a un accès (n'importe quel
+// niveau) à AU MOINS UN sous-module de ce module — sert uniquement à décider si un lien de nav
+// de premier niveau doit s'afficher, jamais à gater un écran précis (chaque écran gate sur son
+// propre sous-module via requireSubModule).
+function hasModuleAccess(user, moduleKey) {
+  if (isSuperAdmin(user)) return true;
+  const mod = MODULES.find(m => m.key === moduleKey);
+  if (!mod) return false;
+  const keys = mod.subModules.length ? mod.subModules.map(sm => sm.key) : [mod.key];
+  return keys.some(k => !!subModuleNiveau(user, k));
+}
+
+// Accès par Business Unit (module Stock du Jour) — couche encore plus fine que hasSubModuleLevel :
 // un "Gestionnaire de Stock" ne doit voir/saisir que la ou les BU qui lui sont accordées.
 // req.user.businessUnits = tableau d'ids de BU, relu en base à chaque requête (voir requireAuth).
 //
@@ -95,30 +128,6 @@ function visibleBusinessUnitIds(user) {
   return granted.length > 0 ? granted : null;
 }
 
-// Niveau d'accès fin à l'intérieur du module `prix` (§3.8) — hiérarchie stricte :
-// consultation < ajout < edition. req.user.prixNiveau est relu en base à chaque requête
-// (voir requireAuth), défaut 'consultation' si aucune ligne n'existe pour cet utilisateur.
-// Un super_admin a toujours le niveau le plus élevé, sans octroi explicite.
-const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
-
-function prixNiveau(user) {
-  if (isSuperAdmin(user)) return 'edition';
-  return user.prixNiveau || 'consultation';
-}
-
-function hasPrixLevel(user, minLevel) {
-  return PRIX_LEVELS.indexOf(prixNiveau(user)) >= PRIX_LEVELS.indexOf(minLevel);
-}
-
-function requirePrixLevel(minLevel) {
-  return (req, res, next) => {
-    if (!hasPrixLevel(req.user, minLevel)) {
-      return res.status(403).json({ error: `Accès refusé : niveau "${minLevel}" requis sur le module prix.` });
-    }
-    next();
-  };
-}
-
 module.exports = {
   PERMS,
   isSuperAdmin,
@@ -126,13 +135,14 @@ module.exports = {
   hasAnyRoleOnEntity,
   hasPerm,
   hasPermAnywhere,
-  hasModule,
+  subModuleNiveau,
+  hasSubModuleLevel,
+  hasModuleAccess,
   canWriteBusinessUnit,
   visibleBusinessUnitIds,
-  prixNiveau,
-  hasPrixLevel,
   requireSuperAdmin,
   requireRoleOnEntity,
-  requireModule,
-  requirePrixLevel,
+  requireSubModule,
+  requireSubModuleWrite,
+  NIVEAUX,
 };

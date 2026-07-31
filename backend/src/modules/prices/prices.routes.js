@@ -1,11 +1,11 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule, requirePrixLevel } = require('../../middleware/permissions');
+const { requireSubModule } = require('../../middleware/permissions');
 const service = require('./prices.service');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('prix'));
+router.use(requireSubModule('prix'));
 
 router.get('/current', async (req, res, next) => {
   try {
@@ -41,7 +41,7 @@ router.get('/series', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requirePrixLevel('ajout'), async (req, res, next) => {
+router.post('/', requireSubModule('prix', 'ajout'), async (req, res, next) => {
   try {
     const { productId, prix, devise, dateEffet, commentaire } = req.body || {};
     const price = await service.addPrice(req.user, { productId, prix, devise, dateEffet, commentaire });
@@ -51,14 +51,14 @@ router.post('/', requirePrixLevel('ajout'), async (req, res, next) => {
 
 // Correction/suppression d'une ligne d'historique déjà saisie — réservé au niveau "edition"
 // (§3.8) : le niveau "ajout" ci-dessus ne permet que d'AJOUTER un nouveau changement de prix.
-router.put('/:id', requirePrixLevel('edition'), async (req, res, next) => {
+router.put('/:id', requireSubModule('prix', 'edition'), async (req, res, next) => {
   try {
     const { prix, devise, dateEffet, commentaire } = req.body || {};
     res.json(await service.updatePrice(Number(req.params.id), { prix, devise, dateEffet, commentaire }));
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requirePrixLevel('edition'), async (req, res, next) => {
+router.delete('/:id', requireSubModule('prix', 'edition'), async (req, res, next) => {
   try {
     await service.deletePrice(Number(req.params.id));
     res.json({ ok: true });

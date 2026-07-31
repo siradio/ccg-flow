@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 
 const ROLE_CODES = ['super_admin', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'dga'];
+const NIVEAUX = [
+  { value: '', label: '— (aucun accès)' },
+  { value: 'consultation', label: 'Consultation (lecture seule)' },
+  { value: 'ajout', label: 'Ajout (peut créer)' },
+  { value: 'edition', label: 'Édition (peut aussi modifier/supprimer)' },
+];
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -10,7 +16,6 @@ export default function Users() {
   const [businessUnits, setBusinessUnits] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '' });
   const [roleForm, setRoleForm] = useState({});
-  const [moduleForm, setModuleForm] = useState({});
   const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
 
@@ -18,7 +23,7 @@ export default function Users() {
   useEffect(() => {
     load();
     client.get('/entities').then(res => setEntities(res.data));
-    client.get('/users/module-catalog').then(res => setModuleCatalog(res.data));
+    client.get('/users/sub-module-catalog').then(res => setModuleCatalog(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
   }, []);
 
@@ -45,16 +50,11 @@ export default function Users() {
     load();
   }
 
-  async function addModule(userId) {
-    const moduleKey = moduleForm[userId];
-    if (!moduleKey) return;
-    await client.post(`/users/${userId}/modules`, { module_key: moduleKey });
-    setModuleForm({ ...moduleForm, [userId]: '' });
-    load();
-  }
-
-  async function removeModule(userId, accessId) {
-    await client.delete(`/users/${userId}/modules/${accessId}`);
+  // Une seule action pour tout le nouveau système : niveau vide = révoque, sinon octroie/met à
+  // jour (§2.3 SPEC.md) — remplace les anciens addModule/removeModule/setPrixNiveau séparés.
+  async function setSubModuleNiveau(userId, subModuleKey, niveau) {
+    if (niveau) await client.put(`/users/${userId}/sub-modules/${subModuleKey}`, { niveau });
+    else await client.delete(`/users/${userId}/sub-modules/${subModuleKey}`);
     load();
   }
 
@@ -71,20 +71,11 @@ export default function Users() {
     load();
   }
 
-  async function setPrixNiveau(userId, niveau) {
-    await client.put(`/users/${userId}/prix-niveau`, { niveau });
-    load();
-  }
-
   async function toggleActive(u) {
     const action = u.actif ? 'désactiver' : 'réactiver';
     if (!window.confirm(`Confirmer : ${action} ${u.prenom} ${u.nom} ?`)) return;
     await client.put(`/users/${u.id}`, { actif: !u.actif });
     load();
-  }
-
-  function moduleLabel(key) {
-    return moduleCatalog.find(m => m.key === key)?.label || key;
   }
 
   return (
@@ -128,25 +119,16 @@ export default function Users() {
             <button onClick={() => addRole(u.id)} className="btn btn-primary btn-sm">+ Ajouter le rôle</button>
           </div>
 
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès aux modules</div>
-          <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {u.modules.map(m => (
-              <span key={m.id} className="badge" style={{ background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
-                {moduleLabel(m.module_key)}
-                {' '}<button onClick={() => removeModule(u.id, m.id)} className="btn-icon">×</button>
-              </span>
-            ))}
-            {u.modules.length === 0 && <span className="empty-row">Aucun module accordé (super_admin a accès à tout par défaut).</span>}
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            Accès aux modules
           </div>
-          <div className="form-inline" style={{ marginTop: 10 }}>
-            <select value={moduleForm[u.id] || ''} onChange={e => setModuleForm({ ...moduleForm, [u.id]: e.target.value })}>
-              <option value="">Module…</option>
-              {moduleCatalog.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-            </select>
-            <button onClick={() => addModule(u.id)} className="btn btn-primary btn-sm">+ Accorder le module</button>
+          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {moduleCatalog.map(mod => (
+              <ModuleAccessGroup key={mod.key} mod={mod} user={u} onChange={(key, niveau) => setSubModuleNiveau(u.id, key, niveau)} />
+            ))}
           </div>
 
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès Business Units (Stock du Jour)</div>
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès Business Units (Stock du Jour / Mouvement Stock)</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {u.businessUnits.map(b => (
               <span key={b.id} className="badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)' }}>
@@ -154,7 +136,7 @@ export default function Users() {
                 {' '}<button onClick={() => removeBusinessUnit(u.id, b.id)} className="btn-icon">×</button>
               </span>
             ))}
-            {u.businessUnits.length === 0 && <span className="empty-row">Aucune BU accordée (lecture seule sur toutes si le module Stock est accordé).</span>}
+            {u.businessUnits.length === 0 && <span className="empty-row">Aucune BU accordée (lecture seule sur toutes si un sous-module Stock est accordé).</span>}
           </div>
           <div className="form-inline" style={{ marginTop: 10 }}>
             <select value={buForm[u.id] || ''} onChange={e => setBuForm({ ...buForm, [u.id]: e.target.value })}>
@@ -162,15 +144,6 @@ export default function Users() {
               {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
             </select>
             <button onClick={() => addBusinessUnit(u.id)} className="btn btn-primary btn-sm">+ Accorder la BU</button>
-          </div>
-
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Niveau d'accès Prix</div>
-          <div className="form-inline" style={{ marginTop: 6 }}>
-            <select value={u.prixNiveau || 'consultation'} onChange={e => setPrixNiveau(u.id, e.target.value)}>
-              <option value="consultation">Consultation (lecture seule)</option>
-              <option value="ajout">Ajout (peut enregistrer un nouveau prix)</option>
-              <option value="edition">Édition (peut aussi corriger/supprimer)</option>
-            </select>
           </div>
         </div>
       ))}
@@ -186,6 +159,33 @@ export default function Users() {
         </form>
         {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
       </div>
+    </div>
+  );
+}
+
+// Un module = un bloc ; ses sous-modules (ou lui-même s'il n'en a pas — voir modules.js §2.3)
+// sont chacun une ligne avec leur propre sélecteur de niveau. Remplace le menu déroulant plat
+// unique d'avant, qui devenait ingérable à mesure que le nombre de modules augmentait.
+function ModuleAccessGroup({ mod, user, onChange }) {
+  const rows = mod.subModules.length ? mod.subModules : [{ key: mod.key, label: mod.label }];
+  return (
+    <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' }}>
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: rows.length > 1 || rows[0].key !== mod.key ? 6 : 0 }}>
+        {mod.label}
+      </div>
+      {rows.map(row => {
+        const current = user.subModules.find(s => s.sub_module_key === row.key)?.niveau || '';
+        return (
+          <div key={row.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '3px 0', paddingLeft: mod.subModules.length ? 12 : 0 }}>
+            <span style={{ fontSize: 13, color: mod.subModules.length ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+              {mod.subModules.length ? row.label : null}
+            </span>
+            <select value={current} onChange={e => onChange(row.key, e.target.value)} style={{ fontSize: 12 }}>
+              {NIVEAUX.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+            </select>
+          </div>
+        );
+      })}
     </div>
   );
 }

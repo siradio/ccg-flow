@@ -10,5 +10,5 @@ module.exports = simpleCrudRouter({
   ],
   filterColumn: 'site_id',
   orderBy: 'nom',
-  moduleKey: 'ref_machines',
+  subModuleKey: 'referentiels.machines',
 });

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const usersService = require('../modules/users/users.service');
 
-// Le token ne sert qu'à authentifier l'identité (id) ; les droits (rôles, modules, BU) sont
+// Le token ne sert qu'à authentifier l'identité (id) ; les droits (rôles, sous-modules, BU) sont
 // relus en base à chaque requête, pour qu'un octroi/retrait d'accès par un super_admin prenne
 // effet immédiatement, sans attendre que l'utilisateur concerné se reconnecte.
 async function requireAuth(req, res, next) {
@@ -21,9 +21,8 @@ async function requireAuth(req, res, next) {
       prenom: full.prenom,
       email: full.email,
       roles: full.roles.map(r => ({ entity_id: r.entity_id, entity_code: r.entity_code, role_code: r.role_code })),
-      modules: full.modules,
+      subModules: full.subModules,
       businessUnits: full.businessUnits,
-      prixNiveau: full.prixNiveau,
     };
     next();
   } catch (e) {

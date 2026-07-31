@@ -1,11 +1,12 @@
 const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModuleWrite } = require('../../middleware/permissions');
 const suppliersService = require('./suppliers.service');
 
 const router = express.Router();
 const { withEntityIds } = suppliersService;
+const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('referentiels.suppliers');
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -33,7 +34,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
+router.post('/', requireAuth, requireCreate, async (req, res, next) => {
   try {
     const { entity_ids, ...fields } = req.body || {};
     const supplier = await suppliersService.createSupplier(fields);
@@ -44,7 +45,7 @@ router.post('/', requireAuth, requireModule('ref_suppliers'), async (req, res, n
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
+router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     const existing = await one('SELECT * FROM suppliers WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
@@ -88,7 +89,7 @@ router.put('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res,
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireAuth, requireModule('ref_suppliers'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     await run('DELETE FROM suppliers WHERE id = $1', [req.params.id]);
     res.json({ ok: true });

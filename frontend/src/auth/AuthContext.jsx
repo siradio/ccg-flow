@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import client from '../api/client';
+import { MODULE_SUB_KEYS } from '../config/modules';
 
 const AuthContext = createContext(null);
 
@@ -54,11 +55,30 @@ export function isSuperAdmin(user) {
   return !!user && user.roles.some(r => r.role_code === 'super_admin');
 }
 
-// Accès par module (RH, Achats, un référentiel précis...) — couche indépendante des rôles
-// de workflow ci-dessus. Un super_admin a toujours accès à tout.
-export function hasModule(user, moduleKey) {
+// Accès par sous-module (RH, Achats, Stock du Jour, Mouvement Stock, un référentiel précis...) —
+// couche indépendante des rôles de workflow ci-dessus, miroir de permissions.js côté backend.
+// Hiérarchie stricte : consultation < ajout < edition. super_admin = toujours 'edition' partout.
+const NIVEAUX = ['consultation', 'ajout', 'edition'];
+
+export function subModuleNiveau(user, subModuleKey) {
+  if (isSuperAdmin(user)) return 'edition';
+  const row = (user?.subModules || []).find(s => s.sub_module_key === subModuleKey);
+  return row ? row.niveau : null;
+}
+
+export function hasSubModuleLevel(user, subModuleKey, minNiveau = 'consultation') {
+  const niveau = subModuleNiveau(user, subModuleKey);
+  if (!niveau) return false;
+  return NIVEAUX.indexOf(niveau) >= NIVEAUX.indexOf(minNiveau);
+}
+
+// Dérivé de MODULE_SUB_KEYS (config/modules.js) : vrai si l'utilisateur a accès à AU MOINS UN
+// sous-module de ce module — sert uniquement à décider si un lien de nav de premier niveau doit
+// s'afficher, jamais à gater un écran précis (chaque écran gate sur son propre sous-module).
+export function hasModuleAccess(user, moduleKey) {
   if (isSuperAdmin(user)) return true;
-  return !!user && (user.modules || []).includes(moduleKey);
+  const keys = MODULE_SUB_KEYS[moduleKey]?.length ? MODULE_SUB_KEYS[moduleKey] : [moduleKey];
+  return keys.some(k => hasSubModuleLevel(user, k));
 }
 
 // Accès par Business Unit (module Stock du Jour) — miroir de permissions.js côté backend.
@@ -67,19 +87,6 @@ export function hasModule(user, moduleKey) {
 export function canWriteBusinessUnit(user, businessUnitId) {
   if (isSuperAdmin(user)) return true;
   return !!user && (user.businessUnits || []).map(Number).includes(Number(businessUnitId));
-}
-
-// Niveau d'accès fin du module `prix` (§3.8) — miroir de permissions.js côté backend.
-// Hiérarchie stricte : consultation < ajout < edition. super_admin = toujours 'edition'.
-const PRIX_LEVELS = ['consultation', 'ajout', 'edition'];
-
-export function prixNiveau(user) {
-  if (isSuperAdmin(user)) return 'edition';
-  return user?.prixNiveau || 'consultation';
-}
-
-export function hasPrixLevel(user, minLevel) {
-  return PRIX_LEVELS.indexOf(prixNiveau(user)) >= PRIX_LEVELS.indexOf(minLevel);
 }
 
 export function entitiesForRole(user, roleCode) {

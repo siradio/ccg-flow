@@ -3,11 +3,17 @@ import client from '../../api/client';
 
 // Page CRUD générique pour un référentiel "simple" (une table, champs plats + éventuels entity_ids).
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
-export default function ReferentialPage({ title, endpoint, fields, entities = [], sites = [], lists = {}, canWrite = false }) {
+// canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
+// distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
+export default function ReferentialPage({ title, endpoint, fields, entities = [], sites = [], lists = {}, canAdd = false, canEdit = false }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields));
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+
+  // Visible dès qu'on peut créer, OU qu'on est en train d'éditer un élément existant (le seul
+  // moyen d'entrer en édition est le bouton "Éditer", lui-même gaté par canEdit).
+  const showForm = canAdd || editingId !== null;
 
   function load() {
     client.get(endpoint).then(res => setItems(res.data));
@@ -51,14 +57,14 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
             <thead>
               <tr>
                 {fields.map(f => <th key={f.key}>{f.label}</th>)}
-                {canWrite && <th />}
+                {canEdit && <th />}
               </tr>
             </thead>
             <tbody>
               {items.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists)}</td>)}
-                  {canWrite && (
+                  {canEdit && (
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
                       <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">Supprimer</button>
@@ -72,7 +78,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
         </div>
       </div>
 
-      {canWrite && (
+      {showForm && (
         <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
           <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? 'Modifier' : 'Ajouter'}</strong>
           {fields.map(f => (

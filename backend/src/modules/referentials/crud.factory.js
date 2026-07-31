@@ -1,15 +1,17 @@
 // Fabrique de routeur CRUD générique pour les référentiels "simples" (une table, pas de junction).
-// Lecture ouverte à tout utilisateur authentifié ; écriture réservée à super_admin ou à qui
-// s'est vu accorder le module d'accès correspondant (voir SPEC.md §2.3, config/modules.js).
+// Lecture ouverte à tout utilisateur authentifié ; écriture par niveau sur le sous-module
+// correspondant (voir SPEC.md §2.3, config/modules.js) — ajout >= 'ajout', modification/
+// suppression >= 'edition', donnant enfin une vraie distinction créer/modifier là où l'accès
+// était binaire auparavant.
 const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModuleWrite } = require('../../middleware/permissions');
 
-function simpleCrudRouter({ table, columns, filterColumn, orderBy, moduleKey }) {
+function simpleCrudRouter({ table, columns, filterColumn, orderBy, subModuleKey }) {
   const router = express.Router();
   const cols = columns.join(', ');
-  const requireWriteAccess = requireModule(moduleKey);
+  const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite(subModuleKey);
 
   router.get('/', requireAuth, async (req, res, next) => {
     try {
@@ -32,7 +34,7 @@ function simpleCrudRouter({ table, columns, filterColumn, orderBy, moduleKey }) 
     } catch (e) { next(e); }
   });
 
-  router.post('/', requireAuth, requireWriteAccess, async (req, res, next) => {
+  router.post('/', requireAuth, requireCreate, async (req, res, next) => {
     try {
       const values = columns.map(c => req.body[c] ?? null);
       const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
@@ -44,7 +46,7 @@ function simpleCrudRouter({ table, columns, filterColumn, orderBy, moduleKey }) 
     } catch (e) { next(e); }
   });
 
-  router.put('/:id', requireAuth, requireWriteAccess, async (req, res, next) => {
+  router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
     try {
       const existing = await one(`SELECT id, ${cols} FROM ${table} WHERE id = $1`, [req.params.id]);
       if (!existing) return res.status(404).json({ error: 'Introuvable.' });
@@ -58,7 +60,7 @@ function simpleCrudRouter({ table, columns, filterColumn, orderBy, moduleKey }) 
     } catch (e) { next(e); }
   });
 
-  router.delete('/:id', requireAuth, requireWriteAccess, async (req, res, next) => {
+  router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
     try {
       await run(`DELETE FROM ${table} WHERE id = $1`, [req.params.id]);
       res.json({ ok: true });

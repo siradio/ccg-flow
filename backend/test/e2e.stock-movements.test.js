@@ -103,3 +103,27 @@ test('quantite négative ou nulle refusée, type_mouvement invalide refusé', as
     .send({ productId: seeded.stockProductId, typeMouvement: 'transfert', quantite: 5, dateMouvement: '2026-03-03' });
   assert.equal(badTypeRes.status, 400);
 });
+
+test("Stock du Jour et Mouvement Stock sont accordables indépendamment (refonte du système de permissions, §2.3 SPEC.md)", async () => {
+  const adminToken = await login('admin@test');
+  const usersRes = await request(app).get('/api/users').set('Authorization', auth(adminToken));
+  // demandeur.sog@test n'a par défaut ni le sous-module stock.saisie_jour ni stock.mouvements (seed.js).
+  const demandeur = usersRes.body.find(u => u.email === 'demandeur.sog@test');
+
+  const beforeToken = await login('demandeur.sog@test');
+  const beforeMouvements = await request(app).get('/api/stock-movements').set('Authorization', auth(beforeToken));
+  assert.equal(beforeMouvements.status, 403);
+  const beforeSaisie = await request(app).get('/api/stock/entries').set('Authorization', auth(beforeToken));
+  assert.equal(beforeSaisie.status, 403);
+
+  // On accorde UNIQUEMENT stock.mouvements, jamais stock.saisie_jour.
+  const grantRes = await request(app).put(`/api/users/${demandeur.id}/sub-modules/stock.mouvements`)
+    .set('Authorization', auth(adminToken))
+    .send({ niveau: 'consultation' });
+  assert.equal(grantRes.status, 201, JSON.stringify(grantRes.body));
+
+  const afterMouvements = await request(app).get('/api/stock-movements').set('Authorization', auth(beforeToken));
+  assert.equal(afterMouvements.status, 200, "stock.mouvements accordé -> accès immédiat sans reconnexion (§2.5)");
+  const afterSaisie = await request(app).get('/api/stock/entries').set('Authorization', auth(beforeToken));
+  assert.equal(afterSaisie.status, 403, "stock.saisie_jour n'a jamais été accordé -> toujours refusé");
+});

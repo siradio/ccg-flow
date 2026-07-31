@@ -1,13 +1,16 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModule } = require('../../middleware/permissions');
 const service = require('./stock-movements.service');
 
 const router = express.Router();
 router.use(requireAuth);
-// Même module que Stock du Jour (`stock`) — Mouvement Stock en est une section sœur, pas un
-// module d'accès séparé (§3.6/§3.9 SPEC.md).
-router.use(requireModule('stock'));
+// Sous-module indépendant de Stock du Jour (§2.3/§3.9 SPEC.md) : accordable séparément depuis la
+// refonte du système de permissions — un utilisateur peut avoir Mouvement Stock sans Stock du
+// Jour, ou l'inverse. L'accès par Business Unit (canWriteBusinessUnit/visibleBusinessUnitIds)
+// continue de s'appliquer uniformément aux deux sous-modules stock, quel que soit lequel a été
+// accordé.
+router.use(requireSubModule('stock.mouvements'));
 
 router.get('/', async (req, res, next) => {
   try {

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
-import { useAuth, hasModule } from '../../auth/AuthContext';
+import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { StatutBadge } from './statutBadge.jsx';
+import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 
 export default function ListPage() {
   const { user } = useAuth();
-  const canWrite = hasModule(user, 'rh');
+  const canWrite = hasSubModuleLevel(user, 'rh', 'ajout');
   const [employees, setEmployees] = useState([]);
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
@@ -37,6 +38,7 @@ export default function ListPage() {
 
   return (
     <div>
+      <ReferentialsSubnav />
       <div className="page-header">
         <div>
           <h1 className="page-title">Employés</h1>

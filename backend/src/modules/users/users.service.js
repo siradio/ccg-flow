@@ -15,30 +15,29 @@ async function loadUserWithRoles(userId) {
      WHERE uer.user_id = $1`,
     [userId]
   );
-  const moduleRows = await all('SELECT module_key FROM user_module_access WHERE user_id = $1', [userId]);
   const buRows = await all('SELECT business_unit_id FROM user_business_unit_access WHERE user_id = $1', [userId]);
-  const prixRow = await one('SELECT niveau FROM user_prix_access WHERE user_id = $1', [userId]);
+  const subModuleRows = await all('SELECT sub_module_key, niveau FROM user_sub_module_access WHERE user_id = $1', [userId]);
   return {
     ...user,
     roles,
-    modules: moduleRows.map(m => m.module_key),
     businessUnits: buRows.map(b => b.business_unit_id),
-    prixNiveau: prixRow ? prixRow.niveau : 'consultation',
+    subModules: subModuleRows,
   };
 }
 
-async function grantModule(userId, moduleKey) {
-  const row = await one(
-    `INSERT INTO user_module_access (user_id, module_key) VALUES ($1,$2)
-     ON CONFLICT (user_id, module_key) DO NOTHING
-     RETURNING id`,
-    [userId, moduleKey]
+// Une seule ligne par (user, sous-module) — upsert, remplace grantModule/setPrixNiveau (SPEC.md
+// §2.3) : chaque octroi porte désormais son niveau dès la création, plus d'état intermédiaire
+// "accordé mais niveau par défaut oublié".
+async function setSubModuleAccess(userId, subModuleKey, niveau) {
+  await run(
+    `INSERT INTO user_sub_module_access (user_id, sub_module_key, niveau) VALUES ($1,$2,$3)
+     ON CONFLICT (user_id, sub_module_key) DO UPDATE SET niveau = $3, updated_at = now()`,
+    [userId, subModuleKey, niveau]
   );
-  return row ? row.id : null;
 }
 
-async function revokeModule(userId, accessRowId) {
-  await run('DELETE FROM user_module_access WHERE id = $1 AND user_id = $2', [accessRowId, userId]);
+async function revokeSubModuleAccess(userId, subModuleKey) {
+  await run('DELETE FROM user_sub_module_access WHERE user_id = $1 AND sub_module_key = $2', [userId, subModuleKey]);
 }
 
 async function grantBusinessUnit(userId, businessUnitId) {
@@ -53,14 +52,6 @@ async function grantBusinessUnit(userId, businessUnitId) {
 
 async function revokeBusinessUnit(userId, accessRowId) {
   await run('DELETE FROM user_business_unit_access WHERE id = $1 AND user_id = $2', [accessRowId, userId]);
-}
-
-async function setPrixNiveau(userId, niveau) {
-  await run(
-    `INSERT INTO user_prix_access (user_id, niveau) VALUES ($1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET niveau = $2, updated_at = now()`,
-    [userId, niveau]
-  );
 }
 
 async function findByEmail(email) {
@@ -114,22 +105,20 @@ async function listUsers() {
     `SELECT uer.id, uer.user_id, uer.entity_id, e.code AS entity_code, uer.role_code
      FROM user_entity_roles uer LEFT JOIN entities e ON e.id = uer.entity_id`
   );
-  const modules = await all('SELECT id, user_id, module_key FROM user_module_access');
   const businessUnits = await all(
     `SELECT uba.id, uba.user_id, uba.business_unit_id, bu.nom AS business_unit_nom
      FROM user_business_unit_access uba JOIN business_units bu ON bu.id = uba.business_unit_id`
   );
-  const prixRows = await all('SELECT user_id, niveau FROM user_prix_access');
+  const subModules = await all('SELECT user_id, sub_module_key, niveau FROM user_sub_module_access');
   return users.map(u => ({
     ...u,
     roles: roles.filter(r => r.user_id === u.id),
-    modules: modules.filter(m => m.user_id === u.id),
     businessUnits: businessUnits.filter(b => b.user_id === u.id),
-    prixNiveau: prixRows.find(p => p.user_id === u.id)?.niveau || 'consultation',
+    subModules: subModules.filter(s => s.user_id === u.id),
   }));
 }
 
 module.exports = {
   loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, listUsers,
-  grantModule, revokeModule, grantBusinessUnit, revokeBusinessUnit, setPrixNiveau,
+  setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, revokeBusinessUnit,
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
-import { useAuth, hasPrixLevel } from '../../auth/AuthContext';
+import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import PricesSubnav from './PricesSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
@@ -13,8 +13,8 @@ function today() {
 
 export default function HistoryPage() {
   const { user } = useAuth();
-  const canAdd = hasPrixLevel(user, 'ajout');
-  const canEdit = hasPrixLevel(user, 'edition');
+  const canAdd = hasSubModuleLevel(user, 'prix', 'ajout');
+  const canEdit = hasSubModuleLevel(user, 'prix', 'edition');
   const [businessUnits, setBusinessUnits] = useState([]);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);

@@ -1,11 +1,12 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModule, requireSubModuleWrite } = require('../../middleware/permissions');
 const service = require('./employees.service');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('rh'));
+router.use(requireSubModule('rh'));
+const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('rh');
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -28,7 +29,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireAuth, async (req, res, next) => {
+router.post('/', requireAuth, requireCreate, async (req, res, next) => {
   try {
     const { nom, prenom, entity_id } = req.body || {};
     if (!nom || !prenom || !entity_id) {
@@ -38,7 +39,7 @@ router.post('/', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireAuth, async (req, res, next) => {
+router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     const updated = await service.update(Number(req.params.id), req.body || {});
     if (!updated) return res.status(404).json({ error: 'Employé introuvable.' });
@@ -46,7 +47,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireAuth, async (req, res, next) => {
+router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     await service.remove(Number(req.params.id));
     res.json({ ok: true });

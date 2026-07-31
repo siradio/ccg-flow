@@ -1,9 +1,10 @@
 const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModuleWrite } = require('../../middleware/permissions');
 
 const router = express.Router();
+const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('referentiels.products');
 
 async function withEntityIds(product) {
   const rows = await all('SELECT entity_id FROM product_entities WHERE product_id = $1', [product.id]);
@@ -36,7 +37,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireAuth, requireModule('ref_products'), async (req, res, next) => {
+router.post('/', requireAuth, requireCreate, async (req, res, next) => {
   try {
     const { code, designation, category_id, business_unit_id, unite, actif, entity_ids, seuil_alerte_stock } = req.body || {};
     if (!designation || !category_id) {
@@ -53,7 +54,7 @@ router.post('/', requireAuth, requireModule('ref_products'), async (req, res, ne
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireAuth, requireModule('ref_products'), async (req, res, next) => {
+router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     const existing = await one('SELECT * FROM products WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
@@ -81,7 +82,7 @@ router.put('/:id', requireAuth, requireModule('ref_products'), async (req, res, 
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireAuth, requireModule('ref_products'), async (req, res, next) => {
+router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     await run('DELETE FROM products WHERE id = $1', [req.params.id]);
     res.json({ ok: true });

@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { requireAuth } = require('../../middleware/auth');
-const { requireModule } = require('../../middleware/permissions');
+const { requireSubModule } = require('../../middleware/permissions');
 const service = require('./purchase-requests.service');
 const auditService = require('../audit/audit.service');
 const attachmentsService = require('../attachments/attachments.service');
@@ -9,7 +9,7 @@ const attachmentsService = require('../attachments/attachments.service');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireModule('achats'));
+router.use(requireSubModule('achats'));
 
 router.post('/', requireAuth, async (req, res, next) => {
   try {

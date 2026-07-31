@@ -200,42 +200,62 @@ Toute vérification de permission est **scopée par entité** : un `controle_ges
 
 Le refus à n'importe quelle étape (`controle_gestion`, `finances`, `dga`) **exige un commentaire** (champ obligatoire, validé côté serveur, pas seulement côté front).
 
-### 2.3 Accès par module (organisation de l'application par module)
+### 2.3 Accès par sous-module (organisation de l'application par module et sous-module)
 
 Couche **indépendante** des rôles ci-dessus (`user_entity_roles`), qui gèrent *l'action* dans le
-circuit Achat. L'accès par module gère *la visibilité de l'application elle-même* : quels
-onglets/écrans un utilisateur voit et peut utiliser, tous modules confondus (RH, Achats, Stock,
-chaque référentiel pris séparément). Un utilisateur peut très bien détenir le rôle `service_achat`
-sans avoir le module `achats` accordé — dans ce cas il ne voit tout simplement pas le module.
+circuit Achat. L'accès par sous-module gère *la visibilité et le niveau d'action de l'application
+elle-même* : quels onglets/écrans un utilisateur voit, et avec quel niveau (consultation < ajout <
+édition) il peut y agir. Un utilisateur peut très bien détenir le rôle `service_achat` sans avoir
+le sous-module `achats` accordé — dans ce cas il ne voit tout simplement pas le module.
+
+**Refonte (remplace l'ancien système à deux mécanismes séparés)** : jusqu'ici, l'accès module
+était un simple binaire oui/non (`user_module_access`), sauf pour Prix qui avait sa propre table à
+niveaux (`user_prix_access`) — bolt-on spécifique, pas réutilisable. Conséquence concrète : Stock
+du Jour et Mouvement Stock partageaient la même clé `stock`, impossible d'accorder l'un sans
+l'autre, et l'admin n'avait qu'un menu déroulant plat de 13 clés sans regroupement. Ces deux
+mécanismes sont unifiés en une seule table générique, avec la hiérarchie de niveaux (déjà
+éprouvée sur Prix) appliquée à **tous** les modules :
 
 ```
-user_module_access
-  id, user_id (FK), module_key, created_at
+user_sub_module_access
+  id, user_id (FK), sub_module_key, niveau ('consultation'|'ajout'|'edition'), updated_at,
+  UNIQUE(user_id, sub_module_key)
 ```
 
-Catalogue des `module_key` (`backend/src/config/modules.js`) :
+Hiérarchie stricte, chaque niveau inclut les précédents : `consultation` (lecture seule) < `ajout`
+(peut créer) < `edition` (peut aussi modifier/supprimer). Chaque octroi porte son niveau dès la
+création — plus d'état intermédiaire "accordé mais niveau par défaut".
 
-| Clé | Module |
-|---|---|
-| `achats` | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
-| `rh` | RH (Employés) |
-| `kpi` | KPI (Achats + RH) — agrégats en lecture seule, voir §3.4 ; indépendant de `achats`/`rh` : donne les statistiques consolidées sans donner accès aux fiches individuelles |
-| `stock` | **Stock** (label du module, §3.6) — couvre deux sections : Stock du Jour (saisie/historique quotidien par BU, §3.5) et Mouvement Stock (§3.9). Voir §2.4 pour la restriction fine d'écriture par BU, commune aux deux sections |
-| `prix` | Historique des prix — voir §3.8 ; contrairement aux référentiels ci-dessous, la **lecture** est aussi gated par ce module (donnée jugée sensible), pas seulement l'écriture |
-| `ref_entities`, `ref_sites`, `ref_warehouses`, `ref_machines`, `ref_products`, `ref_product_categories`, `ref_business_units`, `ref_suppliers` | Un par onglet du référentiel — accès fin, pas tout-ou-rien |
+Catalogue (`backend/src/config/modules.js`, module → sous-modules) : un module avec des
+sous-modules déclarés n'est **jamais** directement accordable, seuls ses sous-modules le sont ; un
+module sans sous-modules déclarés est lui-même l'unité accordable (sa clé sert directement de
+`sub_module_key`).
+
+| Module | Sous-modules | Notes |
+|---|---|---|
+| `achats` | — (unité = `achats`) | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
+| `stock` | `stock.saisie_jour` (Stock du Jour, §3.5), `stock.mouvements` (Mouvement Stock, §3.9) | **Indépendamment accordables** depuis cette refonte — voir §2.4 pour la restriction BU, commune aux deux |
+| `prix` | — (unité = `prix`) | Historique des prix, §3.8 ; contrairement aux référentiels, la **lecture** est aussi gated (donnée jugée sensible), pas seulement l'écriture |
+| `kpi` | — (unité = `kpi`) | Agrégats en lecture seule, §3.4 ; indépendant de `achats`/`rh` |
+| `rh` | — (unité = `rh`) pour l'instant | Deviendra sous-modulé (Personnel / Congés & absences / Évaluation) quand ces écrans existeront réellement — pas avant, pour ne pas exposer des cases à cocher vers du vide |
+| `referentiels` | `referentiels.entities`, `.sites`, `.warehouses`, `.machines`, `.products`, `.product_categories`, `.business_units`, `.suppliers` | Un sous-module par onglet du référentiel — accès fin, pas tout-ou-rien |
+
+Ajouter un futur module (Logistique, QHSE, Commercial, Immobilisations, Production...) = ajouter
+une entrée dans ce catalogue + câbler ses routes sur `requireSubModule(...)` — aucun autre
+changement structurel, c'est tout le sens de cette refonte.
 
 Règles :
-- **super_admin a toujours accès à tout**, sans octroi explicite (`hasModule()` bypass, comme pour les rôles).
-- Pour tout autre utilisateur, l'accès est **refusé par défaut** — il faut l'accorder explicitement (Admin → Utilisateurs → "Accès aux modules").
-- Avoir le module d'un référentiel (ex. `ref_products`) donne aussi le **droit d'écriture** dessus (créer/éditer/supprimer), pas seulement la lecture — un gestionnaire de stock avec `ref_products` peut gérer le catalogue produits, pas juste le consulter.
-- **Ce qui reste volontairement en lecture ouverte à tout utilisateur authentifié**, même sans le module du référentiel correspondant : les listes `GET` d'entités/sites/produits/fournisseurs, parce qu'elles servent de données de référence ailleurs dans l'app (ex. choisir un site sur la fiche employé, ou un produit sur une ligne de demande d'achat) indépendamment du module. Seule l'**écriture** sur ces référentiels est gated par module ; la lecture de `/api/employees` et de tout le domaine `/api/purchase-requests`, elle, est entièrement gated (y compris en lecture), car ce sont des données métier sensibles propres à leur module.
-- Contrôle appliqué **à la fois** côté backend (`requireModule()`, source de vérité) et côté frontend (navigation masquée + garde de route `RequireModule`, juste pour l'UX).
+- **super_admin a toujours accès à tout, niveau `edition` partout**, sans octroi explicite (`isSuperAdmin()` bypass, comme pour les rôles).
+- Pour tout autre utilisateur, l'accès est **refusé par défaut** — il faut l'accorder explicitement (Admin → Utilisateurs → "Accès aux modules", arbre module → sous-module avec un sélecteur de niveau par ligne).
+- Sur les référentiels, `ajout` donne le droit de créer, `edition` celui de modifier/supprimer en plus — distinction qui n'existait pas avant (accès binaire).
+- **Ce qui reste volontairement en lecture ouverte à tout utilisateur authentifié**, même sans le sous-module correspondant : les listes `GET` d'entités/sites/produits/fournisseurs, parce qu'elles servent de données de référence ailleurs dans l'app (ex. choisir un site sur la fiche employé, ou un produit sur une ligne de demande d'achat) indépendamment du module. Seule l'**écriture** sur ces référentiels est gated par niveau ; la lecture de `/api/employees` et de tout le domaine `/api/purchase-requests`, elle, est entièrement gated (y compris en lecture), car ce sont des données métier sensibles propres à leur module.
+- Contrôle appliqué **à la fois** côté backend (`requireSubModule()`, source de vérité) et côté frontend (navigation masquée + garde de route `RequireModule`, juste pour l'UX).
 
-### 2.4 Accès par Business Unit (restriction fine, module `stock` uniquement)
+### 2.4 Accès par Business Unit (restriction fine, sous-modules `stock.saisie_jour` et `stock.mouvements`)
 
-Troisième couche de permission, **indépendante** des deux précédentes (rôles workflow, modules) :
-gère non pas *quel module* un utilisateur voit, mais *sur quelle(s) Business Unit(s) il peut
-écrire* à l'intérieur du module Stock du Jour.
+Couche de permission **indépendante** des précédentes (rôles workflow, sous-modules) : gère non
+pas *quel écran* un utilisateur voit, mais *sur quelle(s) Business Unit(s) il peut écrire* à
+l'intérieur du module Stock.
 
 ```
 user_business_unit_access
@@ -243,30 +263,35 @@ user_business_unit_access
 ```
 
 Règles :
-- **super_admin bypass**, comme les deux autres couches.
-- Un utilisateur avec le module `stock` mais **aucune** ligne dans `user_business_unit_access` a un
-  accès **lecture seule sur toutes les BU** (voir toute l'historique, ne peut rien saisir) — c'est
-  le cas par défaut pour Direction/Finance qui veulent juste consulter.
+- **super_admin bypass**, comme les autres couches.
+- **S'applique uniformément aux deux sous-modules stock** (`stock.saisie_jour` et
+  `stock.mouvements`), quel que soit celui effectivement accordé — une BU accordée vaut pour les
+  deux écrans. Seule la granularité "quel écran" a changé avec la refonte de §2.3 ; "quelle BU" en
+  reste indépendant, volontairement pas dédoublé par sous-module.
+- Un utilisateur avec un sous-module stock mais **aucune** ligne dans `user_business_unit_access` a
+  un accès **lecture seule sur toutes les BU** (voir toute l'historique, ne peut rien saisir) —
+  c'est le cas par défaut pour Direction/Finance qui veulent juste consulter.
 - Un utilisateur avec **au moins une** ligne devient restreint à ces BU précises : il ne peut écrire
   que sur les produits de ces BU (`canWriteBusinessUnit`), et la liste/l'historique qu'il voit sont
   filtrés à ces mêmes BU (`visibleBusinessUnitIds` retourne `null` = pas de restriction, ou un
   tableau = restriction stricte).
 - Un utilisateur peut avoir accès à **plusieurs** BU (ex. un gestionnaire couvrant Yaourt + Mayo).
-- Table dédiée plutôt que réutiliser `user_module_access`, pour garder chaque couche de permission
-  simple à raisonner indépendamment (même pattern que le choix module vs rôle).
-- Gérée via **Admin → Utilisateurs → "Accès Business Units (Stock du Jour)"** (octroi/révocation),
-  `POST/DELETE /api/users/:id/business-units`.
+- Table dédiée plutôt que fusionnée dans `user_sub_module_access`, pour garder chaque couche de
+  permission simple à raisonner indépendamment (même pattern que le choix sous-module vs rôle) —
+  "quel écran" et "quelle BU" sont deux questions différentes.
+- Gérée via **Admin → Utilisateurs → "Accès Business Units (Stock du Jour / Mouvement Stock)"**
+  (octroi/révocation), `POST/DELETE /api/users/:id/business-units`.
 
-### 2.5 Fraîcheur des droits (rôles, modules, BU)
+### 2.5 Fraîcheur des droits (rôles, sous-modules, BU)
 
 `requireAuth` (`backend/src/middleware/auth.js`) ne fait pas confiance au contenu du JWT pour les
-droits : le token ne porte que l'**identité** (`{ id }`), et `roles`/`modules`/`businessUnits` sont
-**relus en base à chaque requête** (`usersService.loadUserWithRoles`). Conséquence : un octroi ou
-un retrait d'accès par un super_admin (rôle, module, ou BU) **prend effet immédiatement** sur les
-requêtes suivantes de l'utilisateur concerné, sans qu'il ait besoin de se déconnecter/reconnecter.
-Avant ce choix, ces informations étaient embarquées dans le JWT à la connexion et ne se
-rafraîchissaient qu'au prochain login — un octroi de BU pouvait donc sembler "ne pas marcher" pour
-un utilisateur déjà connecté.
+droits : le token ne porte que l'**identité** (`{ id }`), et `roles`/`subModules`/`businessUnits`
+sont **relus en base à chaque requête** (`usersService.loadUserWithRoles`). Conséquence : un
+octroi ou un retrait d'accès par un super_admin (rôle, sous-module, ou BU) **prend effet
+immédiatement** sur les requêtes suivantes de l'utilisateur concerné, sans qu'il ait besoin de se
+déconnecter/reconnecter. Avant ce choix, ces informations étaient embarquées dans le JWT à la
+connexion et ne se rafraîchissaient qu'au prochain login — un octroi de BU pouvait donc sembler
+"ne pas marcher" pour un utilisateur déjà connecté.
 
 Limite connue, acceptée pour cette v1 : côté **frontend**, l'objet `user` du contexte React
 (`AuthContext`) n'est chargé qu'au montage de l'app (`GET /auth/me`) — la barre de navigation
@@ -275,34 +300,14 @@ en temps réel. Les vérifications qui comptent réellement pour la sécurité (
 données sensibles) sont, elles, toujours revérifiées côté serveur à chaque appel API et donc
 toujours à jour — la barre de navigation est purement un confort d'affichage.
 
-### 2.6 Niveau d'accès fin du module Prix
+### 2.6 (fusionné dans §2.3)
 
-Cinquième couche de permission (même famille que §2.4, mais **un seul niveau par utilisateur**,
-pas un ensemble comme les BU) : à l'intérieur du module `prix`, quel niveau d'action un
-utilisateur peut effectuer.
-
-```
-user_prix_access
-  user_id (PK, FK -> users), niveau ('consultation'|'ajout'|'edition'), updated_at
-```
-
-Hiérarchie stricte, chaque niveau inclut les précédents : `consultation` (lecture seule) <
-`ajout` (peut en plus enregistrer un nouveau changement de prix) < `edition` (peut en plus
-corriger ou supprimer une ligne d'historique existante — §3.8).
-
-Règles :
-- **super_admin bypass**, toujours au niveau `edition`, sans octroi explicite.
-- Un utilisateur avec le module `prix` mais **aucune** ligne dans `user_prix_access` est au
-  niveau `consultation` par défaut — le plus restrictif, cohérent avec le principe "refusé par
-  défaut" du reste de l'application (§2.3).
-- Contrairement à `user_business_unit_access` (une ligne par BU accordée, un utilisateur peut en
-  avoir plusieurs), ici il y a **au plus une ligne par utilisateur** (`user_id` en clé primaire) :
-  changer de niveau fait un upsert, pas un ajout d'une ligne supplémentaire.
-- Gérée via **Admin → Utilisateurs → "Niveau d'accès Prix"** (simple sélecteur, pas de
-  bouton octroi/révocation séparé puisqu'il n'y a qu'une valeur active à la fois),
-  `PUT /api/users/:id/prix-niveau`.
-- Vérifié côté serveur par `requirePrixLevel(minLevel)` (`middleware/permissions.js`) sur chaque
-  route d'écriture de `prices.routes.js` — jamais seulement côté frontend.
+Le niveau d'accès fin du module Prix (`consultation`/`ajout`/`edition`) avait sa propre table
+dédiée (`user_prix_access`) avant la refonte de §2.3 — c'est désormais un cas normal du système
+générique Module → Sous-module → Niveau, `sub_module_key = 'prix'`, sans mécanisme particulier.
+Section conservée (vide) pour ne pas casser les renvois `§2.6` existants dans ce document.
+Vérifié côté serveur par `requireSubModule('prix', minNiveau)` (`middleware/permissions.js`) sur
+chaque route de `prices.routes.js` — jamais seulement côté frontend.
 
 ---
 
@@ -333,7 +338,7 @@ alors automatiquement dès la validation Finances.
 1. **Création (`brouillon`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site.
 2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. La DGA (ou toute personne détenant aussi le rôle `dga` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
 3. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
-4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), rédige éventuellement un message personnalisé (sinon un texte par défaut est utilisé), et l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut) et **isolé par fournisseur** : l'échec d'un envoi (ex. serveur de messagerie indisponible ou qui rejette l'authentification) n'empêche jamais les autres envois du même lot de partir, et reste visible sur l'écran avec un repli manuel — bouton "PDF" (télécharge le document seul) et "Copier le texte" (même texte que celui réellement envoyé) pour que le fournisseur concerné puisse être recontacté depuis la messagerie personnelle de l'utilisateur. Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le module `ref_suppliers`.
+4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), rédige éventuellement un message personnalisé (sinon un texte par défaut est utilisé), et l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut) et **isolé par fournisseur** : l'échec d'un envoi (ex. serveur de messagerie indisponible ou qui rejette l'authentification) n'empêche jamais les autres envois du même lot de partir, et reste visible sur l'écran avec un repli manuel — bouton "PDF" (télécharge le document seul) et "Copier le texte" (même texte que celui réellement envoyé) pour que le fournisseur concerné puisse être recontacté depuis la messagerie personnelle de l'utilisateur. Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le sous-module `referentiels.suppliers`.
 5. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
 6. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
 7. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
@@ -462,7 +467,7 @@ individuelles (ni à la liste des employés, ni à l'écran de validation d'une 
 saisie de stock). Point de départ pour un futur vrai module de reporting multi-modules (avec
 filtre de période et export), volontairement laissé simple pour cette v1.
 
-### 3.5 Module Stock du Jour (module `stock`)
+### 3.5 Module Stock du Jour (sous-module `stock.saisie_jour`)
 
 Saisie et suivi du stock quotidien de produits finis, par Business Unit (Lait, Tomate, Yaourt,
 Mayo/Margarine), construit en 4 phases : (1) modèle de données + saisie + historique + accès par
@@ -470,11 +475,13 @@ BU — livré ; (2) intégration KPI — livré ; (3) graphiques Recharts (ongle
 par BU et par produit, filtres 7/30/90 jours ou période personnalisée) — livré ; (4) tableau de
 bord (§3.6) — livré.
 
-**Navigation à deux niveaux** : le lien principal du menu est **"Stock"** (module `stock`, label
-inchangé en base) ; en dessous, un premier niveau d'onglets nomme la **section** — "Stock du Jour"
-(Saisie du jour / Historique / Graphiques / Analyse détaillée, via `StockSubnav.jsx`) et
-"Mouvement Stock" (§3.9), toutes deux listées par `StockSectionNav.jsx` — et pour "Stock du Jour"
-un second niveau nomme ses pages.
+**Navigation à deux niveaux** : le lien principal du menu est **"Stock"** (module `stock`,
+regroupant les deux sous-modules indépendamment accordables, §2.3) ; en dessous, un premier niveau
+d'onglets nomme la **section** — "Stock du Jour" (sous-module `stock.saisie_jour` : Saisie du jour
+/ Historique / Graphiques / Analyse détaillée, via `StockSubnav.jsx`) et "Mouvement Stock"
+(sous-module `stock.mouvements`, §3.9) — chaque section n'apparaît dans `StockSectionNav.jsx` que
+si l'utilisateur détient son propre sous-module — et pour "Stock du Jour" un second niveau nomme
+ses pages.
 
 ### 3.6 Tableau de bord exécutif (onglet "Analyse détaillée")
 
@@ -508,10 +515,10 @@ Contenu, calculé côté backend par `GET /api/stock/dashboard` :
   choisie — un produit jamais saisi apparaît avec "Jamais saisi", pour que la Direction voie aussi
   les trous de saisie, pas seulement les valeurs. Ligne rouge si rupture, orange si sous seuil.
 
-Accès : gated par le module `stock` uniquement (comme le reste de l'onglet Stock du Jour), pas de
-rôle "DG" dédié — cohérent avec le principe déjà appliqué aux autres pages en lecture seule du
-module (Historique, Graphiques) : la restriction fine se fait par Business Unit visible (§2.4),
-pas par un rôle applicatif supplémentaire.
+Accès : gated par le sous-module `stock.saisie_jour` uniquement (comme le reste de l'onglet Stock
+du Jour), pas de rôle "DG" dédié — cohérent avec le principe déjà appliqué aux autres pages en
+lecture seule du sous-module (Historique, Graphiques) : la restriction fine se fait par Business
+Unit visible (§2.4), pas par un rôle applicatif supplémentaire.
 
 ```
 stock_entries
@@ -533,11 +540,11 @@ Décisions de conception :
 - Seuil d'alerte configurable **par produit** (`products.seuil_alerte_stock`, §1.1), pas un
   paramètre global dans `app_settings` — chaque produit a un volume d'écoulement différent. Se
   configure dans **Référentiels → Produits** (champ "Seuil d'alerte stock", éditable par quiconque
-  a le module `ref_products`) — vide/non renseigné = pas d'alerte sous-seuil pour ce produit
-  (seule la rupture à 0 reste détectée).
+  a le sous-module `referentiels.products` au niveau `ajout` ou `edition`) — vide/non renseigné =
+  pas d'alerte sous-seuil pour ce produit (seule la rupture à 0 reste détectée).
 - Écriture restreinte par Business Unit via la couche §2.4 ; lecture soumise aux mêmes BU visibles
   pour un utilisateur restreint, ouverte à toutes pour un utilisateur non restreint (mais toujours
-  gated par le module `stock` lui-même — pas d'accès du tout sans le module).
+  gated par le sous-module `stock.saisie_jour` lui-même — pas d'accès du tout sans lui).
 
 ### 3.7 Référentiel produits "produit fini" (import PILCO)
 
@@ -574,13 +581,13 @@ Décisions de conception :
   `created_at` en cas d'égalité).
 - **La BU n'est jamais dupliquée sur `product_prices`** — dérivée de `products.business_unit_id`,
   même principe que pour le stock.
-- **Accès gated par le module `prix` en LECTURE ET EN ÉCRITURE** — contrairement aux référentiels
-  simples (§2.3) dont la lecture reste ouverte à tout utilisateur authentifié, le prix est une
-  donnée jugée sensible : seul un utilisateur avec le module `prix` explicitement accordé peut y
-  accéder, à un niveau qui dépend de `user_prix_access` (§2.6). Pas de restriction fine par
-  Business Unit comme pour le stock (§2.4) dans cette v1 — le niveau d'accès s'applique à tous les
-  produits, toutes BU confondues. À affiner plus tard si un besoin de cloisonnement par BU
-  apparaît (même pattern que `user_business_unit_access` serait réutilisable).
+- **Accès gated par le sous-module `prix` en LECTURE ET EN ÉCRITURE** — contrairement aux
+  référentiels simples (§2.3) dont la lecture reste ouverte à tout utilisateur authentifié, le prix
+  est une donnée jugée sensible : seul un utilisateur avec `prix` explicitement accordé peut y
+  accéder, à un niveau qui dépend de sa ligne dans `user_sub_module_access` (§2.3, ancien §2.6). Pas
+  de restriction fine par Business Unit comme pour le stock (§2.4) dans cette v1 — le niveau d'accès
+  s'applique à tous les produits, toutes BU confondues. À affiner plus tard si un besoin de
+  cloisonnement par BU apparaît (même pattern que `user_business_unit_access` serait réutilisable).
 - Page **Historique** : filtres période/BU/catégorie/produit + formulaire d'ajout d'un nouveau
   prix (BU → produit en cascade, comme la saisie de stock) — visible seulement au niveau
   "ajout" ou "edition" ; boutons Éditer/Supprimer sur chaque ligne visibles seulement au niveau
@@ -589,12 +596,14 @@ Décisions de conception :
   plutôt qu'en courbe lissée — le prix ne varie pas continûment, il change par paliers discrets à
   chaque `date_effet`, une interpolation lissée serait trompeuse.
 
-### 3.9 Module Mouvement Stock (module `stock`, base posée — non finalisé)
+### 3.9 Module Mouvement Stock (sous-module `stock.mouvements`, base posée — non finalisé)
 
 Journal des mouvements individuels de stock (réceptions, sorties), section sœur de "Stock du Jour"
-sous le même onglet principal **"Stock"** (§3.5) et gardée par le **même module** `stock` — pas de
-module séparé, ni de droit d'accès par Business Unit distinct : un utilisateur qui peut saisir le
-Stock du Jour d'une BU peut aussi y enregistrer des mouvements (§2.4).
+sous le même onglet principal **"Stock"** (§3.5), mais gardée par son **propre sous-module**
+`stock.mouvements` : depuis la refonte du système de permissions (§2.3), Stock du Jour et Mouvement
+Stock sont **indépendamment accordables** — un utilisateur peut avoir l'un sans l'autre. Seule la
+restriction par Business Unit reste commune aux deux (§2.4, décision de conception explicite) : une
+BU accordée vaut pour les deux écrans, quel que soit le sous-module effectivement détenu.
 
 ```
 stock_movements
@@ -636,14 +645,12 @@ PUT    /api/users/:id                             (super_admin)
 POST   /api/users/:id/roles                       { entity_id, role_code } (super_admin)
 DELETE /api/users/:id/roles/:roleId               (super_admin)
 
-GET    /api/users/module-catalog                  catalogue des modules disponibles (super_admin)
-POST   /api/users/:id/modules                     { module_key } (super_admin)
-DELETE /api/users/:id/modules/:accessId           (super_admin)
+GET    /api/users/sub-module-catalog              catalogue module -> sous-modules (super_admin, §2.3)
+PUT    /api/users/:id/sub-modules/:key            { niveau } upsert (super_admin, §2.3)
+DELETE /api/users/:id/sub-modules/:key            révoque (super_admin, §2.3)
 
 POST   /api/users/:id/business-units              { business_unit_id } (super_admin, §2.4)
 DELETE /api/users/:id/business-units/:accessId    (super_admin, §2.4)
-
-PUT    /api/users/:id/prix-niveau                 { niveau } (super_admin, §2.6)
 ```
 
 ### 4.2 Référentiels
@@ -655,9 +662,10 @@ GET/POST/PUT/DELETE   /api/machines
 GET/POST/PUT/DELETE   /api/products               ?entity_id= filtre
 GET/POST/PUT/DELETE   /api/suppliers               ?entity_id= filtre
 ```
-Écriture gated par module (`ref_entities`/`ref_sites`/`ref_warehouses`/`ref_machines`/
-`ref_products`/`ref_suppliers`, voir §2.3) — pas une restriction super_admin spécifique, un
-utilisateur non-admin avec le module accordé peut écrire, comme sur tout autre référentiel.
+Écriture gated par sous-module (`referentiels.entities`/`.sites`/`.warehouses`/`.machines`/
+`.products`/`.product_categories`/`.business_units`/`.suppliers`, voir §2.3) — niveau `ajout`
+pour créer, `edition` pour modifier/supprimer ; pas une restriction super_admin spécifique, un
+utilisateur non-admin avec le niveau requis peut écrire, comme sur tout autre référentiel.
 
 ### 4.2bis Employés (module dédié, pas un simple référentiel générique)
 ```
@@ -667,9 +675,10 @@ POST   /api/employees
 PUT    /api/employees/:id
 DELETE /api/employees/:id
 ```
-Toutes les routes ci-dessus, **lecture comme écriture**, sont gated par le module `rh` (voir §2.3
-— exception explicite : contrairement aux référentiels simples, les fiches employés sont une
-donnée métier sensible, la lecture n'est **pas** ouverte à tout utilisateur authentifié).
+Toutes les routes de lecture ci-dessus sont gated par le sous-module `rh` (voir §2.3 — exception
+explicite : contrairement aux référentiels simples, les fiches employés sont une donnée métier
+sensible, la lecture n'est **pas** ouverte à tout utilisateur authentifié) ; POST exige le niveau
+`ajout`, PUT/DELETE le niveau `edition`.
 
 ### 4.3 Demandes d'achat
 ```
@@ -692,10 +701,10 @@ POST   /api/purchase-requests/:id/quick-supplier    mêmes champs que POST /api/
                                                      Référentiels → Fournisseurs, pas une fiche au rabais.
                                                      Si entity_ids est vide/absent, rattache par défaut à
                                                      l'entité de la demande en cours. Rôle service_achat
-                                                     requis sur cette entité (pas le module ref_suppliers :
-                                                     évite de bloquer le service achat en pleine
-                                                     consultation le temps qu'un fournisseur manquant soit
-                                                     ajouté au référentiel complet)
+                                                     requis sur cette entité (pas le sous-module
+                                                     referentiels.suppliers : évite de bloquer le service
+                                                     achat en pleine consultation le temps qu'un fournisseur
+                                                     manquant soit ajouté au référentiel complet)
 POST   /api/purchase-requests/:id/quote-requests           créer demande de devis + liste fournisseurs sollicités
                                                              ({ supplierIds, message? } — message devient le corps
                                                              de l'email envoyé, texte par défaut sinon, §3.1bis)
@@ -762,10 +771,13 @@ GET    /api/kpi/stock        stock par BU (dernière saisie connue par produit),
                               sous leur seuil d'alerte (§3.6)
 ```
 
-### 4.9 Stock du Jour (module `stock`)
+### 4.9 Stock du Jour (sous-module `stock.saisie_jour`)
 ```
 GET    /api/stock/business-units      BU visibles pour l'utilisateur (toutes si non restreint,
-                                       sinon seulement celles accordées via §2.4)
+                                       sinon seulement celles accordées via §2.4) ; accessible avec
+                                       stock.saisie_jour OU stock.mouvements (§2.4 : sert de source
+                                       pour les deux filtres BU, gérée hors du gate de routeur
+                                       stock.saisie_jour ci-dessous pour rester partagée)
 GET    /api/stock/day                 ?date=&business_unit_id= -> grille de saisie du jour :
                                        tous les produits actifs de la BU + leur éventuelle saisie
                                        existante pour cette date, + canWrite (accès en écriture ?)
@@ -788,7 +800,7 @@ GET    /api/stock/dashboard           ?date_from=&date_to=&business_unit_id=&cat
                                        détail produit par produit pour chaque BU
 ```
 
-### 4.9bis Mouvement Stock (module `stock`, base posée — §3.9)
+### 4.9bis Mouvement Stock (sous-module `stock.mouvements`, base posée — §3.9)
 ```
 GET    /api/stock-movements           ?date_from=&date_to=&business_unit_id=&product_id=
                                        &type_mouvement= -> journal filtrable, mêmes BU visibles
@@ -800,7 +812,7 @@ POST   /api/stock-movements           { productId, typeMouvement, quantite, date
 DELETE /api/stock-movements/:id
 ```
 
-### 4.10 Historique des prix (module `prix`, niveaux §2.6)
+### 4.10 Historique des prix (sous-module `prix`, niveaux §2.3)
 ```
 GET    /api/prices/current    ?business_unit_id=&category_id= -> dernier prix connu par produit
                                 (niveau consultation suffit)
@@ -964,20 +976,24 @@ les droits sont relus en base à chaque requête via `requireAuth`, jamais mis e
 pour qu'un changement de permission par un admin s'applique immédiatement sans que l'utilisateur
 concerné ait besoin de se reconnecter) :
 
-- `e2e.stock.test.js` — module Stock du Jour : accès bloqué sans le module, écriture refusée sans
-  octroi de Business Unit, octroi en cours de session débloque l'écriture sans reconnexion,
-  UPSERT vérifié (`stock_entries`, relevé journalier — §2 distinction journal/relevé).
-- `e2e.prices.test.js` — module Prix : les 3 paliers de `user_prix_access` (`consultation` <
-  `ajout` < `edition`, §2.6), et confirmation que `product_prices` est bien un **journal
-  append-only** (pas d'UPSERT, chaque saisie même-jour/même-produit crée une nouvelle ligne).
+- `e2e.stock.test.js` — sous-module `stock.saisie_jour` : accès bloqué sans le sous-module,
+  écriture refusée sans octroi de Business Unit, octroi en cours de session débloque l'écriture
+  sans reconnexion, UPSERT vérifié (`stock_entries`, relevé journalier — §2 distinction
+  journal/relevé).
+- `e2e.prices.test.js` — sous-module `prix` : les 3 paliers désormais génériques de
+  `user_sub_module_access` (`consultation` < `ajout` < `edition`, §2.3, ancien §2.6), et
+  confirmation que `product_prices` est bien un **journal append-only** (pas d'UPSERT, chaque
+  saisie même-jour/même-produit crée une nouvelle ligne).
 - `e2e.user-admin.test.js` — administration des utilisateurs : accès bloqué pour un non-admin,
-  fraîcheur d'un octroi de module en cours de session, désactivation/réactivation d'un compte
+  fraîcheur d'un octroi de sous-module en cours de session, désactivation/réactivation d'un compte
   (§ blocage/rétablissement de connexion), et un token émis avant désactivation est bien rejeté
   dès la requête suivante (pas seulement au prochain login).
-- `e2e.stock-movements.test.js` — module Mouvement Stock (§3.9) : mêmes règles d'accès par
-  Business Unit que Stock du Jour (même module `stock`), plusieurs mouvements le même jour pour
-  le même produit coexistent (journal, pas un relevé — contrairement à `stock_entries`),
-  quantité négative/nulle et type de mouvement invalide refusés.
+- `e2e.stock-movements.test.js` — sous-module `stock.mouvements` (§3.9) : mêmes règles d'accès par
+  Business Unit que Stock du Jour (§2.4, commun aux deux sous-modules), plusieurs mouvements le
+  même jour pour le même produit coexistent (journal, pas un relevé — contrairement à
+  `stock_entries`), quantité négative/nulle et type de mouvement invalide refusés, et un cas
+  dédié prouvant que `stock.saisie_jour`/`stock.mouvements` sont accordables indépendamment
+  (403 sur l'un tant qu'il n'est pas accordé, même si l'autre l'est).
 
 Le script `npm test` (`backend/package.json`) lance toutes les suites avec
 `--test-concurrency=1` — nécessaire car chaque suite réinitialise la base entière

@@ -1,4 +1,7 @@
-// Vérifie les 3 niveaux d'accès du module Prix (consultation < ajout < edition) — SPEC.md §2.6/§3.8.
+// Vérifie les 3 niveaux d'accès du sous-module Prix (consultation < ajout < edition) — SPEC.md
+// §2.3/§2.6/§3.8. Depuis la refonte du système de permissions, chaque octroi porte son niveau dès
+// la création (PUT /users/:id/sub-modules/prix { niveau }) — plus d'état "accordé sans niveau
+// explicite" à tester séparément.
 process.env.NODE_ENV = 'test';
 
 const test = require('node:test');
@@ -45,10 +48,16 @@ test("sans le module 'prix', tout accès est refusé", async () => {
   assert.equal(res.status, 403);
 });
 
-test('niveau consultation (défaut dès que le module est accordé) : lecture ok, écriture refusée', async () => {
+test('niveau consultation : lecture ok, écriture refusée', async () => {
   const adminToken = await login('admin@test');
   const userId = await findUserId(adminToken, 'direction@test');
-  await request(app).post(`/api/users/${userId}/modules`).set('Authorization', auth(adminToken)).send({ module_key: 'prix' });
+  const grantRes = await request(app).put(`/api/users/${userId}/sub-modules/prix`)
+    .set('Authorization', auth(adminToken)).send({ niveau: 'consultation' });
+  assert.equal(grantRes.status, 201, JSON.stringify(grantRes.body));
+  assert.deepEqual(
+    grantRes.body.subModules.find(s => s.sub_module_key === 'prix'),
+    { sub_module_key: 'prix', niveau: 'consultation' }
+  );
 
   const token = await login('direction@test');
 
@@ -64,11 +73,11 @@ test('niveau consultation (défaut dès que le module est accordé) : lecture ok
 test("niveau 'ajout' : peut ajouter un nouveau prix, mais pas corriger/supprimer", async () => {
   const adminToken = await login('admin@test');
   const userId = await findUserId(adminToken, 'direction@test');
-  const setNiveauRes = await request(app).put(`/api/users/${userId}/prix-niveau`)
+  const setNiveauRes = await request(app).put(`/api/users/${userId}/sub-modules/prix`)
     .set('Authorization', auth(adminToken))
     .send({ niveau: 'ajout' });
-  assert.equal(setNiveauRes.status, 200, JSON.stringify(setNiveauRes.body));
-  assert.equal(setNiveauRes.body.prixNiveau, 'ajout');
+  assert.equal(setNiveauRes.status, 201, JSON.stringify(setNiveauRes.body));
+  assert.equal(setNiveauRes.body.subModules.find(s => s.sub_module_key === 'prix').niveau, 'ajout');
 
   const token = await login('direction@test');
   const addRes = await request(app).post('/api/prices')
@@ -89,7 +98,7 @@ test("niveau 'ajout' : peut ajouter un nouveau prix, mais pas corriger/supprimer
 test("niveau 'edition' : peut corriger et supprimer une ligne d'historique", async () => {
   const adminToken = await login('admin@test');
   const userId = await findUserId(adminToken, 'direction@test');
-  await request(app).put(`/api/users/${userId}/prix-niveau`).set('Authorization', auth(adminToken)).send({ niveau: 'edition' });
+  await request(app).put(`/api/users/${userId}/sub-modules/prix`).set('Authorization', auth(adminToken)).send({ niveau: 'edition' });
 
   const token = await login('direction@test');
   const addRes = await request(app).post('/api/prices')

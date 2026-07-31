@@ -1,6 +1,7 @@
 // Peuple la base avec les données nécessaires au scénario de vérification (SPEC.md §7).
 const bcrypt = require('bcryptjs');
 const { pool, one, run, runMigrations } = require('./src/db');
+const usersService = require('./src/modules/users/users.service');
 
 async function alreadySeeded() {
   const row = await one('SELECT COUNT(*) AS n FROM entities');
@@ -65,10 +66,7 @@ async function seed({ closePool = true } = {}) {
     );
     // L'accès au module "Demandes d'achat" est une couche indépendante du rôle métier
     // (voir SPEC.md §2.3) : sans elle, même un service_achat ne verrait pas le module.
-    await run(
-      "INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'achats')",
-      [user.id]
-    );
+    await usersService.setSubModuleAccess(user.id, 'achats', 'edition');
   }
   const admin = await one(
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Admin', 'Système', 'admin@test', $1) RETURNING id",
@@ -83,22 +81,23 @@ async function seed({ closePool = true } = {}) {
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Bah', 'Aissatou', 'rh.sog@test', $1) RETURNING id",
     [hash]
   );
-  await run("INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'rh')", [rhUser.id]);
+  await usersService.setSubModuleAccess(rhUser.id, 'rh', 'edition');
 
   const stockUser = await one(
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Diallo', 'Ousmane', 'stock.sog@test', $1) RETURNING id",
     [hash]
   );
-  await run(
-    "INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'stock'), ($1, 'ref_products')",
-    [stockUser.id]
-  );
+  // Fan-out sur les deux sous-modules Stock (§3.9 SPEC.md) : ce compte de démo doit garder une
+  // couverture complète (Stock du Jour + Mouvement Stock) pour les e2e existants.
+  await usersService.setSubModuleAccess(stockUser.id, 'stock.saisie_jour', 'edition');
+  await usersService.setSubModuleAccess(stockUser.id, 'stock.mouvements', 'edition');
+  await usersService.setSubModuleAccess(stockUser.id, 'referentiels.products', 'edition');
 
   const directionUser = await one(
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Camara', 'Fatoumata', 'direction@test', $1) RETURNING id",
     [hash]
   );
-  await run("INSERT INTO user_module_access (user_id, module_key) VALUES ($1, 'kpi')", [directionUser.id]);
+  await usersService.setSubModuleAccess(directionUser.id, 'kpi', 'edition');
 
   const supplier1 = await one(
     "INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ('Fournisseur Atlantique', 'M. Keita', 'contact@atlantique-gn.test', '+224 620 000 001') RETURNING id"
@@ -136,7 +135,7 @@ async function seed({ closePool = true } = {}) {
   demoUsers.forEach(([nom, prenom, email, role]) => console.log(`  - ${email}  — rôle: ${role} (module achats)`));
   console.log('  - admin@test  — rôle: super_admin (tous modules)');
   console.log('  - rh.sog@test  — module: rh (aucun rôle workflow achat)');
-  console.log('  - stock.sog@test  — modules: stock, ref_products (aucun rôle workflow achat)');
+  console.log('  - stock.sog@test  — sous-modules: stock.saisie_jour, stock.mouvements, referentiels.products (aucun rôle workflow achat)');
   console.log('  - direction@test  — module: kpi (aucun rôle workflow achat)');
 
   if (closePool) await pool.end();

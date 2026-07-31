@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth, isSuperAdmin, hasModule } from '../auth/AuthContext';
+import { useAuth, isSuperAdmin, hasModuleAccess, hasSubModuleLevel } from '../auth/AuthContext';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import logo from '../assets/logo-web-darklogo.png';
@@ -12,14 +12,12 @@ function initials(user) {
   return `${user?.prenom?.[0] || ''}${user?.nom?.[0] || ''}`.toUpperCase();
 }
 
-const REF_MODULE_KEYS = [
-  'ref_entities', 'ref_sites', 'ref_warehouses', 'ref_machines',
-  'ref_products', 'ref_product_categories', 'ref_business_units', 'ref_suppliers',
-];
-
-function hasAnyRefModule(user) {
-  if (isSuperAdmin(user)) return true;
-  return REF_MODULE_KEYS.some(k => hasModule(user, k));
+// Le lien "Stock" doit pointer vers un sous-module réellement accordé — un utilisateur qui n'a
+// que Mouvement Stock (sans Stock du Jour, désormais possible depuis la refonte des permissions,
+// §2.3 SPEC.md) ne doit pas atterrir sur un écran qui lui refuse l'accès.
+function stockLinkTarget(user) {
+  if (isSuperAdmin(user) || hasSubModuleLevel(user, 'stock.saisie_jour')) return '/stock/saisie';
+  return '/stock/mouvements';
 }
 
 export default function Layout() {
@@ -36,12 +34,11 @@ export default function Layout() {
           </span>
           <nav className="main-nav">
             <NavLink to="/" end className={navClass}>Tableau de bord</NavLink>
-            {hasModule(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
-            {hasModule(user, 'rh') && <NavLink to="/employees" className={navClass}>Employés</NavLink>}
-            {hasModule(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
-            {hasModule(user, 'stock') && <NavLink to="/stock/saisie" className={navClass}>Stock</NavLink>}
-            {hasModule(user, 'prix') && <NavLink to="/prices/historique" className={navClass}>Prix</NavLink>}
-            {hasAnyRefModule(user) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
+            {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
+            {hasModuleAccess(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
+            {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}>Stock</NavLink>}
+            {hasModuleAccess(user, 'prix') && <NavLink to="/prices/historique" className={navClass}>Prix</NavLink>}
+            {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}
           </nav>
