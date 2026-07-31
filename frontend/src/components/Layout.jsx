@@ -41,6 +41,7 @@ export default function Layout() {
             {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
             {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}
+            {isSuperAdmin(user) && <NavLink to="/admin/test-data" className={navClass}>Données de test</NavLink>}
           </nav>
         </div>
         <div className="topbar-right">
