@@ -25,6 +25,12 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
+        # VITE_API_URL en chemin relatif : le frontend est servi par le même backend Express
+        # (backend/public), donc même origine — sans ça, Vite inline le fallback de dev
+        # (http://localhost:4001/api) en dur dans le bundle, et l'app déployée appelle le
+        # backend local de quiconque la teste au lieu du backend réellement déployé.
+        env:
+          VITE_API_URL: /api
         run: |
           npm ci
           npm run build
