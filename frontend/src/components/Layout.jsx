@@ -1,7 +1,12 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, isSuperAdmin, hasModuleAccess, hasSubModuleLevel } from '../auth/AuthContext';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
+import {
+  IconDashboard, IconCart, IconChart, IconBox, IconTag, IconBook,
+  IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout,
+} from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
 function navClass({ isActive }) {
@@ -20,45 +25,75 @@ function stockLinkTarget(user) {
   return '/stock/mouvements';
 }
 
+// Rangés sous un onglet "Paramètres" repliable plutôt que mélangés aux liens de nav principaux —
+// ce sont des écrans d'administration (super_admin uniquement), pas des modules métier du
+// quotidien, donc pas au même niveau de visibilité par défaut.
+const PARAMS_ITEMS = [
+  { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
+  { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow },
+  { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase },
+];
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
+
+  const admin = isSuperAdmin(user);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header className="topbar">
-        <div className="topbar-left">
-          <span className="brand">
-            <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
-            CCG Flow
-          </span>
-          <nav className="main-nav">
-            <NavLink to="/" end className={navClass}>Tableau de bord</NavLink>
-            {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}>Demandes d'achat</NavLink>}
-            {hasModuleAccess(user, 'kpi') && <NavLink to="/kpi" className={navClass}>KPI</NavLink>}
-            {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}>Stock</NavLink>}
-            {hasModuleAccess(user, 'prix') && <NavLink to="/prices/historique" className={navClass}>Prix</NavLink>}
-            {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}>Référentiels</NavLink>}
-            {isSuperAdmin(user) && <NavLink to="/admin/users" className={navClass}>Utilisateurs</NavLink>}
-            {isSuperAdmin(user) && <NavLink to="/admin/workflow" className={navClass}>Workflow</NavLink>}
-            {isSuperAdmin(user) && <NavLink to="/admin/test-data" className={navClass}>Données de test</NavLink>}
-          </nav>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
+          CCG Flow
         </div>
-        <div className="topbar-right">
-          <ThemeSwitcher />
-          <NotificationBell />
-          <span className="user-chip">
-            <span className="user-avatar">{initials(user)}</span>
-            {user?.prenom} {user?.nom}
-          </span>
-          <button onClick={() => { logout(); navigate('/login'); }} className="btn btn-invert btn-sm">
-            Déconnexion
-          </button>
-        </div>
-      </header>
-      <main className="page-container">
-        <Outlet />
-      </main>
+        <nav className="sidebar-nav">
+          <NavLink to="/" end className={navClass}><IconDashboard /> Tableau de bord</NavLink>
+          {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}><IconCart /> Demandes d'achat</NavLink>}
+          {hasModuleAccess(user, 'kpi') && <NavLink to="/kpi" className={navClass}><IconChart /> KPI</NavLink>}
+          {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}><IconBox /> Stock</NavLink>}
+          {hasModuleAccess(user, 'prix') && <NavLink to="/prices/historique" className={navClass}><IconTag /> Prix</NavLink>}
+          {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}><IconBook /> Référentiels</NavLink>}
+
+          {admin && (
+            <div className="sidebar-group">
+              <button type="button" className="sidebar-group-toggle" onClick={() => setParamsOpen(o => !o)}>
+                <IconSettings /> Paramètres
+                <span className={`sidebar-chevron${paramsOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
+              </button>
+              {paramsOpen && (
+                <div className="sidebar-subnav">
+                  {PARAMS_ITEMS.map(({ to, label, Icon }) => (
+                    <NavLink key={to} to={to} className={navClass}><Icon /> {label}</NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </nav>
+      </aside>
+
+      <div className="app-main">
+        <header className="topbar">
+          <span />
+          <div className="topbar-right">
+            <ThemeSwitcher />
+            <NotificationBell />
+            <span className="user-chip">
+              <span className="user-avatar">{initials(user)}</span>
+              {user?.prenom} {user?.nom}
+            </span>
+            <button onClick={() => { logout(); navigate('/login'); }} className="btn btn-secondary btn-sm">
+              <IconLogout /> Déconnexion
+            </button>
+          </div>
+        </header>
+        <main className="page-container">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
