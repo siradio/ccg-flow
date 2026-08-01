@@ -591,6 +591,68 @@ a.kpi-card:hover {
   letter-spacing: 0.07em;
 }
 
+/* Tuiles de tendance (Activité 7 jours) : même carte que .kpi-card, avec un delta + mini-graphique
+   en plus — voir Dashboard.jsx (TrendTile). */
+.kpi-tile {
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 14px;
+  transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+}
+
+a.kpi-tile:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--color-border-strong);
+}
+
+.kpi-tile-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.kpi-tile-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpi-tile-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.kpi-tile-delta {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.kpi-tile-delta.up { color: var(--status-green-fg); background: var(--status-green-bg); }
+.kpi-tile-delta.down { color: var(--status-red-fg); background: var(--status-red-bg); }
+
+.spark {
+  width: 100%;
+  height: 28px;
+  display: block;
+}
+
 .dashboard-section-title {
   font-size: 13px;
   font-weight: 600;

@@ -29,6 +29,42 @@ const REFERENTIAL_KPIS = [
   { key: 'users', label: 'Utilisateurs', to: '/admin/users' },
 ];
 
+// Ligne brisée simple sur les 7 derniers jours — pas de bibliothèque de graphiques pour un
+// indicateur aussi petit, juste un polyline mis à l'échelle du min/max de la série.
+function Sparkline({ values, color }) {
+  if (!values || values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => `${(i / (values.length - 1)) * 100},${26 - ((v - min) / range) * 24}`)
+    .join(' ');
+  return (
+    <svg className="spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// trend = { total, delta, sparkline } sur 7 jours vs les 7 précédents (dashboard.service.js) —
+// des compteurs d'événements réellement datés (création, génération de BC), jamais de valeur
+// inventée pour "faire joli".
+function TrendTile({ to, label, trend, color }) {
+  const up = trend.delta >= 0;
+  return (
+    <Link to={to} className="card kpi-tile">
+      <div className="kpi-tile-eyebrow">{label}</div>
+      <div className="kpi-tile-row">
+        <span className="kpi-tile-value">{trend.total}</span>
+        {trend.delta !== 0 && (
+          <span className={`kpi-tile-delta ${up ? 'up' : 'down'}`}>{up ? '+' : ''}{trend.delta}</span>
+        )}
+      </div>
+      <Sparkline values={trend.sparkline} color={color} />
+    </Link>
+  );
+}
+
 function StatusBars({ byStatus }) {
   const max = Math.max(1, ...Object.values(byStatus));
   const entries = STATUS_ORDER.filter(s => byStatus[s]);
@@ -115,6 +151,16 @@ export default function Dashboard() {
 
       {isAdmin && admin && (
         <>
+          {admin.activity && (
+            <>
+              <div className="dashboard-section-title" style={{ marginTop: 0 }}>Activité (7 derniers jours vs 7 précédents)</div>
+              <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <TrendTile to="/purchase-requests" label="Nouvelles demandes" trend={admin.activity.newRequests} color="var(--color-primary)" />
+                <TrendTile to="/purchase-requests" label="Bons de commande générés" trend={admin.activity.ordersGenerated} color="var(--status-green-fg)" />
+              </div>
+            </>
+          )}
+
           <div className="dashboard-section-title">Référentiels</div>
           <div className="kpi-grid">
             {REFERENTIAL_KPIS.map(k => (

@@ -51,6 +51,36 @@ async function getPendingAction(user) {
   return { total, items };
 }
 
+// Comptage jour par jour sur une fenêtre glissante, jours sans activité inclus (sinon un jour à
+// zéro disparaîtrait de la série au lieu d'y apparaître comme un vrai creux) — `table`/`dateColumn`
+// sont toujours des constantes internes ci-dessous, jamais dérivées d'une entrée utilisateur.
+async function getDailyCounts(table, dateColumn, days = 14) {
+  const rows = await all(
+    `WITH days AS (
+       SELECT generate_series(CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day', CURRENT_DATE, INTERVAL '1 day')::date AS day
+     )
+     SELECT d.day, COALESCE(COUNT(t.id), 0)::int AS count
+     FROM days d
+     LEFT JOIN ${table} t ON t.${dateColumn}::date = d.day
+     GROUP BY d.day
+     ORDER BY d.day`,
+    [days]
+  );
+  return rows.map(r => r.count);
+}
+
+// 7 derniers jours vs les 7 précédents — pas de comparaison "statut par statut dans le temps"
+// (non reconstituible : une demande change de statut, aucune table ne garde l'historique des
+// comptages), seulement des compteurs d'événements datés (création, génération de BC), qui eux
+// se prêtent honnêtement à une tendance.
+function trendFromDaily(daily) {
+  const last7 = daily.slice(-7);
+  const prev7 = daily.slice(-14, -7);
+  const total = last7.reduce((s, c) => s + c, 0);
+  const previousTotal = prev7.reduce((s, c) => s + c, 0);
+  return { total, delta: total - previousTotal, sparkline: last7 };
+}
+
 async function getAdminStats() {
   const [employees, products, suppliers, sites, warehouses, machines, users] = await Promise.all([
     one('SELECT COUNT(*)::int AS c FROM employees'),
@@ -78,7 +108,17 @@ async function getAdminStats() {
      FROM purchase_requests WHERE status = 'bon_commande_genere' GROUP BY devise`
   );
 
+  const [newRequestsDaily, ordersDaily] = await Promise.all([
+    getDailyCounts('purchase_requests', 'created_at'),
+    getDailyCounts('purchase_orders', 'generated_at'),
+  ]);
+  const activity = {
+    newRequests: trendFromDaily(newRequestsDaily),
+    ordersGenerated: trendFromDaily(ordersDaily),
+  };
+
   return {
+    activity,
     counts: {
       employees: employees.c, products: products.c, suppliers: suppliers.c,
       sites: sites.c, warehouses: warehouses.c, machines: machines.c, users: users.c,
