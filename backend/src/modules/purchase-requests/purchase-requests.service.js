@@ -201,6 +201,10 @@ async function sendQuoteRequest(user, prId, quoteRequestId) {
         to: s.supplier_email,
         subject: `Demande de devis — ${pr.numero}`,
         text: bodyText,
+        html: mailer.renderMailTemplate({
+          title: 'Demande de devis',
+          bodyHtml: `<p>${bodyText.replace(/\n/g, '<br/>')}</p>`,
+        }),
         attachments: [{ filename: `demande-devis-${pr.numero}.pdf`, content: buffer }],
       });
       await repo.markQuoteRequestSupplierSent(s.id);
