@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     # Pas de `environment:` ici : ce champ change le "sub" du token OIDC envoyé à Azure
     # (repo:...:environment:X au lieu de repo:...:ref:refs/heads/main), qui ne correspondrait
-    # plus à l'identifiant fédéré "Branch" configuré côté Azure AD (App Registration
-    # ccg-flow-github-actions) — remettre uniquement en ajoutant AUSSI un identifiant fédéré de
+    # plus à l'identifiant fédéré "Branch"/main configuré côté Azure AD (App Registration
+    # shared-apps-github-actions) — remettre uniquement en ajoutant AUSSI un identifiant fédéré de
     # type "Environment" côté Azure si on veut activer des règles d'approbation GitHub plus tard.
     steps:
       - uses: actions/checkout@v4
@@ -46,11 +46,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # Pas de `slot-name` pour l'instant : environnement unique le temps de finaliser le
-      # déploiement (App Service Plan Basic, ne supporte pas les slots). Remettre
-      # `slot-name: production` une fois passé en Standard + slot dev créé (voir deploy-dev.yml).
-      - name: Déployer sur l'App Service
+      # Infra partagée (§ SPEC.md déploiement Azure) : un Web App dédié par environnement
+      # (ccgflow-prod), pas un slot sur une ressource unique — nom en dur plutôt qu'une variable
+      # GitHub, puisque ce fichier ne sert jamais qu'à cet environnement.
+      - name: Déployer sur ccgflow-prod
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          app-name: ccgflow-prod
           package: backend

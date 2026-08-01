@@ -1,9 +1,8 @@
 name: Deploy - Dev
 
-# En pause : l'App Service tourne pour l'instant sur un plan Basic (pas de slot "dev" créé), le
-# temps de finaliser un premier déploiement à environnement unique (voir deploy-prod.yml). Rétablir
-# le déclencheur `push: branches: [develop]` une fois le plan passé en Standard + le slot dev créé.
 on:
+  push:
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
@@ -13,9 +12,10 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Pas de `environment:` — voir le commentaire équivalent dans deploy-prod.yml : il faudra un
-    # identifiant fédéré Azure de type "Branch"/develop (déjà prévu, à créer) plutôt
-    # qu'"Environment" pour que le token OIDC corresponde à ce qui est configuré côté Azure AD.
+    # Pas de `environment:` : ce champ changerait le "sub" du token OIDC envoyé à Azure
+    # (repo:...:environment:X au lieu de repo:...:ref:refs/heads/develop), qui ne correspondrait
+    # plus à l'identifiant fédéré "Branch"/develop configuré côté Azure AD (App Registration
+    # shared-apps-github-actions).
     steps:
       - uses: actions/checkout@v4
 
@@ -45,9 +45,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Déployer sur le slot "dev"
+      # Infra partagée (§ SPEC.md déploiement Azure) : un Web App dédié par environnement
+      # (ccgflow-dev), pas un slot sur une ressource unique — nom en dur plutôt qu'une variable
+      # GitHub, puisque ce fichier ne sert jamais qu'à cet environnement.
+      - name: Déployer sur ccgflow-dev
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          slot-name: dev
+          app-name: ccgflow-dev
           package: backend
