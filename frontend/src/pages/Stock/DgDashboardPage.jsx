@@ -205,7 +205,7 @@ export default function DgDashboardPage() {
                   <XAxis dataKey="date" tickFormatter={formatTick} />
                   <YAxis />
                   <Tooltip labelFormatter={formatTick} formatter={v => Number(v).toLocaleString('fr-FR')} />
-                  <Area type="monotone" dataKey="total" stroke="#1d4ed8" fill="#1d4ed822" />
+                  <Area type="monotone" dataKey="total" stroke="#2454e0" fill="#2454e022" />
                 </AreaChart>
               </ResponsiveContainer>
             )}

@@ -16,17 +16,19 @@ export const STATUS_ORDER = [
   'en_validation', 'validee', 'bon_commande_genere', 'rejetee',
 ];
 
+// Renvoie vers les tokens --status-* (index.css), theme-aware (clair/sombre) — plutôt que des
+// hex figés qui resteraient identiques (et trop clairs) en mode sombre.
 export const STATUS_COLORS = {
-  brouillon: { bg: '#f3f4f6', fg: '#374151' },
-  en_attente_validation_besoin: { bg: '#ede9fe', fg: '#5b21b6' },
-  soumise: { bg: '#dbeafe', fg: '#1e40af' },
-  en_analyse_achat: { bg: '#dbeafe', fg: '#1e40af' },
-  devis_en_cours: { bg: '#fef3c7', fg: '#92400e' },
-  devis_selectionne: { bg: '#fef3c7', fg: '#92400e' },
-  en_validation: { bg: '#e0e7ff', fg: '#3730a3' },
-  validee: { bg: '#dcfce7', fg: '#166534' },
-  rejetee: { bg: '#fee2e2', fg: '#991b1b' },
-  bon_commande_genere: { bg: '#dcfce7', fg: '#166534' },
+  brouillon: { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' },
+  en_attente_validation_besoin: { bg: 'var(--status-violet-bg)', fg: 'var(--status-violet-fg)' },
+  soumise: { bg: 'var(--status-blue-bg)', fg: 'var(--status-blue-fg)' },
+  en_analyse_achat: { bg: 'var(--status-blue-bg)', fg: 'var(--status-blue-fg)' },
+  devis_en_cours: { bg: 'var(--status-amber-bg)', fg: 'var(--status-amber-fg)' },
+  devis_selectionne: { bg: 'var(--status-amber-bg)', fg: 'var(--status-amber-fg)' },
+  en_validation: { bg: 'var(--status-indigo-bg)', fg: 'var(--status-indigo-fg)' },
+  validee: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
+  rejetee: { bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
+  bon_commande_genere: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
 };
 
 export function StatusBadge({ status }) {

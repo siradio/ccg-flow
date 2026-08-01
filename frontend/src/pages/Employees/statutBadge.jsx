@@ -1,9 +1,9 @@
 export const STATUT_LABELS = { actif: 'Actif', inactif: 'Inactif', sorti: 'Sorti' };
 
 const STATUT_COLORS = {
-  actif: { bg: '#dcfce7', fg: '#166534' },
-  inactif: { bg: '#f3f4f6', fg: '#374151' },
-  sorti: { bg: '#fee2e2', fg: '#991b1b' },
+  actif: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
+  inactif: { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' },
+  sorti: { bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
 };
 
 export function StatutBadge({ statut }) {

@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
 
-const CONTRAT_COLOR = '#1d4ed8';
+const CONTRAT_COLOR = 'var(--color-primary)';
 const STATUT_LABELS_RH = { actif: 'Actif', inactif: 'Inactif', sorti: 'Sorti' };
 const STATUT_COLORS_RH = {
-  actif: { bg: '#dcfce7', fg: '#166534' },
-  inactif: { bg: '#f3f4f6', fg: '#374151' },
-  sorti: { bg: '#fee2e2', fg: '#991b1b' },
+  actif: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
+  inactif: { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' },
+  sorti: { bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
 };
 
 function BarList({ entries, max, colorFor }) {

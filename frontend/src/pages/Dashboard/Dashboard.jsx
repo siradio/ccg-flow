@@ -40,6 +40,7 @@ function StatusBars({ byStatus }) {
         const count = byStatus[s];
         return (
           <div key={s} className="bar-row">
+            <span className="bar-dot" style={{ background: c.fg }} />
             <span className="bar-label">{STATUS_LABELS[s] || s}</span>
             <div className="bar-track">
               <div className="bar-fill" style={{ width: `${(count / max) * 100}%`, background: c.fg }} />

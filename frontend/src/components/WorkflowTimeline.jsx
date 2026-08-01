@@ -39,9 +39,9 @@ export default function WorkflowTimeline({ pr, steps }) {
           // laissé tel quel : "done" prime visuellement une fois revalidé, le refus reste visible dans l'historique
         }
         const colors = {
-          done: { bg: '#dcfce7', fg: '#166534', label: '✓' },
-          current: { bg: '#dbeafe', fg: '#1e40af', label: '●' },
-          pending: { bg: '#f3f4f6', fg: '#6b7280', label: '○' },
+          done: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)', label: '✓' },
+          current: { bg: 'var(--status-blue-bg)', fg: 'var(--status-blue-fg)', label: '●' },
+          pending: { bg: 'var(--status-neutral-bg)', fg: 'var(--color-text-muted)', label: '○' },
         }[state];
         return (
           <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

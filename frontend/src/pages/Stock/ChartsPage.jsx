@@ -8,7 +8,7 @@ import StockSubnav from './StockSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
 
-const BU_COLORS = ['#1d4ed8', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
+const BU_COLORS = ['#2454e0', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
 const PERIODS = [
   { key: '7', label: '7 jours' },
   { key: '30', label: '30 jours' },
@@ -177,7 +177,7 @@ export default function ChartsPage() {
               <Tooltip labelFormatter={formatTick} formatter={v => Number(v).toLocaleString('fr-FR')} />
               <Legend />
               <Line type="monotone" name={selectedProduct?.designation || 'Quantité'} dataKey="quantite"
-                stroke="#1d4ed8" connectNulls dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                stroke="#2454e0" connectNulls dot={{ r: 2 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
         )}

@@ -128,7 +128,7 @@ export default function ChartPage() {
               <YAxis />
               <Tooltip labelFormatter={formatTick} formatter={v => `${Number(v).toLocaleString('fr-FR')} ${devise || ''}`} />
               <Legend />
-              <Line type="stepAfter" name={`Prix (${devise || ''})`} dataKey="prix" stroke="#1d4ed8" connectNulls dot={{ r: 3 }} activeDot={{ r: 6 }} />
+              <Line type="stepAfter" name={`Prix (${devise || ''})`} dataKey="prix" stroke="#2454e0" connectNulls dot={{ r: 3 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         )}
