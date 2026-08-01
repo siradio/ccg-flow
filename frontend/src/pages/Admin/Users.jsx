@@ -18,6 +18,16 @@ export default function Users() {
   const [roleForm, setRoleForm] = useState({});
   const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
+  // Chaque carte utilisateur est longue (rôles + grille module/sous-module + BU) — sans filtre,
+  // retrouver un utilisateur précis dans une longue liste veut dire défiler devant tous les autres.
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = !search || `${u.prenom} ${u.nom} ${u.email}`.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = !roleFilter || u.roles.some(r => r.role_code === roleFilter);
+    return matchesSearch && matchesRole;
+  });
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
   useEffect(() => {
@@ -82,7 +92,27 @@ export default function Users() {
     <div>
       <h1 className="page-title" style={{ marginBottom: 20 }}>Utilisateurs</h1>
 
-      {users.map(u => (
+      <div className="form-inline" style={{ marginBottom: 16 }}>
+        <input
+          placeholder="Rechercher (nom, prénom, email)…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ minWidth: 260 }}
+        />
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+          <option value="">Tous les rôles</option>
+          {ROLE_CODES.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        {(search || roleFilter) && (
+          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            {filteredUsers.length} / {users.length} utilisateur{users.length > 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {filteredUsers.length === 0 && <p className="empty-row">Aucun utilisateur ne correspond à ce filtre.</p>}
+
+      {filteredUsers.map(u => (
         <div key={u.id} className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
