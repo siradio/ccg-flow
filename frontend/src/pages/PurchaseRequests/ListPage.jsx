@@ -5,10 +5,14 @@ import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
 import { StatusBadge } from './statusLabels.jsx';
 
+const PAGE_SIZE = 20;
+
 export default function ListPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [prs, setPrs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   // null = pas encore choisi explicitement par l'utilisateur : on déduit alors un défaut
   // sensé de son rôle (un valideur doit voir les demandes des autres par défaut, pas
@@ -31,22 +35,26 @@ export default function ListPage() {
   function toggleMineOnly(checked) {
     setMineOnly(checked);
     if (checked) setPendingOnly(false);
+    setPage(1);
   }
 
   function togglePendingOnly(checked) {
     setPendingOnly(checked);
     if (checked) setMineOnly(false);
+    setPage(1);
   }
 
   useEffect(() => {
     setLoading(true);
-    let params = {};
-    if (pendingOnly) params = { pendingAction: 'true' };
-    else if (effectiveMineOnly || !canSeeEntityWide) params = { mine: 'true' };
+    let params = { page, pageSize: PAGE_SIZE };
+    if (pendingOnly) params = { ...params, pendingAction: 'true' };
+    else if (effectiveMineOnly || !canSeeEntityWide) params = { ...params, mine: 'true' };
     client.get('/purchase-requests', { params })
-      .then(res => setPrs(res.data))
+      .then(res => { setPrs(res.data.items); setTotal(res.data.total); })
       .finally(() => setLoading(false));
-  }, [effectiveMineOnly, pendingOnly, canSeeEntityWide]);
+  }, [effectiveMineOnly, pendingOnly, canSeeEntityWide, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -101,6 +109,19 @@ export default function ListPage() {
           )}
         </div>
       </div>
+
+      {!loading && total > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, fontSize: 13, color: 'var(--color-text-muted)' }}>
+          <span>{total} demande{total > 1 ? 's' : ''} au total</span>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Précédent</button>
+              <span>Page {page} / {totalPages}</span>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Suivant →</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

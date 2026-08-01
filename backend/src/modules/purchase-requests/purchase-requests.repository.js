@@ -28,28 +28,39 @@ async function getById(id) {
   );
 }
 
-async function list({ entityId, status, requesterId }) {
+// `COUNT(*) OVER()` renvoie le total (avant LIMIT) sur chaque ligne, pour paginer sans un
+// second aller-retour — évite qu'une liste grossisse indéfiniment sans borne au fil du temps.
+function toPage(rows, page, pageSize) {
+  const total = rows.length ? Number(rows[0].total_count) : 0;
+  return { items: rows.map(({ total_count, ...r }) => r), total, page, pageSize };
+}
+
+async function list({ entityId, status, requesterId }, { page = 1, pageSize = 20 } = {}) {
   const clauses = [];
   const params = [];
   if (entityId) { params.push(entityId); clauses.push(`pr.entity_id = $${params.length}`); }
   if (status) { params.push(status); clauses.push(`pr.status = $${params.length}`); }
   if (requesterId) { params.push(requesterId); clauses.push(`pr.requester_user_id = $${params.length}`); }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  return all(
-    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom
+  params.push(pageSize, (page - 1) * pageSize);
+  const rows = await all(
+    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom,
+            COUNT(*) OVER() AS total_count
      FROM purchase_requests pr
      JOIN entities e ON e.id = pr.entity_id
      JOIN users u ON u.id = pr.requester_user_id
      ${where}
-     ORDER BY pr.created_at DESC`,
+     ORDER BY pr.created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
+  return toPage(rows, page, pageSize);
 }
 
 // Demandes attendant concrètement une action de l'utilisateur, selon les rôles de
 // validation qu'il détient (par entité) — même logique que dashboard.service.js.
-async function listPendingAction(roleEntityPairs) {
-  if (!roleEntityPairs || roleEntityPairs.length === 0) return [];
+async function listPendingAction(roleEntityPairs, { page = 1, pageSize = 20 } = {}) {
+  if (!roleEntityPairs || roleEntityPairs.length === 0) return toPage([], page, pageSize);
   const clauses = [];
   const params = [];
   for (const { roleCode, entityId } of roleEntityPairs) {
@@ -67,22 +78,26 @@ async function listPendingAction(roleEntityPairs) {
       clauses.push(`(pr.entity_id = $${params.length - 1} AND pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})`);
     }
   }
-  return all(
-    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom
+  params.push(pageSize, (page - 1) * pageSize);
+  const rows = await all(
+    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom,
+            COUNT(*) OVER() AS total_count
      FROM purchase_requests pr
      JOIN entities e ON e.id = pr.entity_id
      JOIN users u ON u.id = pr.requester_user_id
      LEFT JOIN workflow_steps ws ON ws.id = pr.current_step_id
      WHERE ${clauses.join(' OR ')}
-     ORDER BY pr.created_at DESC`,
+     ORDER BY pr.created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
+  return toPage(rows, page, pageSize);
 }
 
 // Visibilité par défaut (aucun filtre mine/entityId explicite) : mes propres demandes,
 // où que ce soit, PLUS toutes les demandes des entités où l'utilisateur détient un rôle
 // de validation (entityIds ne contient que ces entités-là, jamais les entités "demandeur seul").
-async function listVisibleTo({ status, requesterId, entityIds }) {
+async function listVisibleTo({ status, requesterId, entityIds }, { page = 1, pageSize = 20 } = {}) {
   const params = [requesterId];
   let visibilityClause = `pr.requester_user_id = $1`;
   if (entityIds && entityIds.length > 0) {
@@ -91,15 +106,19 @@ async function listVisibleTo({ status, requesterId, entityIds }) {
   }
   const clauses = [visibilityClause];
   if (status) { params.push(status); clauses.push(`pr.status = $${params.length}`); }
-  return all(
-    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom
+  params.push(pageSize, (page - 1) * pageSize);
+  const rows = await all(
+    `SELECT pr.*, e.code AS entity_code, u.nom AS requester_nom, u.prenom AS requester_prenom,
+            COUNT(*) OVER() AS total_count
      FROM purchase_requests pr
      JOIN entities e ON e.id = pr.entity_id
      JOIN users u ON u.id = pr.requester_user_id
      WHERE ${clauses.join(' AND ')}
-     ORDER BY pr.created_at DESC`,
+     ORDER BY pr.created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
+  return toPage(rows, page, pageSize);
 }
 
 async function updateStatusAndStep(id, status, currentStepId) {

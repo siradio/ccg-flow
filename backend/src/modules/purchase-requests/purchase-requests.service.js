@@ -410,24 +410,25 @@ async function generatePurchaseOrder(prId, userId) {
   return getFullDetail(prId);
 }
 
-async function listForUser(user, { entityId, status, mine, pendingAction }) {
+async function listForUser(user, { entityId, status, mine, pendingAction, page = 1, pageSize = 20 }) {
+  const pageOpts = { page, pageSize };
   if (pendingAction) {
     // Même logique que le calcul du tableau de bord (dashboard.service.js) : les demandes
     // qui attendent concrètement une action de CET utilisateur, pas juste "ses" demandes.
     const roleEntityPairs = (user.roles || [])
       .filter(r => r.role_code !== 'demandeur' && r.entity_id)
       .map(r => ({ roleCode: r.role_code, entityId: r.entity_id }));
-    return repo.listPendingAction(roleEntityPairs);
+    return repo.listPendingAction(roleEntityPairs, pageOpts);
   }
   if (mine) {
-    return repo.list({ status, requesterId: user.id });
+    return repo.list({ status, requesterId: user.id }, pageOpts);
   }
   if (entityId) {
     if (!hasAnyRoleOnEntity(user, entityId)) throw httpError(403, "Vous n'avez aucun rôle sur cette entité.");
-    return repo.list({ status, entityId });
+    return repo.list({ status, entityId }, pageOpts);
   }
   if (isSuperAdmin(user)) {
-    return repo.list({ status });
+    return repo.list({ status }, pageOpts);
   }
   // Pas de filtre explicite : montrer tout ce que l'utilisateur peut légitimement voir —
   // ses propres demandes partout, PLUS toutes les demandes des entités où il détient un
@@ -436,7 +437,7 @@ async function listForUser(user, { entityId, status, mine, pendingAction }) {
   const visibleEntityIds = [...new Set(
     (user.roles || []).filter(r => r.role_code !== 'demandeur' && r.entity_id).map(r => r.entity_id)
   )];
-  return repo.listVisibleTo({ status, requesterId: user.id, entityIds: visibleEntityIds });
+  return repo.listVisibleTo({ status, requesterId: user.id, entityIds: visibleEntityIds }, pageOpts);
 }
 
 module.exports = {

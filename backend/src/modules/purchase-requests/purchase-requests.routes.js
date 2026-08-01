@@ -20,8 +20,11 @@ router.post('/', requireAuth, async (req, res, next) => {
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const { entityId, status, mine, pendingAction } = req.query;
-    res.json(await service.listForUser(req.user, { entityId, status, mine: mine === 'true', pendingAction: pendingAction === 'true' }));
+    const { entityId, status, mine, pendingAction, page, pageSize } = req.query;
+    res.json(await service.listForUser(req.user, {
+      entityId, status, mine: mine === 'true', pendingAction: pendingAction === 'true',
+      page: page ? Number(page) : 1, pageSize: pageSize ? Number(pageSize) : 20,
+    }));
   } catch (e) { next(e); }
 });
 

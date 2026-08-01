@@ -278,11 +278,12 @@ test('isolation multi-entité : un rôle PBIC ne donne aucun accès aux demandes
   await request(app).post(`/api/users/${newUserRes.body.id}/roles`)
     .set('Authorization', auth(adminToken))
     .send({ entity_id: pbic.id, role_code: 'service_achat' });
-  // Accès module accordé explicitement : sans ça, le test vérifierait le gate de module
-  // (achats non accordé) plutôt que l'isolation par entité qu'il est censé prouver.
-  await request(app).post(`/api/users/${newUserRes.body.id}/modules`)
+  // Accès sous-module accordé explicitement : sans ça, le test vérifierait le gate de
+  // sous-module (achats non accordé) plutôt que l'isolation par entité qu'il est censé prouver.
+  const grantRes = await request(app).put(`/api/users/${newUserRes.body.id}/sub-modules/achats`)
     .set('Authorization', auth(adminToken))
-    .send({ module_key: 'achats' });
+    .send({ niveau: 'edition' });
+  assert.equal(grantRes.status, 201, JSON.stringify(grantRes.body));
 
   const pbicToken = await login('achat.pbic@test');
 
