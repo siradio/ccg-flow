@@ -27,14 +27,18 @@ async function seed({ closePool = true } = {}) {
     "INSERT INTO workflow_templates (module_code, nom) VALUES ('demande_achat', 'Demande d''achat') RETURNING id"
   );
 
+  // Circuit à jour (huit étapes, expression de besoin en tête) — aligné sur bootstrap-prod.js.
+  // La migration 014 qui a introduit "expression_besoin" et retiré le "dga" final ne fait rien
+  // sur une base vide (elle ne fait que UPDATE/INSERT...SELECT des lignes déjà existantes), donc
+  // une base neuve doit partir directement de la structure finale, pas de l'ancien seed pré-014.
   const steps = [
-    [1, 'soumission', 'Soumission par le demandeur', 'demandeur', false, null, null],
-    [2, 'analyse_achat', 'Analyse par le service achat', 'service_achat', false, null, null],
-    [3, 'devis', 'Consultation fournisseurs', 'service_achat', false, null, null],
-    [4, 'validation_achat', 'Validation du service achat', 'service_achat', false, null, null],
-    [5, 'controle_gestion', 'Validation Contrôle de Gestion', 'controle_gestion', true, 'retour_etape_precedente', 'validation_achat'],
-    [6, 'finances', 'Validation Finances', 'finances', true, 'retour_etape_precedente', 'validation_achat'],
-    [7, 'dga', 'Validation DGA', 'dga', true, 'retour_etape_precedente', 'validation_achat'],
+    [1, 'expression_besoin', "Validation de l'expression de besoin (DGA)", 'dga', true, null, null],
+    [2, 'soumission', 'Soumission par le demandeur', 'demandeur', false, null, null],
+    [3, 'analyse_achat', 'Analyse par le service achat', 'service_achat', false, null, null],
+    [4, 'devis', 'Consultation fournisseurs', 'service_achat', false, null, null],
+    [5, 'validation_achat', 'Validation du service achat', 'service_achat', false, null, null],
+    [6, 'controle_gestion', 'Validation Contrôle de Gestion', 'controle_gestion', true, 'retour_etape_precedente', 'validation_achat'],
+    [7, 'finances', 'Validation Finances', 'finances', true, 'retour_etape_precedente', 'validation_achat'],
     [8, 'generation_bc', 'Génération automatique du bon de commande', null, false, null, null],
   ];
   for (const s of steps) {

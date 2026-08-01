@@ -110,7 +110,6 @@ test('scénario nominal : création -> devis -> validations en cascade -> bon de
   const achatToken = await login('achat.sog@test');
   const cgToken = await login('cg.sog@test');
   const financesToken = await login('finances.sog@test');
-  const dgaToken = await login('dga.sog@test');
 
   const prId = await createFundedDraft(demandeurToken, soguipal.id, seeded.productId);
   const quoteIds = await runQuoteCycle(achatToken, prId, seeded.supplierIds, [50_000_000, 45_000_000]);
@@ -137,24 +136,22 @@ test('scénario nominal : création -> devis -> validations en cascade -> bon de
   assert.equal(cgRes.status, 200, JSON.stringify(cgRes.body));
   assert.equal(cgRes.body.current_step_code, 'finances');
 
+  // "finances" est désormais la dernière étape humaine du circuit (expression_besoin, la seule
+  // étape côté DGA, est passée en tête) — sa validation enchaîne directement, en interne, sur
+  // l'étape système "generation_bc", sans validation humaine supplémentaire à attendre.
   const financesRes = await request(app).post(`/api/purchase-requests/${prId}/validate-step`)
     .set('Authorization', auth(financesToken)).send({});
   assert.equal(financesRes.status, 200, JSON.stringify(financesRes.body));
-  assert.equal(financesRes.body.current_step_code, 'dga');
+  assert.equal(financesRes.body.status, 'bon_commande_genere');
+  assert.ok(financesRes.body.purchase_order, 'un bon de commande doit être généré');
 
-  const dgaRes = await request(app).post(`/api/purchase-requests/${prId}/validate-step`)
-    .set('Authorization', auth(dgaToken)).send({});
-  assert.equal(dgaRes.status, 200, JSON.stringify(dgaRes.body));
-  assert.equal(dgaRes.body.status, 'bon_commande_genere');
-  assert.ok(dgaRes.body.purchase_order, 'un bon de commande doit être généré');
-
-  const poId = dgaRes.body.purchase_order.id;
-  const poRes = await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', auth(dgaToken));
+  const poId = financesRes.body.purchase_order.id;
+  const poRes = await request(app).get(`/api/purchase-orders/${poId}`).set('Authorization', auth(financesToken));
   assert.equal(poRes.status, 200);
   assert.equal(Number(poRes.body.montant), 45_000_000);
   assert.match(poRes.body.numero, /^BC-SOGUIPAL-/);
 
-  const pdfRes = await request(app).get(`/api/purchase-orders/${poId}/pdf`).set('Authorization', auth(dgaToken));
+  const pdfRes = await request(app).get(`/api/purchase-orders/${poId}/pdf`).set('Authorization', auth(financesToken));
   assert.equal(pdfRes.status, 200);
   assert.equal(pdfRes.headers['content-type'], 'application/pdf');
   assert.ok(Buffer.byteLength(pdfRes.body) > 100, 'le PDF du bon de commande ne doit pas être vide');
@@ -164,7 +161,7 @@ test('scénario nominal : création -> devis -> validations en cascade -> bon de
   const actions = historyRes.body.map(h => h.action);
   assertSubsequenceInOrder(actions, [
     'create', 'submit', 'validation_besoin', 'quote_request_created', 'quote_request_sent', 'quote_selected',
-    'validation_achat', 'validation_controle_gestion', 'validation_finances', 'validation_dga', 'bon_commande_genere',
+    'validation_achat', 'validation_controle_gestion', 'validation_finances', 'bon_commande_genere',
   ]);
 });
 
