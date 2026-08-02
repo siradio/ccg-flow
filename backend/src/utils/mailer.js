@@ -84,7 +84,7 @@ async function sendMail({ to, subject, text, html, attachments }) {
     throw lastError || new Error('Serveur SMTP indisponible (dernier échec récent).');
   }
   try {
-    const result = await t.sendMail({ from: env.smtp.from, to, subject, text, html, attachments });
+    const result = await t.sendMail({ from: env.smtp.from, to, subject, text, html, attachments: allAttachments });
     brokenUntil = 0;
     return result;
   } catch (e) {
