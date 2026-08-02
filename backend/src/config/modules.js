@@ -16,7 +16,6 @@ const MODULES = [
       { key: 'stock.mouvements', label: 'Mouvement Stock' },
     ],
   },
-  { key: 'prix', label: 'Historique des prix', subModules: [] },
   { key: 'kpi', label: 'KPI (Achats + RH)', subModules: [] },
   // Deviendra sous-modulé (Personnel / Congés & absences / Évaluation) quand ces écrans existeront
   // réellement — pas avant, pour ne pas exposer dans l'admin des cases à cocher menant à du vide.
@@ -32,6 +31,7 @@ const MODULES = [
       { key: 'referentiels.product_categories', label: 'Catégories de produits' },
       { key: 'referentiels.business_units', label: 'Business Units' },
       { key: 'referentiels.suppliers', label: 'Fournisseurs' },
+      { key: 'referentiels.prix', label: 'Historique des prix' },
     ],
   },
 ];

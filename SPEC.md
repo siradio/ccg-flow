@@ -235,10 +235,9 @@ module sans sous-modules déclarés est lui-même l'unité accordable (sa clé s
 |---|---|---|
 | `achats` | — (unité = `achats`) | Demandes d'achat (tout le circuit : demandes, devis, bons de commande, workflow) |
 | `stock` | `stock.saisie_jour` (Stock du Jour, §3.5), `stock.mouvements` (Mouvement Stock, §3.9) | **Indépendamment accordables** depuis cette refonte — voir §2.4 pour la restriction BU, commune aux deux |
-| `prix` | — (unité = `prix`) | Historique des prix, §3.8 ; contrairement aux référentiels, la **lecture** est aussi gated (donnée jugée sensible), pas seulement l'écriture |
 | `kpi` | — (unité = `kpi`) | Agrégats en lecture seule, §3.4 ; indépendant de `achats`/`rh` |
 | `rh` | — (unité = `rh`) pour l'instant | Deviendra sous-modulé (Personnel / Congés & absences / Évaluation) quand ces écrans existeront réellement — pas avant, pour ne pas exposer des cases à cocher vers du vide |
-| `referentiels` | `referentiels.entities`, `.sites`, `.warehouses`, `.machines`, `.products`, `.product_categories`, `.business_units`, `.suppliers` | Un sous-module par onglet du référentiel — accès fin, pas tout-ou-rien |
+| `referentiels` | `referentiels.entities`, `.sites`, `.warehouses`, `.machines`, `.products`, `.product_categories`, `.business_units`, `.suppliers`, `.prix` | Un sous-module par onglet du référentiel — accès fin, pas tout-ou-rien. `.prix` (Historique des prix, §3.8) fait exception : contrairement aux autres, la **lecture** y est aussi gated (donnée jugée sensible), pas seulement l'écriture |
 
 Ajouter un futur module (Logistique, QHSE, Commercial, Immobilisations, Production...) = ajouter
 une entrée dans ce catalogue + câbler ses routes sur `requireSubModule(...)` — aucun autre
@@ -304,10 +303,12 @@ toujours à jour — la barre de navigation est purement un confort d'affichage.
 
 Le niveau d'accès fin du module Prix (`consultation`/`ajout`/`edition`) avait sa propre table
 dédiée (`user_prix_access`) avant la refonte de §2.3 — c'est désormais un cas normal du système
-générique Module → Sous-module → Niveau, `sub_module_key = 'prix'`, sans mécanisme particulier.
+générique Module → Sous-module → Niveau, `sub_module_key = 'referentiels.prix'` (rattaché à
+Référentiels depuis lors, plus module racine), sans mécanisme particulier.
 Section conservée (vide) pour ne pas casser les renvois `§2.6` existants dans ce document.
-Vérifié côté serveur par `requireSubModule('prix', minNiveau)` (`middleware/permissions.js`) sur
-chaque route de `prices.routes.js` — jamais seulement côté frontend.
+Vérifié côté serveur par `requireSubModule('referentiels.prix', minNiveau)`
+(`middleware/permissions.js`) sur chaque route de `prices.routes.js` — jamais seulement côté
+frontend.
 
 ---
 
@@ -561,7 +562,7 @@ Yaourt. Ce n'est pas un défaut d'import (vérifié ligne à ligne), mais un vra
 du référentiel source côté métier pour ces deux BU — à signaler si la saisie de stock quotidien
 doit couvrir plus de produits sur Lait/Tomate.
 
-### 3.8 Module Historique des prix (module `prix`)
+### 3.8 Module Historique des prix (sous-module `referentiels.prix`)
 
 Suivi du prix de chaque produit (toutes BU confondues, référentiel §1.1), avec **historique
 complet des changements** et un graphique d'évolution.
@@ -581,10 +582,13 @@ Décisions de conception :
   `created_at` en cas d'égalité).
 - **La BU n'est jamais dupliquée sur `product_prices`** — dérivée de `products.business_unit_id`,
   même principe que pour le stock.
-- **Accès gated par le sous-module `prix` en LECTURE ET EN ÉCRITURE** — contrairement aux
-  référentiels simples (§2.3) dont la lecture reste ouverte à tout utilisateur authentifié, le prix
-  est une donnée jugée sensible : seul un utilisateur avec `prix` explicitement accordé peut y
-  accéder, à un niveau qui dépend de sa ligne dans `user_sub_module_access` (§2.3, ancien §2.6). Pas
+- **Accès gated par le sous-module `referentiels.prix` en LECTURE ET EN ÉCRITURE** — contrairement
+  aux autres sous-modules de Référentiels (§2.3) dont la lecture reste ouverte à tout utilisateur
+  authentifié, le prix est une donnée jugée sensible : seul un utilisateur avec `referentiels.prix`
+  explicitement accordé peut y accéder, à un niveau qui dépend de sa ligne dans
+  `user_sub_module_access` (§2.3, ancien §2.6). Rattaché à Référentiels dans la navigation et dans
+  l'arbre de permissions Admin > Utilisateurs (accessible via l'onglet "Prix" du sous-menu
+  Référentiels), mais reste gaté indépendamment des autres onglets référentiels. Pas
   de restriction fine par Business Unit comme pour le stock (§2.4) dans cette v1 — le niveau d'accès
   s'applique à tous les produits, toutes BU confondues. À affiner plus tard si un besoin de
   cloisonnement par BU apparaît (même pattern que `user_business_unit_access` serait réutilisable).
@@ -812,7 +816,7 @@ POST   /api/stock-movements           { productId, typeMouvement, quantite, date
 DELETE /api/stock-movements/:id
 ```
 
-### 4.10 Historique des prix (sous-module `prix`, niveaux §2.3)
+### 4.10 Historique des prix (sous-module `referentiels.prix`, niveaux §2.3)
 ```
 GET    /api/prices/current    ?business_unit_id=&category_id= -> dernier prix connu par produit
                                 (niveau consultation suffit)
@@ -980,7 +984,7 @@ concerné ait besoin de se reconnecter) :
   écriture refusée sans octroi de Business Unit, octroi en cours de session débloque l'écriture
   sans reconnexion, UPSERT vérifié (`stock_entries`, relevé journalier — §2 distinction
   journal/relevé).
-- `e2e.prices.test.js` — sous-module `prix` : les 3 paliers désormais génériques de
+- `e2e.prices.test.js` — sous-module `referentiels.prix` : les 3 paliers désormais génériques de
   `user_sub_module_access` (`consultation` < `ajout` < `edition`, §2.3, ancien §2.6), et
   confirmation que `product_prices` est bien un **journal append-only** (pas d'UPSERT, chaque
   saisie même-jour/même-produit crée une nouvelle ligne).

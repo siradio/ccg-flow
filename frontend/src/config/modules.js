@@ -11,5 +11,6 @@ export const MODULE_SUB_KEYS = {
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
     'referentiels.products', 'referentiels.product_categories', 'referentiels.business_units', 'referentiels.suppliers',
+    'referentiels.prix',
   ],
 };

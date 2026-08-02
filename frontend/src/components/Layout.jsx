@@ -4,7 +4,7 @@ import { useAuth, isSuperAdmin, hasModuleAccess, hasSubModuleLevel } from '../au
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import {
-  IconDashboard, IconCart, IconChart, IconBox, IconTag, IconBook,
+  IconDashboard, IconCart, IconChart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
@@ -54,7 +54,6 @@ export default function Layout() {
           {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}><IconCart /> Demandes d'achat</NavLink>}
           {hasModuleAccess(user, 'kpi') && <NavLink to="/kpi" className={navClass}><IconChart /> KPI</NavLink>}
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}><IconBox /> Stock</NavLink>}
-          {hasModuleAccess(user, 'prix') && <NavLink to="/prices/historique" className={navClass}><IconTag /> Prix</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}><IconBook /> Référentiels</NavLink>}
 
           {admin && (

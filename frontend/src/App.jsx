@@ -40,8 +40,8 @@ export default function App() {
         <Route path="stock/graphiques" element={<RequireModule subModule="stock.saisie_jour"><StockChartsPage /></RequireModule>} />
         <Route path="stock/dashboard-dg" element={<RequireModule subModule="stock.saisie_jour"><StockDgDashboardPage /></RequireModule>} />
         <Route path="stock/mouvements" element={<RequireModule subModule="stock.mouvements"><StockMovementsPage /></RequireModule>} />
-        <Route path="prices/historique" element={<RequireModule subModule="prix"><PricesHistoryPage /></RequireModule>} />
-        <Route path="prices/graphique" element={<RequireModule subModule="prix"><PricesChartPage /></RequireModule>} />
+        <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
+        <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<Users />} />
         <Route path="admin/workflow" element={<WorkflowConfig />} />

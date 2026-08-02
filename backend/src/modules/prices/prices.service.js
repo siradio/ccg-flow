@@ -85,7 +85,7 @@ async function getPriceSeries(user, { productId, dateFrom, dateTo }) {
 }
 
 // Correction d'une ligne d'historique déjà saisie — réservé au niveau "edition" (voir
-// requireSubModule('prix', 'edition') dans prices.routes.js, §2.6 SPEC.md). Reste une exception ponctuelle au
+// requireSubModule('referentiels.prix', 'edition') dans prices.routes.js, §2.6 SPEC.md). Reste une exception ponctuelle au
 // principe "jamais d'upsert" du §3.8 : la correction d'une vraie erreur de saisie (montant, date,
 // produit) ne doit pas nécessiter de contourner l'API en base directement, mais ce n'est pas une
 // opération que le niveau "ajout" (écriture normale) doit offrir.

@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import client from '../../api/client';
 import PricesSubnav from './PricesSubnav';
+import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
 
@@ -74,6 +75,7 @@ export default function ChartPage() {
 
   return (
     <div>
+      <ReferentialsSubnav />
       <h1 className="page-title" style={{ marginBottom: 20 }}>Prix</h1>
       <PricesSubnav />
 
