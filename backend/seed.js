@@ -101,7 +101,9 @@ async function seed({ closePool = true } = {}) {
     "INSERT INTO users (nom, prenom, email, password_hash) VALUES ('Camara', 'Fatoumata', 'direction@test', $1) RETURNING id",
     [hash]
   );
-  await usersService.setSubModuleAccess(directionUser.id, 'kpi', 'edition');
+  await usersService.setSubModuleAccess(directionUser.id, 'kpi.achats', 'edition');
+  await usersService.setSubModuleAccess(directionUser.id, 'kpi.rh', 'edition');
+  await usersService.setSubModuleAccess(directionUser.id, 'kpi.stock', 'edition');
 
   const supplier1 = await one(
     "INSERT INTO suppliers (nom, contact_nom, contact_email, contact_tel) VALUES ('Fournisseur Atlantique', 'M. Keita', 'contact@atlantique-gn.test', '+224 620 000 001') RETURNING id"

@@ -16,7 +16,14 @@ const MODULES = [
       { key: 'stock.mouvements', label: 'Mouvement Stock' },
     ],
   },
-  { key: 'kpi', label: 'KPI (Achats + RH)', subModules: [] },
+  {
+    key: 'kpi', label: 'KPI',
+    subModules: [
+      { key: 'kpi.achats', label: 'KPI Achats' },
+      { key: 'kpi.rh', label: 'KPI RH' },
+      { key: 'kpi.stock', label: 'KPI Stock' },
+    ],
+  },
   // Deviendra sous-modulé (Personnel / Congés & absences / Évaluation) quand ces écrans existeront
   // réellement — pas avant, pour ne pas exposer dans l'admin des cases à cocher menant à du vide.
   { key: 'rh', label: 'RH (Employés)', subModules: [] },

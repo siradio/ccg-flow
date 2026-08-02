@@ -45,7 +45,7 @@ test('un utilisateur non super_admin ne peut pas administrer les autres comptes'
   const listRes = await request(app).get('/api/users').set('Authorization', auth(token));
   assert.equal(listRes.status, 403);
 
-  const grantRes = await request(app).put('/api/users/1/sub-modules/kpi')
+  const grantRes = await request(app).put('/api/users/1/sub-modules/kpi.achats')
     .set('Authorization', auth(token))
     .send({ niveau: 'edition' });
   assert.equal(grantRes.status, 403);
@@ -63,7 +63,7 @@ test("l'octroi d'un module prend effet immédiatement, sans reconnexion (§2.5)"
   const beforeGrant = await request(app).get('/api/kpi/achats').set('Authorization', auth(staleToken));
   assert.equal(beforeGrant.status, 403, "le module kpi ne doit pas encore être accordé");
 
-  await request(app).put(`/api/users/${userId}/sub-modules/kpi`)
+  await request(app).put(`/api/users/${userId}/sub-modules/kpi.achats`)
     .set('Authorization', auth(adminToken))
     .send({ niveau: 'edition' });
 

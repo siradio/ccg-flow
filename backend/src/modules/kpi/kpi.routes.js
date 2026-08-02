@@ -5,19 +5,18 @@ const service = require('./kpi.service');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireSubModule('kpi'));
 
-router.get('/achats', async (req, res, next) => {
+router.get('/achats', requireSubModule('kpi.achats'), async (req, res, next) => {
   try { res.json(await service.getAchatsKpi()); }
   catch (e) { next(e); }
 });
 
-router.get('/rh', async (req, res, next) => {
+router.get('/rh', requireSubModule('kpi.rh'), async (req, res, next) => {
   try { res.json(await service.getRhKpi()); }
   catch (e) { next(e); }
 });
 
-router.get('/stock', async (req, res, next) => {
+router.get('/stock', requireSubModule('kpi.stock'), async (req, res, next) => {
   try { res.json(await service.getStockKpi()); }
   catch (e) { next(e); }
 });

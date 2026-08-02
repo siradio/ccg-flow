@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
+import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { STATUS_LABELS, STATUS_ORDER, STATUS_COLORS } from '../PurchaseRequests/statusLabels.jsx';
 
 const CONTRAT_COLOR = 'var(--color-primary)';
@@ -239,16 +240,26 @@ function StockKpi({ data }) {
   );
 }
 
+const TABS = [
+  { key: 'achats', label: 'Achats', subModule: 'kpi.achats' },
+  { key: 'rh', label: 'RH', subModule: 'kpi.rh' },
+  { key: 'stock', label: 'Stock (résumé)', subModule: 'kpi.stock' },
+];
+
 export default function KpiPage() {
-  const [tab, setTab] = useState('achats');
+  const { user } = useAuth();
+  const allowedTabs = TABS.filter(t => hasSubModuleLevel(user, t.subModule));
+
+  const [tab, setTab] = useState(allowedTabs[0]?.key);
   const [achats, setAchats] = useState(null);
   const [rh, setRh] = useState(null);
   const [stock, setStock] = useState(null);
 
   useEffect(() => {
-    client.get('/kpi/achats').then(res => setAchats(res.data));
-    client.get('/kpi/rh').then(res => setRh(res.data));
-    client.get('/kpi/stock').then(res => setStock(res.data));
+    if (allowedTabs.some(t => t.key === 'achats')) client.get('/kpi/achats').then(res => setAchats(res.data));
+    if (allowedTabs.some(t => t.key === 'rh')) client.get('/kpi/rh').then(res => setRh(res.data));
+    if (allowedTabs.some(t => t.key === 'stock')) client.get('/kpi/stock').then(res => setStock(res.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -256,9 +267,9 @@ export default function KpiPage() {
       <h1 className="page-title" style={{ marginBottom: 20 }}>KPI</h1>
 
       <nav className="subnav">
-        <a className={tab === 'achats' ? 'active' : undefined} onClick={() => setTab('achats')} style={{ cursor: 'pointer' }}>Achats</a>
-        <a className={tab === 'rh' ? 'active' : undefined} onClick={() => setTab('rh')} style={{ cursor: 'pointer' }}>RH</a>
-        <a className={tab === 'stock' ? 'active' : undefined} onClick={() => setTab('stock')} style={{ cursor: 'pointer' }}>Stock (résumé)</a>
+        {allowedTabs.map(t => (
+          <a key={t.key} className={tab === t.key ? 'active' : undefined} onClick={() => setTab(t.key)} style={{ cursor: 'pointer' }}>{t.label}</a>
+        ))}
       </nav>
 
       {tab === 'achats' && (achats ? <AchatsKpi data={achats} /> : <p>Chargement…</p>)}

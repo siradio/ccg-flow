@@ -47,9 +47,12 @@ function getTransporter() {
     transporter = nodemailer.createTransport({
       host: env.smtp.host,
       port: env.smtp.port,
-      secure: false, // pas de TLS en local
-      ignoreTLS: true, // ignire en local
-      //auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
+      // TLS implicite uniquement sur le port 465 ; le port 587 (Brevo, M365, la plupart des relais)
+      // utilise STARTTLS, négocié automatiquement par nodemailer tant que `secure` est à false et
+      // qu'`ignoreTLS` n'est pas forcé — d'où son retrait, il désactivait purement et simplement le
+      // chiffrement et empêchait toute authentification réelle de fonctionner.
+      secure: Number(env.smtp.port) === 465,
+      auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
     });
   }
   return transporter;

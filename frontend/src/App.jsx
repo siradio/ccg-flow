@@ -34,7 +34,7 @@ export default function App() {
         <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
         <Route path="employees/new" element={<RequireModule subModule="rh" minNiveau="ajout"><EmployeesFormPage /></RequireModule>} />
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
-        <Route path="kpi" element={<RequireModule subModule="kpi"><KpiPage /></RequireModule>} />
+        <Route path="kpi" element={<RequireModule subModule={['kpi.achats', 'kpi.rh', 'kpi.stock']}><KpiPage /></RequireModule>} />
         <Route path="stock/saisie" element={<RequireModule subModule="stock.saisie_jour"><StockEntryPage /></RequireModule>} />
         <Route path="stock/historique" element={<RequireModule subModule="stock.saisie_jour"><StockHistoryPage /></RequireModule>} />
         <Route path="stock/graphiques" element={<RequireModule subModule="stock.saisie_jour"><StockChartsPage /></RequireModule>} />
