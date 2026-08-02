@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasRoleOnEntity } from '../../auth/AuthContext';
 import WorkflowTimeline from '../../components/WorkflowTimeline';
+import AsyncButton from '../../components/AsyncButton';
 import { StatusBadge } from './statusLabels.jsx';
 import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
 import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
@@ -120,10 +121,10 @@ export default function DetailPage() {
 
       {pr.status === 'brouillon' && isRequester && (
         <section className="card">
-          <button className="btn btn-primary" disabled={pr.lines.length === 0}
+          <AsyncButton disabled={pr.lines.length === 0}
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), "Demande soumise à la DGA pour validation de l'expression de besoin.")}>
             Soumettre l'expression de besoin
-          </button>
+          </AsyncButton>
         </section>
       )}
 
@@ -148,15 +149,21 @@ export default function DetailPage() {
 
 function LinesSection({ pr, products, isRequester, guarded }) {
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
+  const [submitting, setSubmitting] = useState(false);
   const editable = pr.status === 'brouillon' && isRequester;
 
   async function addLine(e) {
     e.preventDefault();
-    const ok = await guarded(() => client.post(`/purchase-requests/${pr.id}/lines`, {
-      productId: form.productId || null, descriptionLibre: form.descriptionLibre || null,
-      quantite: Number(form.quantite), unite: form.unite,
-    }));
-    if (ok) setForm({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
+    setSubmitting(true);
+    try {
+      const ok = await guarded(() => client.post(`/purchase-requests/${pr.id}/lines`, {
+        productId: form.productId || null, descriptionLibre: form.descriptionLibre || null,
+        quantite: Number(form.quantite), unite: form.unite,
+      }));
+      if (ok) setForm({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -176,10 +183,10 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                 <td>{l.fournisseur_retenu_id ? '✓' : '—'}</td>
                 {editable && (
                   <td>
-                    <button className="btn btn-danger btn-sm"
+                    <AsyncButton className="btn btn-danger btn-sm"
                       onClick={() => guarded(() => client.delete(`/purchase-requests/${pr.id}/lines/${l.id}`))}>
                       Supprimer
-                    </button>
+                    </AsyncButton>
                   </td>
                 )}
               </tr>
@@ -201,7 +208,10 @@ function LinesSection({ pr, products, isRequester, guarded }) {
           <input placeholder="Quantité" type="number" required value={form.quantite}
             onChange={e => setForm({ ...form, quantite: e.target.value })} style={{ width: 100 }} />
           <input placeholder="Unité" value={form.unite} onChange={e => setForm({ ...form, unite: e.target.value })} style={{ width: 100 }} />
-          <button type="submit" className="btn btn-primary">Ajouter</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting && <span className="btn-spinner" aria-hidden="true" />}
+            Ajouter
+          </button>
         </form>
       )}
     </section>
@@ -311,10 +321,10 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
             Ce texte sera le corps de l'email envoyé (et celui proposé au "copier" ci-dessous) — modifiable jusqu'à l'envoi.
           </p>
-          <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
+          <AsyncButton style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }), 'Consultation lancée auprès des fournisseurs sélectionnés.')}>
             Lancer la consultation
-          </button>
+          </AsyncButton>
         </div>
       )}
 
@@ -346,10 +356,10 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
           </ul>
           {canAct && qr.suppliers.some(s => s.statut === 'a_envoyer') && (
             <>
-              <button className="btn btn-secondary" style={{ marginTop: 8 }}
+              <AsyncButton className="btn btn-secondary" style={{ marginTop: 8 }}
                 onClick={() => guarded(() => sendQuoteRequestBatch(qr.id), 'Demandes de devis envoyées.')}>
                 Envoyer les demandes de devis
-              </button>
+              </AsyncButton>
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
                 Si l'envoi échoue (ex. messagerie indisponible), utilisez "PDF" + "Copier le texte" pour l'envoyer vous-même depuis votre propre messagerie.
               </p>
@@ -365,6 +375,7 @@ function QuotesSection({ pr, guarded }) {
   const { user } = useAuth();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', notes: '', file: null });
+  const [submitting, setSubmitting] = useState(false);
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
@@ -380,8 +391,10 @@ function QuotesSection({ pr, guarded }) {
     data.append('montant', form.montant);
     data.append('devise', pr.devise);
     if (form.file) data.append('file', form.file);
+    setSubmitting(true);
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), 'Devis enregistré.')
-      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', notes: '', file: null }); });
+      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', notes: '', file: null }); })
+      .finally(() => setSubmitting(false));
   }
 
   return (
@@ -405,10 +418,10 @@ function QuotesSection({ pr, guarded }) {
                 </td>
                 <td>{q.selectionne ? '✓' : ''}</td>
                 {canSelect && !q.selectionne && (
-                  <td><button className="btn btn-primary btn-sm"
+                  <td><AsyncButton className="btn btn-primary btn-sm"
                     onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), 'Devis retenu comme offre sélectionnée.')}>
                     Sélectionner
-                  </button></td>
+                  </AsyncButton></td>
                 )}
               </tr>
             ))}
@@ -426,7 +439,10 @@ function QuotesSection({ pr, guarded }) {
             Devis du fournisseur (PDF, optionnel)
             <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
           </label>
-          <button type="submit" className="btn btn-primary">Enregistrer le devis</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting && <span className="btn-spinner" aria-hidden="true" />}
+            Enregistrer le devis
+          </button>
         </form>
       )}
     </section>
@@ -455,13 +471,13 @@ function ValidationSection({ pr, guarded }) {
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/validate-step`, { comment }), 'Étape validée.')}>
+        <AsyncButton onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/validate-step`, { comment }), 'Étape validée.')}>
           Valider
-        </button>
+        </AsyncButton>
         {canReject && (
-          <button className="btn btn-danger" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/reject-step`, { comment }), 'Demande refusée.')}>
+          <AsyncButton className="btn btn-danger" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/reject-step`, { comment }), 'Demande refusée.')}>
             Refuser
-          </button>
+          </AsyncButton>
         )}
       </div>
     </section>
