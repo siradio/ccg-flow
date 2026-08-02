@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth, isSuperAdmin, hasModuleAccess, hasSubModuleLevel } from '../auth/AuthContext';
+import { useAuth, isSuperAdmin, isUserAdmin, hasModuleAccess, hasSubModuleLevel } from '../auth/AuthContext';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import {
@@ -26,12 +26,13 @@ function stockLinkTarget(user) {
 }
 
 // Rangés sous un onglet "Paramètres" repliable plutôt que mélangés aux liens de nav principaux —
-// ce sont des écrans d'administration (super_admin uniquement), pas des modules métier du
-// quotidien, donc pas au même niveau de visibilité par défaut.
+// ce sont des écrans d'administration, pas des modules métier du quotidien, donc pas au même
+// niveau de visibilité par défaut. "Utilisateurs" est aussi accessible à support_it (superOnly
+// absent) ; Workflow/Données de test restent réservés aux vrais super_admin.
 const PARAMS_ITEMS = [
   { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
-  { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow },
-  { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase },
+  { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
+  { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase, superOnly: true },
 ];
 
 export default function Layout() {
@@ -41,6 +42,8 @@ export default function Layout() {
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
 
   const admin = isSuperAdmin(user);
+  const userAdmin = isUserAdmin(user);
+  const visibleParamsItems = PARAMS_ITEMS.filter(item => admin || !item.superOnly);
 
   return (
     <div className="app-shell">
@@ -56,7 +59,7 @@ export default function Layout() {
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}><IconBox /> Stock</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}><IconBook /> Référentiels</NavLink>}
 
-          {admin && (
+          {userAdmin && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setParamsOpen(o => !o)}>
                 <IconSettings /> Paramètres
@@ -64,7 +67,7 @@ export default function Layout() {
               </button>
               {paramsOpen && (
                 <div className="sidebar-subnav">
-                  {PARAMS_ITEMS.map(({ to, label, Icon }) => (
+                  {visibleParamsItems.map(({ to, label, Icon }) => (
                     <NavLink key={to} to={to} className={navClass}><Icon /> {label}</NavLink>
                   ))}
                 </div>

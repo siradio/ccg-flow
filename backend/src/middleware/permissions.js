@@ -21,6 +21,15 @@ function isSuperAdmin(user) {
   return (user.roles || []).some(r => r.role_code === 'super_admin');
 }
 
+// "support_it" : peut gérer les comptes utilisateurs (créer, désactiver, assigner rôles/accès aux
+// modules) sans être super_admin — pas d'accès automatique au reste de l'admin (workflow, données
+// de test) ni aux modules métier, ni le droit d'accorder/retirer super_admin ou support_it
+// eux-mêmes (réservé aux vrais super_admin, voir users.routes.js, pour éviter toute
+// auto-élévation de privilèges via ce rôle).
+function isUserAdmin(user) {
+  return isSuperAdmin(user) || (user.roles || []).some(r => r.role_code === 'support_it');
+}
+
 // L'utilisateur détient-il ce rôle sur cette entité (ou super_admin, qui a accès partout) ?
 function hasRoleOnEntity(user, roleCode, entityId) {
   if (isSuperAdmin(user)) return true;
@@ -46,6 +55,13 @@ function hasPermAnywhere(user, perm) {
 
 function requireSuperAdmin(req, res, next) {
   if (!isSuperAdmin(req.user)) {
+    return res.status(403).json({ error: 'Réservé aux administrateurs.' });
+  }
+  next();
+}
+
+function requireUserAdmin(req, res, next) {
+  if (!isUserAdmin(req.user)) {
     return res.status(403).json({ error: 'Réservé aux administrateurs.' });
   }
   next();
@@ -131,6 +147,7 @@ function visibleBusinessUnitIds(user) {
 module.exports = {
   PERMS,
   isSuperAdmin,
+  isUserAdmin,
   hasRoleOnEntity,
   hasAnyRoleOnEntity,
   hasPerm,
@@ -141,6 +158,7 @@ module.exports = {
   canWriteBusinessUnit,
   visibleBusinessUnitIds,
   requireSuperAdmin,
+  requireUserAdmin,
   requireRoleOnEntity,
   requireSubModule,
   requireSubModuleWrite,

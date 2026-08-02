@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RequireModule from './components/RequireModule';
+import RequireAdmin from './components/RequireAdmin';
 import Dashboard from './pages/Dashboard/Dashboard';
 import ListPage from './pages/PurchaseRequests/ListPage';
 import CreatePage from './pages/PurchaseRequests/CreatePage';
@@ -43,9 +44,9 @@ export default function App() {
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
-        <Route path="admin/users" element={<Users />} />
-        <Route path="admin/workflow" element={<WorkflowConfig />} />
-        <Route path="admin/test-data" element={<TestData />} />
+        <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
+        <Route path="admin/workflow" element={<RequireAdmin><WorkflowConfig /></RequireAdmin>} />
+        <Route path="admin/test-data" element={<RequireAdmin><TestData /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -9,7 +9,7 @@ async function loadUserWithRoles(userId) {
   if (!user) return null;
 
   const roles = await all(
-    `SELECT uer.entity_id, e.code AS entity_code, uer.role_code
+    `SELECT uer.id, uer.entity_id, e.code AS entity_code, uer.role_code
      FROM user_entity_roles uer
      LEFT JOIN entities e ON e.id = uer.entity_id
      WHERE uer.user_id = $1`,
@@ -64,6 +64,17 @@ async function createUser({ nom, prenom, email, password, employeeId }) {
     'INSERT INTO users (nom, prenom, email, password_hash, employee_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
     [nom, prenom, email, hash, employeeId || null]
   );
+  // Rôle demandeur sur toutes les entités par défaut : un compte fraîchement créé peut soumettre
+  // une demande d'achat immédiatement, sans qu'un admin ajoute le rôle à la main pour chaque
+  // entité — à retirer/ajuster ensuite si le compte a en réalité un rôle plus spécifique.
+  const entities = await all('SELECT id FROM entities');
+  for (const e of entities) {
+    await run(
+      `INSERT INTO user_entity_roles (user_id, entity_id, role_code) VALUES ($1,$2,'demandeur')
+       ON CONFLICT (user_id, entity_id, role_code) DO NOTHING`,
+      [row.id, e.id]
+    );
+  }
   return row.id;
 }
 
@@ -99,6 +110,10 @@ async function removeRole(userId, roleRowId) {
   await run('DELETE FROM user_entity_roles WHERE id = $1 AND user_id = $2', [roleRowId, userId]);
 }
 
+async function getRoleById(roleRowId) {
+  return one('SELECT id, user_id, entity_id, role_code FROM user_entity_roles WHERE id = $1', [roleRowId]);
+}
+
 async function listUsers() {
   const users = await all('SELECT id, nom, prenom, email, actif, created_at FROM users ORDER BY nom, prenom');
   const roles = await all(
@@ -119,6 +134,6 @@ async function listUsers() {
 }
 
 module.exports = {
-  loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, listUsers,
+  loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, getRoleById, listUsers,
   setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, revokeBusinessUnit,
 };

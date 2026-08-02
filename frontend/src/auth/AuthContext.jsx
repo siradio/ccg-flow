@@ -55,6 +55,12 @@ export function isSuperAdmin(user) {
   return !!user && user.roles.some(r => r.role_code === 'super_admin');
 }
 
+// "support_it" : gestion des utilisateurs (comptes, rôles, accès aux modules) sans être
+// super_admin — miroir de permissions.js côté serveur (isUserAdmin).
+export function isUserAdmin(user) {
+  return isSuperAdmin(user) || (!!user && user.roles.some(r => r.role_code === 'support_it'));
+}
+
 // Accès par sous-module (RH, Achats, Stock du Jour, Mouvement Stock, un référentiel précis...) —
 // couche indépendante des rôles de workflow ci-dessus, miroir de permissions.js côté backend.
 // Hiérarchie stricte : consultation < ajout < edition. super_admin = toujours 'edition' partout.

@@ -272,6 +272,16 @@ test('isolation multi-entité : un rôle PBIC ne donne aucun accès aux demandes
     .send({ nom: 'Test', prenom: 'PBIC', email: 'achat.pbic@test', password: seeded.password });
   assert.equal(newUserRes.status, 201, JSON.stringify(newUserRes.body));
 
+  // Un compte neuf reçoit désormais le rôle demandeur sur toutes les entités par défaut — on le
+  // retire ici des entités autres que PBIC pour tester une vraie isolation par entité, sinon ce
+  // test prouverait autre chose (accès via ce demandeur par défaut, pas via l'absence de rôle
+  // PBIC -> Soguipal qu'il est censé vérifier).
+  for (const role of newUserRes.body.roles) {
+    if (role.entity_id !== pbic.id) {
+      await request(app).delete(`/api/users/${newUserRes.body.id}/roles/${role.id}`).set('Authorization', auth(adminToken));
+    }
+  }
+
   await request(app).post(`/api/users/${newUserRes.body.id}/roles`)
     .set('Authorization', auth(adminToken))
     .send({ entity_id: pbic.id, role_code: 'service_achat' });

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
 
-const ROLE_CODES = ['super_admin', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'dga'];
+const ROLE_CODES = ['super_admin', 'support_it', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'dga'];
+// Rôles globaux, non rattachés à une entité (comme super_admin) — voir users.routes.js.
+const GLOBAL_ROLES = ['super_admin', 'support_it'];
 const NIVEAUX = [
   { value: '', label: '— (aucun accès)' },
   { value: 'consultation', label: 'Consultation (lecture seule)' },
@@ -50,7 +52,7 @@ export default function Users() {
   async function addRole(userId) {
     const rf = roleForm[userId] || {};
     if (!rf.role_code) return;
-    await client.post(`/users/${userId}/roles`, { entity_id: rf.role_code === 'super_admin' ? null : Number(rf.entity_id), role_code: rf.role_code });
+    await client.post(`/users/${userId}/roles`, { entity_id: GLOBAL_ROLES.includes(rf.role_code) ? null : Number(rf.entity_id), role_code: rf.role_code });
     setRoleForm({ ...roleForm, [userId]: {} });
     load();
   }
@@ -140,7 +142,7 @@ export default function Users() {
               <option value="">Rôle…</option>
               {ROLE_CODES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            {roleForm[u.id]?.role_code && roleForm[u.id]?.role_code !== 'super_admin' && (
+            {roleForm[u.id]?.role_code && !GLOBAL_ROLES.includes(roleForm[u.id]?.role_code) && (
               <select value={roleForm[u.id]?.entity_id || ''} onChange={e => setRoleForm({ ...roleForm, [u.id]: { ...roleForm[u.id], entity_id: e.target.value } })}>
                 <option value="">Entité…</option>
                 {entities.map(en => <option key={en.id} value={en.id}>{en.nom}</option>)}
