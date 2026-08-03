@@ -211,7 +211,7 @@ export default function Users() {
 
       {filteredUsers.map(u => (
         <div key={u.id} className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
               <strong>{u.prenom} {u.nom}</strong>
               <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
