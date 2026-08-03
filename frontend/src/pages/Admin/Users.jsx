@@ -18,6 +18,7 @@ export default function Users() {
   const [businessUnits, setBusinessUnits] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '', notify: true });
   const [notice, setNotice] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const [roleForm, setRoleForm] = useState({});
   const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
@@ -103,6 +104,30 @@ export default function Users() {
     load();
   }
 
+  // (Ré)envoi des accès à un utilisateur existant. Le mot de passe étant haché (jamais stocké en
+  // clair), on ne peut pas renvoyer l'ancien : l'action génère un nouveau mot de passe, le
+  // réinitialise et l'envoie — d'où la confirmation explicite avant d'agir.
+  async function sendCredentials(u) {
+    if (!window.confirm(
+      `Envoyer les accès à ${u.prenom} ${u.nom} (${u.email}) ?\n\nUn nouveau mot de passe sera généré et envoyé par email. L'ancien mot de passe ne fonctionnera plus.`
+    )) return;
+    setError('');
+    setNotice(null);
+    setSendingId(u.id);
+    try {
+      const { data } = await client.post(`/users/${u.id}/send-credentials`);
+      if (data.notification?.sent) {
+        setNotice({ type: 'success', text: `Nouveaux accès envoyés par email à ${u.email}.` });
+      } else {
+        setNotice({ type: 'warning', text: `Mot de passe réinitialisé, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}. Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` });
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur lors de l’envoi des accès.');
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -171,9 +196,19 @@ export default function Users() {
               <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
               {!u.actif && <em style={{ color: 'var(--color-text-muted)' }}> (désactivé)</em>}
             </div>
-            <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
-              {u.actif ? 'Désactiver' : 'Réactiver'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button
+                onClick={() => sendCredentials(u)}
+                disabled={sendingId === u.id}
+                className="btn btn-secondary btn-sm"
+                title="Générer un nouveau mot de passe et l’envoyer par email"
+              >
+                {sendingId === u.id ? 'Envoi…' : 'Envoyer les accès'}
+              </button>
+              <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
+                {u.actif ? 'Désactiver' : 'Réactiver'}
+              </button>
+            </div>
           </div>
 
           <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>

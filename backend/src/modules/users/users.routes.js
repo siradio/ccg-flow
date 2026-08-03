@@ -62,6 +62,33 @@ router.put('/:id', requireAuth, requireUserAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// (Ré)envoi des accès à un utilisateur existant, à tout moment depuis Admin -> Utilisateurs.
+// Comme les mots de passe sont stockés hachés (jamais en clair), on ne peut pas renvoyer l'ancien :
+// on en génère donc un nouveau, on le réinitialise et on l'envoie par email. Le mot de passe généré
+// est toujours renvoyé dans la réponse pour permettre un repli manuel si l'email échoue.
+router.post('/:id/send-credentials', requireAuth, requireUserAdmin, async (req, res, next) => {
+  try {
+    const user = await usersService.findById(Number(req.params.id));
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    const password = generatePassword();
+    await usersService.updateUser(user.id, { password });
+
+    const notification = { sent: false };
+    try {
+      const scheme = req.get('x-forwarded-proto') || req.protocol;
+      const loginUrl = `${scheme}://${req.get('host')}/login`;
+      await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password, loginUrl });
+      notification.sent = true;
+    } catch (e) {
+      // Envoi isolé, jamais bloquant : le mot de passe est déjà réinitialisé, l'UI proposera le
+      // repli manuel avec le mot de passe généré ci-dessous.
+      notification.error = e.message;
+    }
+    res.json({ notification, generatedPassword: password });
+  } catch (e) { next(e); }
+});
+
 router.post('/:id/roles', requireAuth, requireUserAdmin, async (req, res, next) => {
   try {
     const { entity_id, role_code } = req.body || {};
