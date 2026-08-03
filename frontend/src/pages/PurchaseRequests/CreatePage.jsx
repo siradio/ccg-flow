@@ -52,7 +52,7 @@ export default function CreatePage() {
     <div>
       <h1 className="page-title" style={{ marginBottom: 4 }}>Nouvelle demande d'achat</h1>
       <p className="page-subtitle" style={{ marginBottom: 20, maxWidth: 500 }}>
-        Une fois soumise, votre demande doit d'abord être validée par la DGA comme{' '}
+        Une fois soumise, votre demande doit d'abord être validée comme{' '}
         <strong>expression de besoin</strong>, avant que le service achat ne consulte des
         fournisseurs. Le circuit complet :
       </p>

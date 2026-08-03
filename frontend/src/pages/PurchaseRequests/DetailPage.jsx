@@ -121,7 +121,7 @@ export default function DetailPage() {
       {pr.status === 'brouillon' && isRequester && (
         <section className="card">
           <button className="btn btn-primary" disabled={pr.lines.length === 0}
-            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), "Demande soumise à la DGA pour validation de l'expression de besoin.")}>
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), "Demande soumise pour validation de l'expression de besoin.")}>
             Soumettre l'expression de besoin
           </button>
         </section>
