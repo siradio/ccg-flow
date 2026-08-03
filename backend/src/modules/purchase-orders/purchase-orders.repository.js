@@ -14,7 +14,8 @@ async function setNumero(id, numero) {
 
 async function getById(id) {
   return one(
-    `SELECT po.*, s.nom AS supplier_nom, pr.numero AS purchase_request_numero, pr.entity_id, pr.objet,
+    `SELECT po.*, s.nom AS supplier_nom, s.contact_email AS supplier_email,
+            pr.numero AS purchase_request_numero, pr.entity_id, pr.objet,
             e.nom AS entity_nom, e.code AS entity_code
      FROM purchase_orders po
      JOIN suppliers s ON s.id = po.supplier_id

@@ -80,6 +80,13 @@ router.post('/:id/quote-requests/:qrId/send', requireAuth, async (req, res, next
   catch (e) { next(e); }
 });
 
+// Envoi ciblé de la demande de devis à UN fournisseur, avec une adresse email optionnelle dans le
+// corps (`email`) quand le fournisseur n'en a pas de renseignée dans le référentiel.
+router.post('/:id/quote-requests/suppliers/:qrsId/send', requireAuth, async (req, res, next) => {
+  try { res.json(await service.sendQuoteRequestToSupplier(req.user, Number(req.params.id), Number(req.params.qrsId), req.body && req.body.email)); }
+  catch (e) { next(e); }
+});
+
 // Repli manuel quand l'envoi automatique échoue (ex. SMTP tenant bloqué) : le PDF seul, à envoyer
 // soi-même depuis sa messagerie habituelle avec le texte copié depuis l'écran.
 router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, res, next) => {

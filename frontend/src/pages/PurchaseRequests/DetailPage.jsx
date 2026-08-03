@@ -139,13 +139,7 @@ export default function DetailPage() {
       <ValidationSection pr={pr} refresh={refresh} showToast={showToast} />
 
       {pr.purchase_order && (
-        <section className="card">
-          <h2>Bon de commande</h2>
-          <p><strong>{pr.purchase_order.numero}</strong> — {pr.purchase_order.montant} {pr.purchase_order.devise}</p>
-          <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/purchase-orders/${pr.purchase_order.id}/pdf`)}>
-            Voir le PDF
-          </button>
-        </section>
+        <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
       )}
 
       <HistorySection key={version} prId={pr.id} />
@@ -238,6 +232,9 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   const [adding, setAdding] = useState(false);
   const [sendResults, setSendResults] = useState({}); // { [quoteRequestSupplierId]: { sent, error } }
   const [copiedId, setCopiedId] = useState(null);
+  const [emailFor, setEmailFor] = useState({});   // { [qrsId]: email saisi } — quand le fournisseur n'a pas d'email
+  const [needEmail, setNeedEmail] = useState({}); // { [qrsId]: true } — afficher le champ de saisie
+  const [sendingOne, setSendingOne] = useState(null); // qrsId en cours d'envoi
 
   function copyEmailText(qr, s) {
     const subject = `Demande de devis — ${pr.numero}`;
@@ -251,6 +248,21 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   async function sendQuoteRequestBatch(qrId) {
     const res = await client.post(`/purchase-requests/${pr.id}/quote-requests/${qrId}/send`);
     setSendResults(r => ({ ...r, ...Object.fromEntries(res.data.map(x => [x.supplierId, x])) }));
+  }
+
+  // Envoi ciblé à un fournisseur. S'il n'a pas d'email et qu'aucun n'a été saisi, on affiche le
+  // champ de saisie au lieu d'envoyer.
+  async function sendToSupplier(s) {
+    const email = (emailFor[s.id] || '').trim();
+    if (!s.supplier_email && !email) { setNeedEmail(n => ({ ...n, [s.id]: true })); return; }
+    setSendingOne(s.id);
+    const ok = await guarded(async () => {
+      await client.post(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/send`, email ? { email } : {});
+      setSendResults(r => ({ ...r, [s.supplier_id]: { sent: true } }));
+      setNeedEmail(n => ({ ...n, [s.id]: false }));
+    }, `Demande de devis envoyée à ${s.supplier_nom}.`);
+    setSendingOne(null);
+    if (!ok) setSendResults(r => ({ ...r, [s.supplier_id]: { sent: false, error: "Échec de l'envoi." } }));
   }
 
   const canCreate = canAct && ['soumise', 'en_analyse_achat'].includes(pr.status);
@@ -347,6 +359,27 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
                     onClick={() => copyEmailText(qr, s)}>
                     {copiedId === s.id ? 'Copié ✓' : 'Copier le texte'}
                   </button>
+                  {canAct && (
+                    <>
+                      {' '}
+                      <button type="button" className="btn btn-primary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
+                        disabled={sendingOne === s.id}
+                        onClick={() => sendToSupplier(s)}>
+                        {sendingOne === s.id ? 'Envoi…' : (s.statut === 'envoye' ? 'Renvoyer par email' : 'Envoyer par email')}
+                      </button>
+                      {needEmail[s.id] && (
+                        <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
+                          <input type="email" placeholder="email du fournisseur" value={emailFor[s.id] || ''}
+                            onChange={e => setEmailFor(f => ({ ...f, [s.id]: e.target.value }))}
+                            style={{ fontSize: 12, padding: '2px 6px', width: 190 }} />
+                          <button type="button" className="btn btn-primary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
+                            disabled={sendingOne === s.id || !(emailFor[s.id] || '').trim()}
+                            onClick={() => sendToSupplier(s)}>Envoyer</button>
+                        </span>
+                      )}
+                      {result?.sent === true && <span style={{ color: 'var(--color-success-fg)' }}> — envoyé ✓</span>}
+                    </>
+                  )}
                 </li>
               );
             })}
@@ -435,6 +468,59 @@ function QuotesSection({ pr, guarded }) {
           </label>
           <button type="submit" className="btn btn-primary">Enregistrer le devis</button>
         </form>
+      )}
+    </section>
+  );
+}
+
+function PurchaseOrderSection({ po, canSend }) {
+  const [sending, setSending] = useState(false);
+  const [needEmail, setNeedEmail] = useState(false);
+  const [email, setEmail] = useState('');
+  const [result, setResult] = useState(null); // { ok, message }
+
+  async function send() {
+    const e = email.trim();
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await client.post(`/purchase-orders/${po.id}/send`, e ? { email: e } : {});
+      setResult({ ok: true, message: `Bon de commande envoyé à ${res.data.to}.` });
+      setNeedEmail(false);
+    } catch (err) {
+      // 400 = le fournisseur n'a pas d'email : on propose la saisie.
+      if (err.response?.status === 400) setNeedEmail(true);
+      setResult({ ok: false, message: err.response?.data?.error || "Échec de l'envoi." });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>Bon de commande</h2>
+      <p><strong>{po.numero}</strong> — {po.montant} {po.devise}</p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/purchase-orders/${po.id}/pdf`)}>
+          Voir le PDF
+        </button>
+        {canSend && (
+          <button className="btn btn-primary" disabled={sending} onClick={send}>
+            {sending ? 'Envoi…' : 'Envoyer au fournisseur'}
+          </button>
+        )}
+      </div>
+      {needEmail && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="email" placeholder="email du fournisseur" value={email} onChange={e => setEmail(e.target.value)}
+            style={{ flex: '1 1 240px', maxWidth: 320 }} />
+          <button className="btn btn-primary btn-sm" disabled={sending || !email.trim()} onClick={send}>Envoyer</button>
+        </div>
+      )}
+      {result && (
+        <div className={`alert ${result.ok ? 'alert-success' : 'alert-danger'}`} style={{ marginTop: 12, marginBottom: 0 }}>
+          {result.message}
+        </div>
       )}
     </section>
   );
