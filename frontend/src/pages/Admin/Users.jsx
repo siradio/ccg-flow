@@ -101,8 +101,17 @@ export default function Users() {
   async function toggleActive(u) {
     const action = u.actif ? 'désactiver' : 'réactiver';
     if (!window.confirm(`Confirmer : ${action} ${u.prenom} ${u.nom} ?`)) return;
-    await client.put(`/users/${u.id}`, { actif: !u.actif });
-    load();
+    setError('');
+    setNotice(null);
+    try {
+      await client.put(`/users/${u.id}`, { actif: !u.actif });
+      setNotice({ type: 'success', text: `${u.prenom} ${u.nom} ${u.actif ? 'désactivé' : 'réactivé'}.` });
+      load();
+    } catch (err) {
+      // Ne plus échouer en silence : un compte sans droits d'administration recevait un 403 sans
+      // aucun retour visible, donnant l'impression que « le bouton ne marche pas ».
+      setError(err.response?.data?.error || `Impossible de ${action} cet utilisateur.`);
+    }
   }
 
   function togglePwPanel(u) {
