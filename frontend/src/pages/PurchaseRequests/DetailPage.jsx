@@ -32,6 +32,13 @@ export default function DetailPage() {
     return client.get(`/purchase-requests/${id}`).then(res => setPr(res.data));
   }, [id]);
 
+  // Recharge la demande ET rafraîchit l'historique (clé `version`) — utilisé par les sections qui
+  // gèrent elles-mêmes leur retour visuel (ex. ValidationSection).
+  const refresh = useCallback(async () => {
+    await reload();
+    setVersion(v => v + 1);
+  }, [reload]);
+
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     client.get('/settings').then(res => setMinSuppliers(Number(res.data.min_suppliers_devis) || 1));
@@ -129,7 +136,7 @@ export default function DetailPage() {
 
       <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} entities={entities} />
       <QuotesSection pr={pr} guarded={guarded} />
-      <ValidationSection pr={pr} guarded={guarded} />
+      <ValidationSection pr={pr} refresh={refresh} showToast={showToast} />
 
       {pr.purchase_order && (
         <section className="card">
@@ -433,9 +440,11 @@ function QuotesSection({ pr, guarded }) {
   );
 }
 
-function ValidationSection({ pr, guarded }) {
+function ValidationSection({ pr, refresh, showToast }) {
   const { user } = useAuth();
   const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(null); // 'validate' | 'reject' | null — désactive les boutons pendant l'appel
+  const [msg, setMsg] = useState(null);   // { type: 'success' | 'error', text } — retour affiché SOUS les boutons
 
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
@@ -447,23 +456,49 @@ function ValidationSection({ pr, guarded }) {
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
   const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin';
 
+  // Retour visuel géré localement (près des boutons) + anti double-clic : tant qu'un appel est en
+  // cours, les boutons sont désactivés, ce qui évite les clics répétés et les erreurs en cascade.
+  async function act(kind) {
+    if (busy) return;
+    const path = kind === 'reject' ? 'reject-step' : 'validate-step';
+    const successText = kind === 'reject' ? 'Demande refusée.' : 'Étape validée.';
+    setBusy(kind);
+    setMsg(null);
+    try {
+      await client.post(`/purchase-requests/${pr.id}/${path}`, { comment });
+      setMsg({ type: 'success', text: successText });
+      showToast(successText);
+      await refresh(); // le statut avance : cette section peut alors disparaître (ce n'est plus notre tour)
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.error || 'Une erreur est survenue.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="card">
       <h2>Validation</h2>
       {canReject && (
         <textarea placeholder="Commentaire (obligatoire en cas de refus)" value={comment} onChange={e => setComment(e.target.value)}
+          disabled={!!busy}
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/validate-step`, { comment }), 'Étape validée.')}>
-          Valider
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
+          {busy === 'validate' ? 'Validation…' : 'Valider'}
         </button>
         {canReject && (
-          <button className="btn btn-danger" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/reject-step`, { comment }), 'Demande refusée.')}>
-            Refuser
+          <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
+            {busy === 'reject' ? 'Refus…' : 'Refuser'}
           </button>
         )}
       </div>
+      {msg && (
+        <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} style={{ marginTop: 12, marginBottom: 0 }}>
+          {msg.text}
+        </div>
+      )}
     </section>
   );
 }
