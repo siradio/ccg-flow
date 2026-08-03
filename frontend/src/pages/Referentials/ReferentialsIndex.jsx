@@ -37,6 +37,7 @@ const CONFIGS = {
   },
   sites: {
     title: 'Sites', endpoint: '/sites', subModuleKey: 'referentiels.sites',
+    filters: ['entity_id'],
     fields: [
       { key: 'entity_id', label: 'Entité', type: 'entitySelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -46,6 +47,7 @@ const CONFIGS = {
   },
   warehouses: {
     title: 'Entrepôts', endpoint: '/warehouses', subModuleKey: 'referentiels.warehouses',
+    filters: ['site_id'],
     fields: [
       { key: 'site_id', label: 'Site', type: 'siteSelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -54,6 +56,7 @@ const CONFIGS = {
   },
   machines: {
     title: 'Machines de production', endpoint: '/machines', subModuleKey: 'referentiels.machines',
+    filters: ['site_id', 'categorie', 'actif'],
     fields: [
       { key: 'site_id', label: 'Site', type: 'siteSelect', required: true },
       { key: 'nom', label: 'Nom', required: true },
@@ -86,6 +89,9 @@ const CONFIGS = {
   },
   products: {
     title: 'Produits', endpoint: '/products', subModuleKey: 'referentiels.products',
+    // "Catégorie" (produit fini / matière première / consommable…) tient lieu de type de produit :
+    // c'est l'axe de classification demandé, filtrable directement ici.
+    filters: ['category_id', 'business_unit_id', 'entity_ids'],
     fields: [
       { key: 'code', label: 'Code' },
       { key: 'designation', label: 'Désignation', required: true },
@@ -98,6 +104,7 @@ const CONFIGS = {
   },
   suppliers: {
     title: 'Fournisseurs', endpoint: '/suppliers', subModuleKey: 'referentiels.suppliers',
+    filters: ['origine', 'categorie', 'actif', 'entity_ids'],
     fields: SUPPLIER_FIELDS,
   },
 };
@@ -143,6 +150,7 @@ export default function ReferentialsIndex() {
       <ReferentialsSubnav />
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
+        filters={config.filters || []}
         entities={entities} sites={sites} lists={{ categories, businessUnits }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}

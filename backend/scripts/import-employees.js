@@ -43,6 +43,7 @@ async function main() {
 
   let created = 0;
   let skippedUnknownBU = 0;
+  let skippedExisting = 0;
   for (const r of rows) {
     const mapping = BU_MAP[r.business_unit_raw];
     if (!mapping) {
@@ -52,8 +53,18 @@ async function main() {
     }
     const entityId = entityIdByCode[mapping.entityCode];
     const businessUnitId = mapping.buCode ? buIdByCode[mapping.buCode] : null;
-    const siteId = await resolveSite(r.site, entityId);
 
+    // Idempotence : ne réinsère pas un employé déjà présent (clé naturelle matricule + nom + prénom).
+    // `IS NOT DISTINCT FROM` traite correctement un matricule NULL (~59 codes partagés dans la source,
+    // certains vides). Rejouer le script sur une base déjà peuplée n'ajoute donc aucun doublon —
+    // essentiel pour un import vers la prod qu'on ne veut surtout pas dupliquer par mégarde.
+    const existing = await one(
+      'SELECT 1 FROM employees WHERE matricule IS NOT DISTINCT FROM $1 AND nom = $2 AND prenom = $3 LIMIT 1',
+      [r.matricule, r.nom, r.prenom]
+    );
+    if (existing) { skippedExisting++; continue; }
+
+    const siteId = await resolveSite(r.site, entityId);
     await run(
       `INSERT INTO employees
          (matricule, nom, prenom, poste, departement, entity_id, site_id, business_unit_id,
@@ -65,7 +76,7 @@ async function main() {
     created++;
   }
 
-  console.log(`\n${created} employé(s) importé(s). ${skippedUnknownBU} ignoré(s) (Business_Unit inconnue).`);
+  console.log(`\n${created} employé(s) importé(s), ${skippedExisting} déjà présent(s) (ignorés), ${skippedUnknownBU} ignoré(s) (Business_Unit inconnue).`);
   await pool.end();
 }
 

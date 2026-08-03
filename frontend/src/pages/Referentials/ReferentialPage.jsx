@@ -5,11 +5,18 @@ import client from '../../api/client';
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
-export default function ReferentialPage({ title, endpoint, fields, entities = [], sites = [], lists = {}, canAdd = false, canEdit = false }) {
+export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields));
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
+
+  // Filtres = sous-ensemble des champs déclaré par référentiel (voir CONFIGS.filters). On récupère
+  // la définition complète du champ pour connaître sa source d'options (entités, sites, liste FK,
+  // options d'un select, ou valeurs distinctes des items pour un champ texte libre).
+  const filterDefs = filters.map(key => fields.find(f => f.key === key)).filter(Boolean);
 
   // Visible dès qu'on peut créer, OU qu'on est en train d'éditer un élément existant (le seul
   // moyen d'entrer en édition est le bouton "Éditer", lui-même gaté par canEdit).
@@ -51,9 +58,53 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
     load();
   }
 
+  // Filtrage entièrement côté client (les référentiels sont chargés en entier) : recherche texte
+  // sur tous les champs textuels + chaque filtre déroulant actif. `hasActiveFilter` sert à n'afficher
+  // le bouton "Réinitialiser" que quand il y a quelque chose à réinitialiser.
+  const hasActiveFilter = search.trim() !== '' || Object.values(filterValues).some(v => v !== '' && v != null);
+  const visibleItems = items.filter(item =>
+    matchesSearch(item, fields, search) &&
+    filterDefs.every(f => matchesFilter(f, item, filterValues[f.key]))
+  );
+
+  function resetFilters() {
+    setSearch('');
+    setFilterValues({});
+  }
+
   return (
     <div>
       <h1 className="page-title" style={{ marginBottom: 20 }}>{title}</h1>
+
+      {items.length > 0 && (
+        <div className="form-inline" style={{ marginBottom: 16 }}>
+          <input
+            type="search"
+            placeholder="Rechercher…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ minWidth: 200 }}
+          />
+          {filterDefs.map(f => (
+            <select
+              key={f.key}
+              value={filterValues[f.key] ?? ''}
+              onChange={e => setFilterValues(fv => ({ ...fv, [f.key]: e.target.value }))}
+            >
+              <option value="">{f.label} : tous</option>
+              {filterOptions(f, items, entities, sites, lists).map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          ))}
+          {hasActiveFilter && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>Réinitialiser</button>
+          )}
+          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            {visibleItems.length} / {items.length}
+          </span>
+        </div>
+      )}
 
       <div className="card" style={{ padding: 0, marginBottom: 20 }}>
         <div className="table-wrap">
@@ -65,7 +116,7 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {visibleItems.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists)}</td>)}
                   {canEdit && (
@@ -76,7 +127,11 @@ export default function ReferentialPage({ title, endpoint, fields, entities = []
                   )}
                 </tr>
               ))}
-              {items.length === 0 && <tr><td className="empty-row" colSpan={fields.length + 1}>Aucun élément.</td></tr>}
+              {visibleItems.length === 0 && (
+                <tr><td className="empty-row" colSpan={fields.length + 1}>
+                  {items.length === 0 ? 'Aucun élément.' : 'Aucun élément ne correspond aux filtres.'}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -101,6 +156,48 @@ export function emptyForm(fields) {
   const f = {};
   for (const field of fields) f[field.key] = field.type === 'multiEntity' ? [] : field.type === 'checkbox' ? !!field.default : '';
   return f;
+}
+
+// Recherche texte : vrai si la requête (insensible à la casse) est incluse dans n'importe quel
+// champ dont la valeur est une chaîne (code, nom, désignation, ville…). Les champs numériques,
+// cases à cocher et listes d'entités sont ignorés par la recherche libre (ils ont leurs filtres).
+function matchesSearch(item, fields, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return fields.some(f => {
+    const v = item[f.key];
+    return typeof v === 'string' && v.toLowerCase().includes(q);
+  });
+}
+
+// Un filtre déroulant actif : l'item doit correspondre à la valeur sélectionnée. Les FK (entité,
+// site, liste) comparent en numérique ; multiEntity teste l'appartenance à entity_ids ; le reste
+// compare en chaîne.
+function matchesFilter(field, item, selected) {
+  if (selected === '' || selected == null) return true;
+  if (field.type === 'multiEntity') return (item.entity_ids || []).includes(Number(selected));
+  const value = item[field.key];
+  if (field.type === 'entitySelect' || field.type === 'siteSelect' || field.type === 'fkSelect') {
+    return Number(value) === Number(selected);
+  }
+  if (field.type === 'checkbox') return String(!!value) === String(selected);
+  return String(value) === String(selected);
+}
+
+// Options d'un filtre selon le type du champ : entités/sites/liste FK depuis les données de
+// référence chargées, options figées pour un select, sinon les valeurs distinctes présentes dans
+// les items (utile pour un champ texte libre comme la catégorie d'une machine ou le pays d'un
+// fournisseur).
+function filterOptions(field, items, entities, sites, lists = {}) {
+  if (field.type === 'entitySelect' || field.type === 'multiEntity') {
+    return entities.map(e => ({ value: e.id, label: e.code || e.nom }));
+  }
+  if (field.type === 'siteSelect') return sites.map(s => ({ value: s.id, label: s.nom }));
+  if (field.type === 'fkSelect') return (lists[field.listKey] || []).map(o => ({ value: o.id, label: o.nom }));
+  if (field.type === 'select') return field.options.map(o => ({ value: o, label: o }));
+  if (field.type === 'checkbox') return [{ value: 'true', label: 'Oui' }, { value: 'false', label: 'Non' }];
+  const seen = [...new Set(items.map(i => i[field.key]).filter(v => v !== null && v !== undefined && v !== ''))];
+  return seen.sort((a, b) => String(a).localeCompare(String(b))).map(v => ({ value: v, label: String(v) }));
 }
 
 function renderValue(field, item, entities, sites, lists = {}) {
