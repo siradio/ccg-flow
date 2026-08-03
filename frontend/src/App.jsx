@@ -14,7 +14,6 @@ import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import TestData from './pages/Admin/TestData';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
-import KpiPage from './pages/Kpi/KpiPage';
 import StockEntryPage from './pages/Stock/EntryPage';
 import StockHistoryPage from './pages/Stock/HistoryPage';
 import StockChartsPage from './pages/Stock/ChartsPage';
@@ -35,7 +34,8 @@ export default function App() {
         <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
         <Route path="employees/new" element={<RequireModule subModule="rh" minNiveau="ajout"><EmployeesFormPage /></RequireModule>} />
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
-        <Route path="kpi" element={<RequireModule subModule={['kpi.achats', 'kpi.rh', 'kpi.stock']}><KpiPage /></RequireModule>} />
+        {/* Fusionné dans le Tableau de bord (onglets Vue globale/Achats/RH/Stock) — redirige les liens/habitudes existants. */}
+        <Route path="kpi" element={<Navigate to="/" replace />} />
         <Route path="stock/saisie" element={<RequireModule subModule="stock.saisie_jour"><StockEntryPage /></RequireModule>} />
         <Route path="stock/historique" element={<RequireModule subModule="stock.saisie_jour"><StockHistoryPage /></RequireModule>} />
         <Route path="stock/graphiques" element={<RequireModule subModule="stock.saisie_jour"><StockChartsPage /></RequireModule>} />

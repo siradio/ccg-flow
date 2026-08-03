@@ -19,6 +19,7 @@ const MODULES = [
   {
     key: 'kpi', label: 'KPI',
     subModules: [
+      { key: 'kpi.global', label: 'Vue globale (tous domaines)' },
       { key: 'kpi.achats', label: 'KPI Achats' },
       { key: 'kpi.rh', label: 'KPI RH' },
       { key: 'kpi.stock', label: 'KPI Stock' },

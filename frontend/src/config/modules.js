@@ -8,7 +8,7 @@
 // clé sert directement de sub_module_key) — même règle que côté backend.
 export const MODULE_SUB_KEYS = {
   stock: ['stock.saisie_jour', 'stock.mouvements'],
-  kpi: ['kpi.achats', 'kpi.rh', 'kpi.stock'],
+  kpi: ['kpi.global', 'kpi.achats', 'kpi.rh', 'kpi.stock'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
     'referentiels.products', 'referentiels.product_categories', 'referentiels.business_units', 'referentiels.suppliers',

@@ -1,5 +1,5 @@
 const { all, one } = require('../../db');
-const { isSuperAdmin } = require('../../middleware/permissions');
+const { hasSubModuleLevel } = require('../../middleware/permissions');
 
 async function getMyRequestStats(userId) {
   const rows = await all(
@@ -81,7 +81,7 @@ function trendFromDaily(daily) {
   return { total, delta: total - previousTotal, sparkline: last7 };
 }
 
-async function getAdminStats() {
+async function getGlobalStats() {
   const [employees, products, suppliers, sites, warehouses, machines, users] = await Promise.all([
     one('SELECT COUNT(*)::int AS c FROM employees'),
     one('SELECT COUNT(*)::int AS c FROM products'),
@@ -130,13 +130,16 @@ async function getAdminStats() {
 }
 
 async function getDashboard(user) {
-  const admin = isSuperAdmin(user);
-  const [myRequests, pendingAction, adminStats] = await Promise.all([
+  // "Vue globale" (tendances, référentiels, répartition par statut/entité tous domaines confondus)
+  // est accordable indépendamment via kpi.global — pas réservée à super_admin, pour que le top
+  // management puisse la voir sans avoir accès à l'administration du système (SPEC.md §2.3).
+  const canSeeGlobal = hasSubModuleLevel(user, 'kpi.global');
+  const [myRequests, pendingAction, globalStats] = await Promise.all([
     getMyRequestStats(user.id),
     getPendingAction(user),
-    admin ? getAdminStats() : Promise.resolve(null),
+    canSeeGlobal ? getGlobalStats() : Promise.resolve(null),
   ]);
-  return { isAdmin: admin, myRequests, pendingAction, admin: adminStats };
+  return { canSeeGlobal, myRequests, pendingAction, global: globalStats };
 }
 
 module.exports = { getDashboard };
