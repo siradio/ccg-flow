@@ -15,21 +15,13 @@ router.get('/', requireAuth, async (req, res, next) => {
 });
 
 // --- Configuration SMTP (super_admin uniquement) ---
+// LECTURE SEULE : la config SMTP est gérée via les variables d'environnement du serveur (App
+// Settings Azure : SMTP_*), pas éditée depuis l'app — pour éviter le piège d'une config qui semble
+// saisie mais n'est en fait qu'héritée du serveur. Seuls la consultation et le test sont exposés.
 // Le mot de passe n'est jamais renvoyé : seul un indicateur `passwordSet` est exposé.
 router.get('/smtp', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try { res.json(await service.getSmtpConfigForAdmin()); }
   catch (e) { next(e); }
-});
-
-router.put('/smtp', requireAuth, requireSuperAdmin, async (req, res, next) => {
-  try {
-    const { host, port, user, from, secure, password } = req.body || {};
-    if (port !== undefined && port !== '' && !Number.isFinite(Number(port))) {
-      return res.status(400).json({ error: 'Le port doit être un nombre.' });
-    }
-    // password : champ optionnel. Absent => mot de passe inchangé. Chaîne vide => effacement.
-    res.json(await service.setSmtpConfig({ host, port, user, from, secure, password }));
-  } catch (e) { next(e); }
 });
 
 // Envoie un vrai email de test avec la config actuellement enregistrée. `to` par défaut = l'email
@@ -47,6 +39,11 @@ router.post('/smtp/test', requireAuth, requireSuperAdmin, async (req, res, next)
 
 router.put('/:key', requireAuth, requireSuperAdmin, async (req, res, next) => {
   try {
+    // Les clés SMTP sont gérées par l'environnement du serveur, jamais écrites via l'app (empêche
+    // aussi un PUT /smtp de retomber ici et de créer une clé parasite).
+    if (/^smtp/i.test(req.params.key)) {
+      return res.status(403).json({ error: 'La configuration SMTP est gérée côté serveur (variables d’environnement), en lecture seule ici.' });
+    }
     const { value } = req.body || {};
     if (value === undefined || value === null || value === '') {
       return res.status(400).json({ error: 'value requis.' });

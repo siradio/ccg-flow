@@ -2,17 +2,14 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 
-// Configuration SMTP éditable par un super_admin, sans redéploiement (remplace la nécessité de
-// modifier le .env sur le serveur). Le mot de passe n'est jamais renvoyé par l'API : le champ reste
-// vide et n'est envoyé que si l'admin en saisit un nouveau (sinon l'existant est conservé).
+// Écran Email (SMTP) en LECTURE SEULE : la configuration du serveur d'envoi est gérée via les
+// variables d'environnement du serveur (App Settings Azure : SMTP_HOST, SMTP_PORT, SMTP_USER,
+// SMTP_PASS, SMTP_FROM). On affiche ici la configuration effective + un bouton de test, sans champ
+// éditable — pour éviter le piège d'une config qui semble saisie mais n'est en fait qu'héritée du
+// serveur.
 export default function EmailSettings() {
   const { user } = useAuth();
-  const [form, setForm] = useState(null);
-  const [password, setPassword] = useState('');
-  const [passwordSet, setPasswordSet] = useState(false);
-  const [fromDb, setFromDb] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [cfg, setCfg] = useState(null);
   const [error, setError] = useState('');
 
   const [testTo, setTestTo] = useState('');
@@ -21,39 +18,10 @@ export default function EmailSettings() {
 
   useEffect(() => {
     client.get('/settings/smtp').then(res => {
-      const d = res.data;
-      setForm({ host: d.host || '', port: d.port || '587', user: d.user || '', from: d.from || '', secure: !!d.secure });
-      setPasswordSet(!!d.passwordSet);
-      setFromDb(!!d.fromDb);
+      setCfg(res.data);
       setTestTo(user?.email || '');
     }).catch(() => setError('Impossible de charger la configuration.'));
   }, [user]);
-
-  function update(field, value) {
-    setForm(f => ({ ...f, [field]: value }));
-    setSaved(false);
-  }
-
-  async function save() {
-    setError('');
-    setSaved(false);
-    setSaving(true);
-    try {
-      const payload = { ...form };
-      // Le mot de passe n'est transmis que si l'admin en a saisi un : sinon on omet le champ pour
-      // conserver l'existant côté serveur (undefined = inchangé).
-      if (password !== '') payload.password = password;
-      const res = await client.put('/settings/smtp', payload);
-      setPasswordSet(!!res.data.passwordSet);
-      setFromDb(!!res.data.fromDb);
-      setPassword('');
-      setSaved(true);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Une erreur est survenue à l’enregistrement.');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function sendTest() {
     setTestResult(null);
@@ -68,78 +36,54 @@ export default function EmailSettings() {
     }
   }
 
-  if (!form) return <p>Chargement…</p>;
+  if (error) return <div className="alert alert-danger">{error}</div>;
+  if (!cfg) return <p>Chargement…</p>;
+
+  const configured = !!cfg.host;
+  const rows = [
+    ['Serveur (hôte)', cfg.host || '—'],
+    ['Port', cfg.port || '—'],
+    ['TLS implicite (465)', cfg.secure ? 'Oui' : 'Non'],
+    ['Utilisateur (login SMTP)', cfg.user || '—'],
+    ['Mot de passe', cfg.passwordSet ? 'Défini' : 'Non défini'],
+    ['Expéditeur (From)', cfg.from || '—'],
+  ];
 
   return (
     <div>
       <h1 className="page-title">Configuration email (SMTP)</h1>
 
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 620, marginTop: 0 }}>
-        Serveur d’envoi utilisé pour les emails de l’application (demandes de devis, notifications).
-        Les valeurs saisies ici prennent le pas sur celles du fichier <code>.env</code> du serveur.
-        {!fromDb && ' Actuellement, la configuration provient encore du .env — renseignez les champs ci-dessous pour la piloter depuis l’admin.'}
+      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 640, marginTop: 0 }}>
+        Serveur d’envoi utilisé pour les emails de l’application (demandes de devis, notifications, accès
+        utilisateurs). La configuration est gérée via les <strong>variables d’environnement du serveur</strong>{' '}
+        (App Settings Azure : <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>,{' '}
+        <code>SMTP_PASS</code>, <code>SMTP_FROM</code>). Cet écran est en lecture seule ; utilisez le test
+        ci-dessous pour vérifier l’envoi.
       </p>
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {!configured && (
+        <div className="alert alert-warning" style={{ maxWidth: 640 }}>
+          Aucun serveur SMTP n’est configuré : les emails ne partiront pas tant que les variables
+          d’environnement ne sont pas renseignées côté serveur.
+        </div>
+      )}
 
       <section className="card" style={{ maxWidth: 520 }}>
-        <div className="form-grid" style={{ maxWidth: '100%' }}>
-          <label className="field">
-            Serveur (hôte)
-            <input type="text" value={form.host} onChange={e => update('host', e.target.value)} placeholder="ex. smtp-relay.brevo.com" />
-          </label>
-
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            <label className="field" style={{ flex: '1 1 120px' }}>
-              Port
-              <input type="number" value={form.port} onChange={e => update('port', e.target.value)} placeholder="587" />
-            </label>
-            <label className="field" style={{ flex: '1 1 200px', justifyContent: 'flex-end' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
-                <input type="checkbox" checked={form.secure} onChange={e => update('secure', e.target.checked)} style={{ width: 'auto' }} />
-                Connexion TLS implicite (port 465)
-              </span>
-            </label>
-          </div>
-
-          <label className="field">
-            Utilisateur (login SMTP)
-            <input type="text" value={form.user} onChange={e => update('user', e.target.value)} autoComplete="off" placeholder="laisser vide si le relais n’exige pas d’authentification" />
-          </label>
-
-          <label className="field">
-            Mot de passe
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setSaved(false); }}
-              autoComplete="new-password"
-              placeholder={passwordSet ? '•••••••• (défini — laisser vide pour ne pas changer)' : 'non défini'}
-            />
-            <span style={{ fontSize: 12, color: 'var(--color-text-faint)', fontWeight: 400 }}>
-              Stocké chiffré. Jamais réaffiché. Laissez vide pour conserver le mot de passe actuel.
-            </span>
-          </label>
-
-          <label className="field">
-            Expéditeur (From)
-            <input type="text" value={form.from} onChange={e => update('from', e.target.value)} placeholder={'"CCG" <direction@ccggroupe.com>'} />
-          </label>
-        </div>
-
-        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
-            {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-          {saved && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>Enregistré.</span>}
+        <h2 style={{ marginTop: 0 }}>Configuration effective</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '10px 18px', fontSize: 14 }}>
+          {rows.map(([label, value]) => (
+            <div key={label} style={{ display: 'contents' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+              <span style={{ fontWeight: 600, wordBreak: 'break-word' }}>{value}</span>
+            </div>
+          ))}
         </div>
       </section>
 
       <section className="card" style={{ maxWidth: 520, marginTop: 18 }}>
         <h2 style={{ marginTop: 0 }}>Tester la configuration</h2>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>
-          Envoie un vrai email de test avec la configuration <strong>enregistrée</strong>. Pensez à
-          enregistrer vos modifications avant de tester.
+          Envoie un vrai email de test avec la configuration effective ci-dessus.
         </p>
         <div className="form-inline">
           <input
@@ -149,7 +93,7 @@ export default function EmailSettings() {
             placeholder="destinataire@exemple.com"
             style={{ flex: '1 1 240px' }}
           />
-          <button className="btn btn-secondary btn-sm" onClick={sendTest} disabled={testing || !testTo}>
+          <button className="btn btn-primary btn-sm" onClick={sendTest} disabled={testing || !testTo}>
             {testing ? 'Envoi…' : 'Envoyer un email de test'}
           </button>
         </div>
