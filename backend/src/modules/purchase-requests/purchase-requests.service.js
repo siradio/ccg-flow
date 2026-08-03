@@ -223,6 +223,43 @@ async function sendQuoteRequest(user, prId, quoteRequestId) {
   return results;
 }
 
+// Envoi CIBLÉ de la demande de devis à UN fournisseur, avec possibilité de fournir une adresse
+// email de remplacement (`emailOverride`) — utile quand le fournisseur n'a pas d'email renseigné
+// dans le référentiel. À défaut d'override, on utilise l'email du fournisseur ; s'il n'y en a
+// aucun, on renvoie une 400 explicite pour que l'UI propose la saisie.
+async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'envoyer la demande de devis');
+
+  const s = await repo.getQuoteRequestSupplier(qrsId);
+  if (!s) throw httpError(404, 'Fournisseur sollicité introuvable.');
+  const to = (emailOverride || '').trim() || s.supplier_email;
+  if (!to) throw httpError(400, "Ce fournisseur n'a pas d'adresse email : saisissez-en une pour l'envoi.");
+
+  const qr = await repo.getQuoteRequest(s.quote_request_id);
+  const bodyText = qr?.message?.trim() || defaultQuoteRequestBody(pr.numero);
+  const lines = await repo.getLines(prId);
+  const buffer = await pdf.generateQuoteRequestPdf({
+    purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom,
+  });
+  try {
+    await mailer.sendMail({
+      to,
+      subject: `Demande de devis — ${pr.numero}`,
+      text: bodyText,
+      html: mailer.renderMailTemplate({ title: 'Demande de devis', bodyHtml: `<p>${bodyText.replace(/\n/g, '<br/>')}</p>` }),
+      attachments: [{ filename: `demande-devis-${pr.numero}.pdf`, content: buffer }],
+    });
+  } catch (e) {
+    console.error(`Échec envoi devis à ${to} (fournisseur ${s.supplier_nom}) :`, e.message);
+    throw httpError(502, "Échec de l'envoi — le serveur de messagerie a refusé le message.");
+  }
+  await repo.markQuoteRequestSupplierSent(s.id);
+  await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_sent', userId: user.id, details: { supplier: s.supplier_nom, to } });
+  return { sent: true, to };
+}
+
 // Permet de récupérer le PDF d'une demande de devis pour un fournisseur précis sans passer par
 // l'envoi email — sert de repli quand l'envoi automatique échoue (§ ci-dessus) : le service achat
 // télécharge le PDF et envoie lui-même le message (texte copiable via getQuoteRequestEmailPreview)
@@ -446,6 +483,6 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
 
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
-  quickAddSupplier, createQuoteRequest, sendQuoteRequest, getQuoteRequestSupplierPdf, addQuote, selectQuote,
+  quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
   validateStep, rejectStep, listForUser,
 };
