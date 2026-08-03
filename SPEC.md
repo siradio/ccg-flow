@@ -411,8 +411,34 @@ app_settings
 | Clé | Défaut | Rôle |
 |---|---|---|
 | `min_suppliers_devis` | `2` | Nombre minimum de fournisseurs à sélectionner avant de pouvoir lancer une demande de devis (§3.1 étape `devis`). Mettre à `1` désactive de fait la contrainte — utile si un référentiel fournisseurs d'une entité n'est pas encore complet. |
+| `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_from`, `smtp_secure` | *(vide → `.env`)* | Configuration du serveur d'envoi email (voir ci-dessous). Éditables depuis l'admin, pas via `PUT /api/settings/:key`. |
 
-Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key`.
+Éditable via **Workflow → Paramètres** (page admin) ou directement `PUT /api/settings/:key` — **sauf les clés `smtp_*`** (voir ci-dessous), qui passent par des routes dédiées.
+
+#### Configuration SMTP (Admin → Email)
+
+Le serveur d'envoi des emails (demandes de devis, notifications) est **configurable depuis
+l'interface** par un `super_admin` (**Paramètres → Email (SMTP)**), sans redéploiement ni accès au
+`.env` du serveur. Champs : hôte, port, TLS implicite (465), utilisateur, mot de passe, expéditeur.
+
+- **Résolution en cascade** : chaque champ est lu en base s'il y est renseigné, sinon on retombe
+  sur la variable d'environnement `SMTP_*` correspondante. Une installation qui configure encore
+  tout via `.env` continue donc de fonctionner à l'identique (compatibilité ascendante, tests
+  inclus) ; renseigner un champ dans l'admin le fait primer sur le `.env`.
+- **Mot de passe chiffré au repos** : stocké chiffré (**AES-256-GCM**, clé dérivée de `JWT_SECRET`
+  via scrypt — `backend/src/utils/crypto.js`), jamais renvoyé au client. L'API n'expose qu'un
+  booléen `passwordSet`, et le champ est laissé vide au chargement (le laisser vide = conserver le
+  mot de passe actuel). Conséquence assumée : changer `JWT_SECRET` rend le secret illisible (retour
+  au `.env`, à ressaisir).
+- **Non exposé** : les clés `smtp_*` sont **exclues du `GET /api/settings`** (ouvert à tout
+  utilisateur authentifié). Elles ne transitent que par `GET`/`PUT /api/settings/smtp`, réservés au
+  `super_admin`.
+- **Bouton « Envoyer un email de test »** (`POST /api/settings/smtp/test`) : envoie un vrai email
+  avec la config **enregistrée**, remonte l'erreur SMTP brute en cas d'échec (identifiants, hôte,
+  port…). Volontairement hors du coupe-circuit `brokenUntil` du mailer, pour pouvoir retester
+  aussitôt après correction.
+- **Rechargement à chaud** : `settings.setSmtpConfig` incrémente un compteur de version ; le mailer
+  reconstruit son transporteur `nodemailer` dès que la version change, sans redémarrer le serveur.
 
 ### 3.3bis Documents générés (PDF)
 
@@ -1094,6 +1120,12 @@ Service, pas à tout l'abonnement), pas d'accès aux données — `DATABASE_URL`
 `SMTP_*` sont configurés séparément, **directement dans Azure** (App Settings, jamais dans
 GitHub) :
 
+> **Note SMTP** : depuis l'ajout de la configuration email en base (§3.3), les `SMTP_*` d'Azure ne
+> sont plus qu'un **repli**. La config d'envoi peut désormais être saisie et testée directement
+> depuis l'application (**Paramètres → Email (SMTP)**, super_admin), sans redéploiement ni accès aux
+> App Settings — approche recommandée. Les `SMTP_*` restent utiles comme valeurs par défaut d'une
+> base neuve tant que rien n'a été saisi dans l'admin.
+
 - Dans le portail Azure : App Service → Environment variables.
 - **`DATABASE_URL` doit inclure `?sslmode=require`** — Azure Database for PostgreSQL exige TLS,
   contrairement au Postgres Docker local. `backend/src/db.js` active `ssl: { rejectUnauthorized:
@@ -1125,7 +1157,9 @@ production.
    `achats@ccg-guinee.com` précisément (Centre d'admin Exchange → boîte aux lettres →
    "Authenticated SMTP"), soit passer à une authentification OAuth2 (app registration + Graph
    API), soit utiliser un relais SMTP tiers (SendGrid, Mailgun, etc.) non soumis à cette
-   politique. En attendant, chaque échec d'envoi (demande de devis) reste isolé par fournisseur et
+   politique. **Depuis §3.3, plus besoin de passer par les App Settings Azure pour ça** : la config
+   SMTP (y compris un basculement vers un relais tiers type Brevo/SendGrid) se fait directement
+   depuis **Paramètres → Email (SMTP)** dans l'app, avec bouton de test intégré. En attendant, chaque échec d'envoi (demande de devis) reste isolé par fournisseur et
    propose un repli manuel (PDF + texte à copier) — voir §3.1 pt.4.
 5. ✅ App Registration Azure AD (`ccg-flow-github-actions`) + identifiant fédéré (federated
    credential) de type Branch pour `main`, avec ID d'organisation/repo GitHub immuables (pas les

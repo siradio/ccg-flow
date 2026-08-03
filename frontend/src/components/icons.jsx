@@ -38,6 +38,9 @@ export function IconDatabase() {
 export function IconSettings() {
   return <Svg><circle cx="12" cy="12" r="3" /><path d="M19.4 13a7.9 7.9 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.4L4.6 11a7.9 7.9 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13Z" /></Svg>;
 }
+export function IconMail() {
+  return <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Svg>;
+}
 export function IconChevron() {
   return <Svg><path d="m9 18 6-6-6-6" /></Svg>;
 }

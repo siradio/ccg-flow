@@ -5,7 +5,7 @@ import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
-  IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout,
+  IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -32,6 +32,7 @@ function stockLinkTarget(user) {
 const PARAMS_ITEMS = [
   { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
   { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
+  { to: '/admin/email', label: 'Email (SMTP)', Icon: IconMail, superOnly: true },
   { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase, superOnly: true },
 ];
 
