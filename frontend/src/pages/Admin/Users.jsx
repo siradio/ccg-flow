@@ -16,7 +16,8 @@ export default function Users() {
   const [entities, setEntities] = useState([]);
   const [moduleCatalog, setModuleCatalog] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
-  const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '' });
+  const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '', notify: true });
+  const [notice, setNotice] = useState(null);
   const [roleForm, setRoleForm] = useState({});
   const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
@@ -43,9 +44,19 @@ export default function Users() {
   async function createUser(e) {
     e.preventDefault();
     setError('');
+    setNotice(null);
     try {
-      await client.post('/users', form);
-      setForm({ nom: '', prenom: '', email: '', password: '' });
+      const { data } = await client.post('/users', form);
+      const who = `${form.prenom} ${form.nom} (${form.email})`;
+      if (form.notify && data.notification?.sent) {
+        setNotice({ type: 'success', text: `Utilisateur créé. Identifiants envoyés par email à ${form.email}.` });
+      } else if (form.notify && !data.notification?.sent) {
+        const pw = data.generatedPassword ? ` Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` : ' Communiquez-lui manuellement le mot de passe saisi.';
+        setNotice({ type: 'warning', text: `Utilisateur créé, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${pw}` });
+      } else {
+        setNotice({ type: 'success', text: `Utilisateur ${who} créé.` });
+      }
+      setForm({ nom: '', prenom: '', email: '', password: '', notify: true });
       setShowCreateForm(false);
       load();
     } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
@@ -108,10 +119,27 @@ export default function Users() {
             <input placeholder="Nom" required value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
             <input placeholder="Prénom" required value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
             <input placeholder="Email" type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            <input placeholder="Mot de passe (optionnel)" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            <input placeholder={form.notify ? 'Mot de passe (vide = généré)' : 'Mot de passe (optionnel)'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={form.notify} onChange={e => setForm({ ...form, notify: e.target.checked })} />
+              Notifier par email
+            </label>
             <button type="submit" className="btn btn-primary">Créer</button>
           </form>
+          <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
+            Si « Notifier par email » est coché, l'utilisateur reçoit ses identifiants et un lien de connexion. Laissez le mot de passe vide pour en générer un automatiquement.
+          </p>
           {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          className={`alert ${notice.type === 'success' ? 'alert-success' : 'alert-warning'}`}
+          style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+        >
+          <span>{notice.text}</span>
+          <button onClick={() => setNotice(null)} className="btn-icon" aria-label="Fermer">×</button>
         </div>
       )}
 

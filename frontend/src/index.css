@@ -343,6 +343,7 @@ tbody tr:hover .sticky-col {
 }
 .alert-danger { background: var(--color-danger-soft); color: var(--color-danger-hover); }
 .alert-success { background: var(--color-success-bg); color: var(--color-success-fg); }
+.alert-warning { background: var(--color-warning-bg); color: var(--color-warning-fg); }
 
 /* ─── Badges (statuts, rôles) ──────────────────────────────────────── */
 
