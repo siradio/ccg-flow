@@ -3,6 +3,7 @@ const { requireAuth } = require('../../middleware/auth');
 const { requireUserAdmin, isSuperAdmin, NIVEAUX } = require('../../middleware/permissions');
 const { MODULES, SUB_MODULE_KEYS } = require('../../config/modules');
 const usersService = require('./users.service');
+const { generatePassword, sendCredentialsEmail } = require('./users.email');
 
 const router = express.Router();
 
@@ -17,14 +18,39 @@ router.get('/', requireAuth, requireUserAdmin, async (req, res, next) => {
 
 router.post('/', requireAuth, requireUserAdmin, async (req, res, next) => {
   try {
-    const { nom, prenom, email, password, employeeId } = req.body || {};
+    const { nom, prenom, email, password, employeeId, notify } = req.body || {};
     if (!nom || !prenom || !email) {
       return res.status(400).json({ error: 'Nom, prénom et email obligatoires.' });
     }
     const existing = await usersService.findByEmail(email);
     if (existing) return res.status(409).json({ error: 'Email déjà utilisé.' });
-    const id = await usersService.createUser({ nom, prenom, email, password, employeeId });
-    res.status(201).json(await usersService.loadUserWithRoles(id));
+
+    const typedPassword = (password || '').trim();
+    // Quand on notifie sans mot de passe saisi, on en génère un fort plutôt que de retomber sur le
+    // défaut "changeme" (qui n'aurait aucun sens à envoyer par email). Comportement inchangé sinon.
+    const generated = notify && !typedPassword;
+    const effectivePassword = typedPassword || (generated ? generatePassword() : undefined);
+
+    const id = await usersService.createUser({ nom, prenom, email, password: effectivePassword, employeeId });
+    const user = await usersService.loadUserWithRoles(id);
+
+    const notification = { requested: !!notify, sent: false };
+    if (notify) {
+      try {
+        const scheme = req.get('x-forwarded-proto') || req.protocol;
+        const loginUrl = `${scheme}://${req.get('host')}/login`;
+        await sendCredentialsEmail({ to: email, prenom, email, password: effectivePassword, loginUrl });
+        notification.sent = true;
+      } catch (e) {
+        // Envoi isolé, jamais bloquant : le compte est créé même si l'email échoue (même principe
+        // que les demandes de devis, §3.1). L'UI affichera le repli manuel.
+        notification.sent = false;
+        notification.error = e.message;
+      }
+    }
+    // Mot de passe renvoyé UNIQUEMENT quand il a été généré côté serveur, pour que l'admin puisse
+    // le communiquer manuellement si l'email n'est pas parti (jamais exposé si l'admin l'a saisi).
+    res.status(201).json({ ...user, notification, generatedPassword: generated ? effectivePassword : undefined });
   } catch (e) { next(e); }
 });
 
