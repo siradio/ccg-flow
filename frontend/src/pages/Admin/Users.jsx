@@ -24,6 +24,7 @@ export default function Users() {
   // retrouver un utilisateur précis dans une longue liste veut dire défiler devant tous les autres.
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search || `${u.prenom} ${u.nom} ${u.email}`.toLowerCase().includes(search.toLowerCase());
@@ -45,6 +46,7 @@ export default function Users() {
     try {
       await client.post('/users', form);
       setForm({ nom: '', prenom: '', email: '', password: '' });
+      setShowCreateForm(false);
       load();
     } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
   }
@@ -92,7 +94,26 @@ export default function Users() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Utilisateurs</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h1 className="page-title" style={{ margin: 0 }}>Utilisateurs</h1>
+        <button onClick={() => setShowCreateForm(o => !o)} className="btn btn-primary">
+          {showCreateForm ? 'Annuler' : '+ Ajouter un utilisateur'}
+        </button>
+      </div>
+
+      {showCreateForm && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h2>Nouvel utilisateur</h2>
+          <form onSubmit={createUser} className="form-inline">
+            <input placeholder="Nom" required value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
+            <input placeholder="Prénom" required value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
+            <input placeholder="Email" type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <input placeholder="Mot de passe (optionnel)" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            <button type="submit" className="btn btn-primary">Créer</button>
+          </form>
+          {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
+        </div>
+      )}
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <input
@@ -179,18 +200,6 @@ export default function Users() {
           </div>
         </div>
       ))}
-
-      <div className="card" style={{ marginTop: 24 }}>
-        <h2>Nouvel utilisateur</h2>
-        <form onSubmit={createUser} className="form-inline">
-          <input placeholder="Nom" required value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
-          <input placeholder="Prénom" required value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
-          <input placeholder="Email" type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-          <input placeholder="Mot de passe (optionnel)" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-          <button type="submit" className="btn btn-primary">Créer</button>
-        </form>
-        {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
-      </div>
     </div>
   );
 }
