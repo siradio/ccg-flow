@@ -19,6 +19,7 @@ export default function Users() {
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '', notify: true });
   const [notice, setNotice] = useState(null);
   const [sendingId, setSendingId] = useState(null);
+  const [pwPanel, setPwPanel] = useState({}); // { [userId]: { password, notify } } — panneau "Mot de passe" ouvert
   const [roleForm, setRoleForm] = useState({});
   const [buForm, setBuForm] = useState({});
   const [error, setError] = useState('');
@@ -104,25 +105,36 @@ export default function Users() {
     load();
   }
 
-  // (Ré)envoi des accès à un utilisateur existant. Le mot de passe étant haché (jamais stocké en
-  // clair), on ne peut pas renvoyer l'ancien : l'action génère un nouveau mot de passe, le
-  // réinitialise et l'envoie — d'où la confirmation explicite avant d'agir.
-  async function sendCredentials(u) {
-    if (!window.confirm(
-      `Envoyer les accès à ${u.prenom} ${u.nom} (${u.email}) ?\n\nUn nouveau mot de passe sera généré et envoyé par email. L'ancien mot de passe ne fonctionnera plus.`
-    )) return;
+  function togglePwPanel(u) {
+    setPwPanel(p => {
+      if (p[u.id]) { const n = { ...p }; delete n[u.id]; return n; }
+      return { ...p, [u.id]: { password: '', notify: true } };
+    });
+  }
+
+  // Définit le mot de passe d'un utilisateur existant : celui saisi par l'admin, ou un mot de passe
+  // fort généré si le champ est laissé vide. L'ancien mot de passe est toujours remplacé (les mots
+  // de passe sont hachés, on ne peut pas renvoyer l'ancien) — le champ visible rend l'action
+  // volontaire, plus de réinitialisation surprise.
+  async function applyPassword(u) {
+    const st = pwPanel[u.id];
+    if (!st) return;
     setError('');
     setNotice(null);
     setSendingId(u.id);
     try {
-      const { data } = await client.post(`/users/${u.id}/send-credentials`);
-      if (data.notification?.sent) {
-        setNotice({ type: 'success', text: `Nouveaux accès envoyés par email à ${u.email}.` });
+      const { data } = await client.post(`/users/${u.id}/set-password`, { password: st.password, notify: st.notify });
+      const gen = data.generatedPassword;
+      if (st.notify && data.notification?.sent) {
+        setNotice({ type: 'success', text: `Mot de passe mis à jour et envoyé par email à ${u.email}.` });
+      } else if (st.notify && !data.notification?.sent) {
+        setNotice({ type: 'warning', text: `Mot de passe mis à jour, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${gen ? ` Mot de passe généré : ${gen} — à communiquer manuellement.` : ''}` });
       } else {
-        setNotice({ type: 'warning', text: `Mot de passe réinitialisé, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}. Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` });
+        setNotice({ type: 'success', text: `Mot de passe mis à jour pour ${u.email}.${gen ? ` Mot de passe généré : ${gen} — à lui communiquer.` : ''}` });
       }
+      setPwPanel(p => { const n = { ...p }; delete n[u.id]; return n; });
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l’envoi des accès.');
+      setError(err.response?.data?.error || 'Erreur lors de la mise à jour du mot de passe.');
     } finally {
       setSendingId(null);
     }
@@ -198,18 +210,45 @@ export default function Users() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
               <button
-                onClick={() => sendCredentials(u)}
-                disabled={sendingId === u.id}
+                onClick={() => togglePwPanel(u)}
                 className="btn btn-secondary btn-sm"
-                title="Générer un nouveau mot de passe et l’envoyer par email"
+                title="Définir / réinitialiser le mot de passe et l’envoyer par email"
               >
-                {sendingId === u.id ? 'Envoi…' : 'Envoyer les accès'}
+                {pwPanel[u.id] ? 'Fermer' : 'Mot de passe'}
               </button>
               <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
                 {u.actif ? 'Désactiver' : 'Réactiver'}
               </button>
             </div>
           </div>
+
+          {pwPanel[u.id] && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
+              <div className="form-inline" style={{ flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Nouveau mot de passe (vide = généré)"
+                  value={pwPanel[u.id].password}
+                  onChange={e => setPwPanel(p => ({ ...p, [u.id]: { ...p[u.id], password: e.target.value } }))}
+                  style={{ minWidth: 260 }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
+                  <input
+                    type="checkbox"
+                    checked={pwPanel[u.id].notify}
+                    onChange={e => setPwPanel(p => ({ ...p, [u.id]: { ...p[u.id], notify: e.target.checked } }))}
+                  />
+                  Envoyer par email
+                </label>
+                <button onClick={() => applyPassword(u)} disabled={sendingId === u.id} className="btn btn-primary btn-sm">
+                  {sendingId === u.id ? 'Application…' : 'Appliquer'}
+                </button>
+              </div>
+              <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                Définit un nouveau mot de passe pour {u.prenom} {u.nom} (l’actuel sera remplacé). Laissez le champ vide pour en générer un automatiquement. Décochez « Envoyer par email » pour le communiquer vous-même.
+              </p>
+            </div>
+          )}
 
           <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

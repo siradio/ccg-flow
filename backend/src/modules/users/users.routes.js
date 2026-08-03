@@ -62,30 +62,42 @@ router.put('/:id', requireAuth, requireUserAdmin, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// (Ré)envoi des accès à un utilisateur existant, à tout moment depuis Admin -> Utilisateurs.
-// Comme les mots de passe sont stockés hachés (jamais en clair), on ne peut pas renvoyer l'ancien :
-// on en génère donc un nouveau, on le réinitialise et on l'envoie par email. Le mot de passe généré
-// est toujours renvoyé dans la réponse pour permettre un repli manuel si l'email échoue.
-router.post('/:id/send-credentials', requireAuth, requireUserAdmin, async (req, res, next) => {
+// Définit le mot de passe d'un utilisateur existant, depuis Admin -> Utilisateurs. L'admin peut
+// SAISIR un mot de passe précis (celui de son choix, communiqué comme il veut) OU laisser vide pour
+// en générer un fort automatiquement. L'envoi par email est optionnel (`notify`). Comme les mots de
+// passe sont hachés (jamais stockés en clair), on ne peut jamais « renvoyer » l'ancien : toute
+// (ré)émission passe forcément par la définition d'un nouveau mot de passe — d'où le champ explicite
+// côté UI plutôt qu'un bouton « renvoyer » trompeur.
+router.post('/:id/set-password', requireAuth, requireUserAdmin, async (req, res, next) => {
   try {
     const user = await usersService.findById(Number(req.params.id));
     if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
 
-    const password = generatePassword();
-    await usersService.updateUser(user.id, { password });
-
-    const notification = { sent: false };
-    try {
-      const scheme = req.get('x-forwarded-proto') || req.protocol;
-      const loginUrl = `${scheme}://${req.get('host')}/login`;
-      await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password, loginUrl });
-      notification.sent = true;
-    } catch (e) {
-      // Envoi isolé, jamais bloquant : le mot de passe est déjà réinitialisé, l'UI proposera le
-      // repli manuel avec le mot de passe généré ci-dessous.
-      notification.error = e.message;
+    const { password, notify } = req.body || {};
+    const typed = (password || '').trim();
+    if (typed && typed.length < 8) {
+      return res.status(400).json({ error: 'Mot de passe trop court (8 caractères minimum).' });
     }
-    res.json({ notification, generatedPassword: password });
+    const generated = !typed;
+    const newPassword = typed || generatePassword();
+    await usersService.updateUser(user.id, { password: newPassword });
+
+    const notification = { requested: !!notify, sent: false };
+    if (notify) {
+      try {
+        const scheme = req.get('x-forwarded-proto') || req.protocol;
+        const loginUrl = `${scheme}://${req.get('host')}/login`;
+        await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password: newPassword, loginUrl });
+        notification.sent = true;
+      } catch (e) {
+        // Envoi isolé, jamais bloquant : le mot de passe est déjà changé, l'UI proposera le repli
+        // manuel avec le mot de passe généré ci-dessous (le cas échéant).
+        notification.error = e.message;
+      }
+    }
+    // Mot de passe renvoyé UNIQUEMENT quand il a été généré côté serveur (jamais celui saisi par
+    // l'admin, qu'il connaît déjà), pour permettre un repli manuel.
+    res.json({ notification, generatedPassword: generated ? newPassword : undefined });
   } catch (e) { next(e); }
 });
 
