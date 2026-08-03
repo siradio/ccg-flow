@@ -32,7 +32,7 @@ async function seed({ closePool = true } = {}) {
   // sur une base vide (elle ne fait que UPDATE/INSERT...SELECT des lignes déjà existantes), donc
   // une base neuve doit partir directement de la structure finale, pas de l'ancien seed pré-014.
   const steps = [
-    [1, 'expression_besoin', "Validation de l'expression de besoin (DGA)", 'dga', true, null, null],
+    [1, 'expression_besoin', "Validation de l'expression de besoin", 'validateur_besoin', true, null, null],
     [2, 'soumission', 'Soumission par le demandeur', 'demandeur', false, null, null],
     [3, 'analyse_achat', 'Analyse par le service achat', 'service_achat', false, null, null],
     [4, 'devis', 'Consultation fournisseurs', 'service_achat', false, null, null],
@@ -55,7 +55,7 @@ async function seed({ closePool = true } = {}) {
     ['Bah', 'Fatoumata', 'achat.sog@test', 'service_achat'],
     ['Camara', 'Sekou', 'cg.sog@test', 'controle_gestion'],
     ['Barry', 'Mariam', 'finances.sog@test', 'finances'],
-    ['Sylla', 'Ibrahima', 'dga.sog@test', 'dga'],
+    ['Sylla', 'Ibrahima', 'dga.sog@test', 'validateur_besoin'],
   ];
   const password = 'Test1234!';
   const hash = bcrypt.hashSync(password, 10);

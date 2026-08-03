@@ -21,7 +21,7 @@ const ENTITIES = [
 ];
 
 const STEPS = [
-  [1, 'expression_besoin', "Validation de l'expression de besoin (DGA)", 'dga', true, null, null],
+  [1, 'expression_besoin', "Validation de l'expression de besoin", 'validateur_besoin', true, null, null],
   [2, 'soumission', 'Soumission par le demandeur', 'demandeur', false, null, null],
   [3, 'analyse_achat', 'Analyse par le service achat', 'service_achat', false, null, null],
   [4, 'devis', 'Consultation fournisseurs', 'service_achat', false, null, null],

@@ -9,7 +9,7 @@ import client from '../../api/client';
 // DGA...) — leur "code" est un ancrage technique, pas une simple étiquette. On peut renommer
 // leur nom affiché, pas leur code, ni les supprimer.
 const PROTECTED_CODES = ['expression_besoin', 'soumission', 'analyse_achat', 'devis', 'validation_achat'];
-const ROLE_OPTIONS = ['service_achat', 'controle_gestion', 'finances', 'dga'];
+const ROLE_OPTIONS = ['service_achat', 'controle_gestion', 'finances', 'validateur_besoin'];
 
 export default function WorkflowConfig() {
   const [template, setTemplate] = useState(null);

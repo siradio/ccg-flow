@@ -440,7 +440,7 @@ function ValidationSection({ pr, guarded }) {
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
   let requiredRole = null;
-  if (pr.status === 'en_attente_validation_besoin') requiredRole = 'dga';
+  if (pr.status === 'en_attente_validation_besoin') requiredRole = 'validateur_besoin';
   else if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
   else if (pr.status === 'en_validation') requiredRole = pr.current_step_role;
 

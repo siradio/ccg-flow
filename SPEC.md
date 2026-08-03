@@ -14,7 +14,7 @@ Décisions actées pendant le cadrage (voir résumé en fin de document) :
 - Devises : **GNF + USD/EUR** au choix par demande.
 - Notifications **email + in-app**.
 - Audit trail **complet** dès v1.
-- Étapes Contrôle de Gestion → Finances → DGA **strictement séquentielles**.
+- Étapes Contrôle de Gestion → Finances → Validateur expression de besoin **strictement séquentielles**.
 - Création de demande ouverte à **tout employé disposant d'un compte**.
 - Pièces jointes stockées **en base (BYTEA)**.
 - Authentification **email + mot de passe (JWT)**, cohérent avec le projet GSBC existant.
@@ -101,7 +101,7 @@ workflow_templates
   id, module_code ('demande_achat'|'bon_commande_commercial'|...), nom, actif
 
 workflow_steps
-  id, workflow_template_id (FK), ordre, code ('service_achat'|'controle_gestion'|'finances'|'dga'|...),
+  id, workflow_template_id (FK), ordre, code ('service_achat'|'controle_gestion'|'finances'|'validateur_besoin'|...),
   nom, role_code_requis, commentaire_obligatoire_si_refus (bool), comportement_si_refus ('retour_etape_precedente'|'annulation')
 ```
 Le workflow réel décrit par CCG est *inséré comme donnée* dans ces deux tables au premier démarrage (voir §3), pas codé en dur — un futur changement d'ordre ou d'intervenant se fait par configuration, pas par déploiement.
@@ -172,13 +172,13 @@ notifications
 | `service_achat` | Service Achat | par entité | Analyse, génère la demande de devis, sélectionne le devis retenu, renseigne les prix, valide l'étape achat |
 | `controle_gestion` | Contrôle de Gestion | par entité | Valide/refuse après le service achat |
 | `finances` | Finances | par entité | Valide/refuse après le contrôle de gestion |
-| `dga` | DGA | par entité (ou globale si un seul DGA groupe) | Valide en dernier ; déclenche la génération du bon de commande |
+| `validateur_besoin` | Validateur expression de besoin | par entité (ou globale si une seule personne pour tout le groupe) | Valide l'expression de besoin en amont ; historiquement le rôle "DGA", renommé pour permettre la délégation sans sous-entendre que le titulaire est littéralement le Directeur Général Adjoint |
 
 Un utilisateur peut cumuler plusieurs rôles sur plusieurs entités (ex. `service_achat` sur Soguipal ET PBIC). `super_admin` n'a pas besoin d'entité (accès total).
 
 ### 2.2 Matrice de permissions
 
-| Action | demandeur | service_achat | controle_gestion | finances | dga | super_admin |
+| Action | demandeur | service_achat | controle_gestion | finances | validateur_besoin | super_admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | Créer une demande (son entité) | ✔ | ✔ | – | – | – | ✔ |
 | Voir ses propres demandes | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
@@ -190,7 +190,7 @@ Un utilisateur peut cumuler plusieurs rôles sur plusieurs entités (ex. `servic
 | Renseigner les prix finaux et valider l'étape achat | – | ✔ | – | – | – | ✔ |
 | Valider/refuser étape Contrôle de Gestion | – | – | ✔ | – | – | ✔ |
 | Valider/refuser étape Finances | – | – | – | ✔ | – | ✔ |
-| Valider étape DGA (déclenche le BC) | – | – | – | – | ✔ | ✔ |
+| Valider l'expression de besoin en amont | – | – | – | – | ✔ | ✔ |
 | Gérer référentiels (produits, fournisseurs, sites...) | – | – | – | – | – | ✔ |
 | Gérer utilisateurs et rôles | – | – | – | – | – | ✔ |
 | Configurer le workflow | – | – | – | – | – | ✔ |
@@ -198,7 +198,7 @@ Un utilisateur peut cumuler plusieurs rôles sur plusieurs entités (ex. `servic
 
 Toute vérification de permission est **scopée par entité** : un `controle_gestion` de Soguipal ne peut agir que sur les demandes dont `purchase_requests.entity_id = son entité`, sauf `super_admin`.
 
-Le refus à n'importe quelle étape (`controle_gestion`, `finances`, `dga`) **exige un commentaire** (champ obligatoire, validé côté serveur, pas seulement côté front).
+Le refus à n'importe quelle étape (`controle_gestion`, `finances`, `validateur_besoin`) **exige un commentaire** (champ obligatoire, validé côté serveur, pas seulement côté front).
 
 ### 2.3 Accès par sous-module (organisation de l'application par module et sous-module)
 
@@ -318,48 +318,50 @@ Chargé en base au premier démarrage comme `workflow_template` (`module_code = 
 
 | Ordre | Code étape | Rôle requis | Commentaire obligatoire si refus | Comportement si refus |
 |---|---|---|---|---|
-| 1 | `expression_besoin` | `dga` | **oui** | retour à `brouillon` (statut, pas via `retour_step_code` — voir §3.1bis) |
+| 1 | `expression_besoin` | `validateur_besoin` | **oui** | retour à `brouillon` (statut, pas via `retour_step_code` — voir §3.1bis) |
 | 2 | `soumission` | `demandeur` | — | — (pas une validation, juste la création) |
 | 3 | `analyse_achat` | `service_achat` | non (pas un refus, une transformation) | — |
 | 4 | `devis` | `service_achat` | non | — |
 | 5 | `validation_achat` | `service_achat` | non | — |
 | 6 | `controle_gestion` | `controle_gestion` | **oui** | retour à l'étape `validation_achat` |
 | 7 | `finances` | `finances` | **oui** | retour à l'étape `validation_achat` |
-| 8 | `dga` | `dga` | **oui** | retour à l'étape `validation_achat` |
+| 8 | `validateur_besoin` | `validateur_besoin` | **oui** | retour à l'étape `validation_achat` |
 | 9 | `generation_bc` | (système) | — | génération auto du bon de commande |
 
-L'étape 8 (`dga`, validation finale) existe encore par défaut mais est devenue redondante
-depuis l'ajout de `expression_besoin` (§3.1bis) : la DGA a déjà donné son accord en amont, avant
-même que le service achat ne consulte des fournisseurs. Elle peut être retirée du circuit par un
-`super_admin` via `Admin → Workflow` (§3.2) — aucun code à changer, le bon de commande se génère
-alors automatiquement dès la validation Finances.
+L'étape 8 (`validateur_besoin`, validation finale) existe encore par défaut mais est devenue
+redondante depuis l'ajout de `expression_besoin` (§3.1bis) : le validateur a déjà donné son
+accord en amont, avant même que le service achat ne consulte des fournisseurs. Elle peut être
+retirée du circuit par un `super_admin` via `Admin → Workflow` (§3.2) — aucun code à changer, le
+bon de commande se génère alors automatiquement dès la validation Finances.
 
 ### 3.1 Détail du cycle de vie d'une demande
 
 1. **Création (`brouillon`)** — le demandeur saisit objet, justification, lignes (produit ou libre), site.
-2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. La DGA (ou toute personne détenant aussi le rôle `dga` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
+2. **Expression de besoin (`brouillon` → `en_attente_validation_besoin` → `soumise`)** — le demandeur soumet. Le validateur expression de besoin (toute personne détenant le rôle `validateur_besoin` sur l'entité — §2.4bis) valide ou refuse *avant* que le service achat ne soit mobilisé, pour éviter qu'il consulte des fournisseurs pour une dépense qui sera finalement refusée (§3.1bis). Une fois validée, la demande passe à `soumise` et suit le circuit ci-dessous exactement comme avant.
 3. **Analyse achat (`en_analyse_achat`)** — le service achat prend connaissance, peut demander une précision au demandeur (commentaire libre, pas un rejet formel du workflow).
 4. **Demande de devis (`devis_en_cours`)** — le service achat sélectionne 2 à 3 fournisseurs (issus du référentiel, filtrés par entité), rédige éventuellement un message personnalisé (sinon un texte par défaut est utilisé), et l'outil génère un PDF "demande de devis" et l'envoie par email à chaque fournisseur (`quote_requests` + `quote_request_suppliers`). Chaque envoi est tracé (destinataire, date, statut) et **isolé par fournisseur** : l'échec d'un envoi (ex. serveur de messagerie indisponible ou qui rejette l'authentification) n'empêche jamais les autres envois du même lot de partir, et reste visible sur l'écran avec un repli manuel — bouton "PDF" (télécharge le document seul) et "Copier le texte" (même texte que celui réellement envoyé) pour que le fournisseur concerné puisse être recontacté depuis la messagerie personnelle de l'utilisateur. Si un fournisseur à consulter n'existe pas encore dans le référentiel, il peut être ajouté directement depuis cet écran — mêmes champs, même formulaire que Référentiels → Fournisseurs (entités à cocher comprises, celle de la demande en cours pré-cochée) — sans devoir y détenir le sous-module `referentiels.suppliers`.
 5. **Réception des devis** — le service achat saisit manuellement les devis reçus (montant, devise, pièce jointe scannée) dans `quotes`, un par fournisseur sollicité.
 6. **Sélection & validation achat (`devis_selectionne` → `en_validation`)** — le service achat marque un devis `selectionne = true`, ce qui répercute automatiquement `prix_unitaire_final` et `fournisseur_retenu_id` sur les lignes de la demande. Il valide l'étape : la demande passe à l'étape `controle_gestion`.
 7. **Contrôle de Gestion** — valide ou refuse (commentaire obligatoire au refus). Si validé → passe à `finances`. Si refusé → retour à `validation_achat`, statut redevient `devis_selectionne`, notification au service achat avec le commentaire.
 8. **Finances** — même logique, séquentiel après Contrôle de Gestion (jamais en parallèle).
-9. **DGA (optionnelle, §ci-dessus)** — si l'étape existe encore dans le circuit configuré, valide ou refuse en dernier lieu.
-10. **Génération automatique du bon de commande** — dès la validation de la dernière étape du circuit configuré (Finances ou DGA selon la configuration) : création de `purchase_orders` (numéro généré, fournisseur retenu, montant total), génération du PDF, statut demande → `bon_commande_genere`. Le devis retenu est joint au dossier.
+9. **Validateur expression de besoin (optionnelle, §ci-dessus)** — si l'étape existe encore dans le circuit configuré, valide ou refuse en dernier lieu.
+10. **Génération automatique du bon de commande** — dès la validation de la dernière étape du circuit configuré (Finances ou Validateur expression de besoin selon la configuration) : création de `purchase_orders` (numéro généré, fournisseur retenu, montant total), génération du PDF, statut demande → `bon_commande_genere`. Le devis retenu est joint au dossier.
 
-### 3.1bis Expression de besoin (filtre DGA en amont)
+### 3.1bis Expression de besoin (filtre en amont)
 
 Ajouté suite à un retour métier : le service achat perdait du temps à consulter des fournisseurs
-et obtenir des devis pour des demandes finalement refusées en toute fin de circuit par la DGA.
-Le nouveau statut `en_attente_validation_besoin` s'intercale entre `brouillon` et `soumise` :
+et obtenir des devis pour des demandes finalement refusées en toute fin de circuit. Le nouveau
+statut `en_attente_validation_besoin` s'intercale entre `brouillon` et `soumise` :
 
 - `POST /:id/submit` fait désormais passer la demande à `en_attente_validation_besoin` (au lieu
-  de `soumise` directement) et notifie le rôle `dga` sur l'entité (au lieu de `service_achat`).
-- `POST /:id/validate-step` (rôle `dga` requis) fait passer la demande à `soumise` et notifie
-  `service_achat` — reprend exactement le comportement que `submit()` avait avant ce changement.
-- `POST /:id/reject-step` (rôle `dga` requis, commentaire obligatoire) renvoie la demande à
-  `brouillon` — jamais d'annulation définitive, même principe que le reste du circuit (§3.2) — et
-  notifie le demandeur avec le motif.
+  de `soumise` directement) et notifie le rôle `validateur_besoin` sur l'entité (au lieu de
+  `service_achat`).
+- `POST /:id/validate-step` (rôle `validateur_besoin` requis) fait passer la demande à `soumise`
+  et notifie `service_achat` — reprend exactement le comportement que `submit()` avait avant ce
+  changement.
+- `POST /:id/reject-step` (rôle `validateur_besoin` requis, commentaire obligatoire) renvoie la
+  demande à `brouillon` — jamais d'annulation définitive, même principe que le reste du circuit
+  (§3.2) — et notifie le demandeur avec le motif.
 
 Contrairement au reste du circuit (§3.2), cette étape n'est **pas** pilotée par le moteur
 générique `workflow_steps`/`current_step_id` : `en_attente_validation_besoin` est un statut à
@@ -371,14 +373,16 @@ l'affichage (`WorkflowTimeline`, `Admin → Workflow`) et est protégée en écr
 logique réelle (contrairement à `validation_achat`, dont le `code` est l'ancrage utilisé par le
 moteur pour retrouver sa position — §3.2).
 
-**"En cas d'absence du DGA"** : le modèle de rôles (`user_entity_roles`) autorise déjà plusieurs
-personnes à détenir le même rôle sur une même entité. Accorder le rôle `dga` à une personne
-remplaçante (via `Admin → Utilisateurs`) suffit : les deux sont notifiées et n'importe laquelle
-peut valider — aucun mécanisme de délégation/suppléance dédié n'a été ajouté, ce n'était pas
-nécessaire.
+**"En cas d'absence du titulaire habituel"** : le modèle de rôles (`user_entity_roles`) autorise
+déjà plusieurs personnes à détenir le même rôle sur une même entité — c'est d'ailleurs la raison
+d'être du nom `validateur_besoin` (plutôt que l'ancien `dga`, qui laissait entendre que le
+titulaire devait être littéralement le Directeur Général Adjoint). Accorder le rôle
+`validateur_besoin` à une personne remplaçante (via `Admin → Utilisateurs`) suffit : les deux sont
+notifiées et n'importe laquelle peut valider — aucun mécanisme de délégation/suppléance dédié n'a
+été ajouté, ce n'était pas nécessaire.
 
 ### 3.2 Configurabilité
-Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis controle_gestion puis finances puis dga". La logique métier lit `workflow_steps` triées par `ordre` pour un `module_code` donné, et détermine l'étape suivante et le rôle requis dynamiquement. Ceci permet, pour ce module ou un futur module (ex. BC commerciaux), de :
+Le moteur de workflow ne doit **jamais** coder en dur "service_achat puis controle_gestion puis finances puis validateur_besoin". La logique métier lit `workflow_steps` triées par `ordre` pour un `module_code` donné, et détermine l'étape suivante et le rôle requis dynamiquement. Ceci permet, pour ce module ou un futur module (ex. BC commerciaux), de :
 - réordonner les étapes,
 - ajouter/retirer une étape,
 - changer le rôle requis à une étape,
@@ -938,7 +942,7 @@ Scénario à exécuter (via un script `backend/test/e2e.purchase-request.test.js
 1. Créer les 3 entités (CCG, Soguipal, PBIC).
 2. Créer 6 utilisateurs de test, chacun avec un rôle sur Soguipal :
    `demandeur.sog@test`, `achat.sog@test` (service_achat), `cg.sog@test` (controle_gestion),
-   `finances.sog@test`, `dga.sog@test`, `admin@test` (super_admin).
+   `finances.sog@test`, `dga.sog@test` (validateur_besoin), `admin@test` (super_admin).
 3. Créer 2 fournisseurs rattachés à Soguipal, 1 produit ("Sac d'emballage 25kg").
 4. Charger le `workflow_template` "demande_achat" avec ses 8 étapes (§3).
 
@@ -953,10 +957,9 @@ Scénario à exécuter (via un script `backend/test/e2e.purchase-request.test.js
 8. **POST .../quotes/:id/select** sur le moins-disant → vérifier que `purchase_request_lines.prix_unitaire_final` et `fournisseur_retenu_id` sont mis à jour.
 9. **POST .../validate-step** (étape `validation_achat`) → statut passe en attente `controle_gestion`. Vérifier notification à `cg.sog@test`.
 10. **Login** `cg.sog@test` → **POST .../validate-step** → passe en attente `finances`. Vérifier que `demandeur.sog@test` ne peut PAS valider cette étape (403).
-11. **Login** `finances.sog@test` → **POST .../validate-step** → passe en attente `dga`.
-12. **Login** `dga.sog@test` → **POST .../validate-step** → statut final `bon_commande_genere`.
-13. **GET /purchase-orders/:id** → vérifier numéro généré, fournisseur = celui sélectionné à l'étape 8, montant = somme des lignes au prix final.
-14. **GET /purchase-requests/:id/history** → vérifier la présence, dans l'ordre, de : création, soumission, demande de devis envoyée, devis sélectionné, validation achat, validation CG, validation finances, validation DGA, génération BC — chacune avec l'utilisateur et l'horodatage corrects.
+11. **Login** `finances.sog@test` → **POST .../validate-step** → `finances` est la dernière étape humaine du circuit par défaut (`validateur_besoin` étant passé en amont, §3.1bis) : la validation enchaîne directement sur l'étape système `generation_bc`, statut final `bon_commande_genere`, sans validation humaine supplémentaire à attendre.
+12. **GET /purchase-orders/:id** → vérifier numéro généré, fournisseur = celui sélectionné à l'étape 8, montant = somme des lignes au prix final.
+13. **GET /purchase-requests/:id/history** → vérifier la présence, dans l'ordre, de : création, soumission, validation de l'expression de besoin, demande de devis envoyée, devis sélectionné, validation achat, validation CG, validation finances, génération BC — chacune avec l'utilisateur et l'horodatage corrects.
 
 ### 7.3 Scénario de rejet (doit revenir en arrière, pas s'annuler)
 1. Reprendre les étapes 1 à 9 ci-dessus sur une nouvelle demande.

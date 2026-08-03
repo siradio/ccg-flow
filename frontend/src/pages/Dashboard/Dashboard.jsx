@@ -16,7 +16,7 @@ const ROLE_LABELS = {
   service_achat: 'Service Achat',
   controle_gestion: 'Contrôle de Gestion',
   finances: 'Finances',
-  dga: 'DGA',
+  validateur_besoin: 'Validateur expression de besoin',
 };
 
 const REFERENTIAL_KPIS = [

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
 
-const ROLE_CODES = ['super_admin', 'support_it', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'dga'];
+const ROLE_CODES = ['super_admin', 'support_it', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'validateur_besoin'];
 // Rôles globaux, non rattachés à une entité (comme super_admin) — voir users.routes.js.
 const GLOBAL_ROLES = ['super_admin', 'support_it'];
 const NIVEAUX = [

@@ -26,7 +26,7 @@ async function getPendingAction(user) {
         [r.entity_id]
       );
       count = row.count;
-    } else if (r.role_code === 'dga') {
+    } else if (r.role_code === 'validateur_besoin') {
       // Même double point d'action que listPendingAction() côté demandes d'achat : expression
       // de besoin en amont + étape finale si elle existe encore dans le circuit configuré.
       const row = await one(

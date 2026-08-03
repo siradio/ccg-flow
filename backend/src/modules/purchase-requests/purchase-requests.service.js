@@ -116,13 +116,13 @@ async function submit(user, prId) {
   if (lines.length === 0) throw httpError(400, 'Impossible de soumettre une demande sans ligne.');
 
   // Avant de mobiliser le Service Achat (recherche fournisseurs, devis...), l'expression de
-  // besoin doit être validée par la DGA (ou toute autre personne détenant aussi le rôle `dga`
-  // sur cette entité — voir §2.4bis SPEC.md) — évite de faire ce travail pour rien si la
-  // dépense n'est finalement pas approuvée.
+  // besoin doit être validée par un validateur_besoin (n'importe qui détenant ce rôle sur cette
+  // entité — voir §2.4bis SPEC.md) — évite de faire ce travail pour rien si la dépense n'est
+  // finalement pas approuvée.
   await repo.updateStatusAndStep(prId, 'en_attente_validation_besoin', null);
   await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'submit', userId: user.id });
   await notifications.notifyRoleOnEntity(
-    pr.entity_id, 'dga', 'Validation requise — expression de besoin',
+    pr.entity_id, 'validateur_besoin', 'Validation requise — expression de besoin',
     `La demande ${pr.numero} (${pr.objet}) attend la validation de l'expression de besoin.`, `/purchase-requests/${prId}`
   );
   return getFullDetail(prId);
@@ -290,7 +290,7 @@ async function validateStep(user, prId, commentaire) {
     // statut n'est pas piloté par workflow_steps, voir submit()) — passe directement à
     // "soumise" pour reprendre le circuit achat classique, exactement comme submit() le
     // faisait avant l'ajout de cette étape.
-    await assertRole(user, 'dga', pr.entity_id, "valider l'expression de besoin");
+    await assertRole(user, 'validateur_besoin', pr.entity_id, "valider l'expression de besoin");
     await repo.updateStatusAndStep(prId, 'soumise', null);
     await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'validation_besoin', userId: user.id, details: { commentaire } });
     await notifications.notifyRoleOnEntity(
@@ -352,7 +352,7 @@ async function rejectStep(user, prId, commentaire) {
   if (!pr) throw httpError(404, 'Demande introuvable.');
 
   if (pr.status === 'en_attente_validation_besoin') {
-    await assertRole(user, 'dga', pr.entity_id, "refuser l'expression de besoin");
+    await assertRole(user, 'validateur_besoin', pr.entity_id, "refuser l'expression de besoin");
     if (!commentaire) throw httpError(400, 'Un commentaire est obligatoire pour refuser une expression de besoin.');
     // Retour à brouillon (jamais d'annulation définitive, même principe que le reste du
     // circuit) : le demandeur peut revoir sa demande et la resoumettre.
@@ -436,7 +436,7 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
   }
   // Pas de filtre explicite : montrer tout ce que l'utilisateur peut légitimement voir —
   // ses propres demandes partout, PLUS toutes les demandes des entités où il détient un
-  // rôle de validation (service_achat/controle_gestion/finances/dga), pas seulement les
+  // rôle de validation (service_achat/controle_gestion/finances/validateur_besoin), pas seulement les
   // siennes — sinon un valideur ne verrait jamais les demandes des autres à traiter.
   const visibleEntityIds = [...new Set(
     (user.roles || []).filter(r => r.role_code !== 'demandeur' && r.entity_id).map(r => r.entity_id)

@@ -14,7 +14,7 @@ const PERMS = {
   service_achat:     ['pa_view_own', 'pa_view_entity', 'pa_analyse', 'pa_devis_gerer', 'pa_valider_achat'],
   controle_gestion:  ['pa_view_own', 'pa_view_entity', 'pa_valider_cg'],
   finances:          ['pa_view_own', 'pa_view_entity', 'pa_valider_finances'],
-  dga:               ['pa_view_own', 'pa_view_entity', 'pa_valider_dga'],
+  validateur_besoin: ['pa_view_own', 'pa_view_entity', 'pa_valider_besoin'],
 };
 
 function isSuperAdmin(user) {

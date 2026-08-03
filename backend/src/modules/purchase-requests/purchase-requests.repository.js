@@ -67,9 +67,9 @@ async function listPendingAction(roleEntityPairs, { page = 1, pageSize = 20 } = 
     if (roleCode === 'service_achat') {
       params.push(entityId);
       clauses.push(`(pr.entity_id = $${params.length} AND pr.status IN ('soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'))`);
-    } else if (roleCode === 'dga') {
-      // La DGA a deux points d'action possibles : l'expression de besoin en amont (nouveau
-      // statut, pas piloté par current_step_id) et, si elle existe encore dans le circuit
+    } else if (roleCode === 'validateur_besoin') {
+      // Un validateur_besoin a deux points d'action possibles : l'expression de besoin en amont
+      // (nouveau statut, pas piloté par current_step_id) et, si elle existe encore dans le circuit
       // configuré, l'étape de validation finale — voir submit()/validateStep().
       params.push(entityId, roleCode);
       clauses.push(`(pr.entity_id = $${params.length - 1} AND (pr.status = 'en_attente_validation_besoin' OR (pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})))`);
