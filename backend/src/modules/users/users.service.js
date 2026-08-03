@@ -58,6 +58,10 @@ async function findByEmail(email) {
   return one('SELECT * FROM users WHERE email = $1', [email]);
 }
 
+async function findById(id) {
+  return one('SELECT id, nom, prenom, email, actif FROM users WHERE id = $1', [id]);
+}
+
 async function createUser({ nom, prenom, email, password, employeeId }) {
   const hash = bcrypt.hashSync(password || 'changeme', 10);
   const row = await one(
@@ -134,6 +138,6 @@ async function listUsers() {
 }
 
 module.exports = {
-  loadUserWithRoles, findByEmail, createUser, updateUser, addRole, removeRole, getRoleById, listUsers,
+  loadUserWithRoles, findByEmail, findById, createUser, updateUser, addRole, removeRole, getRoleById, listUsers,
   setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, revokeBusinessUnit,
 };
