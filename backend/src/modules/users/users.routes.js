@@ -4,8 +4,16 @@ const { requireUserAdmin, isSuperAdmin, NIVEAUX } = require('../../middleware/pe
 const { MODULES, SUB_MODULE_KEYS } = require('../../config/modules');
 const usersService = require('./users.service');
 const { generatePassword, sendCredentialsEmail } = require('./users.email');
+const env = require('../../config/env');
 
 const router = express.Router();
+
+// URL de connexion pour les emails : l'URL publique configurée (env.appUrl, renseignée
+// automatiquement sur Azure) prime ; à défaut seulement, on dérive de la requête (local).
+function buildLoginUrl(req) {
+  const base = env.appUrl || `${req.get('x-forwarded-proto') || req.protocol}://${req.get('host')}`;
+  return `${base.replace(/\/+$/, '')}/login`;
+}
 
 // Rôles réservés aux vrais super_admin (jamais à un support_it) : les accorder/retirer soi-même
 // ouvrirait une auto-élévation de privilèges via le rôle support_it (§ users.routes.js).
@@ -37,9 +45,7 @@ router.post('/', requireAuth, requireUserAdmin, async (req, res, next) => {
     const notification = { requested: !!notify, sent: false };
     if (notify) {
       try {
-        const scheme = req.get('x-forwarded-proto') || req.protocol;
-        const loginUrl = `${scheme}://${req.get('host')}/login`;
-        await sendCredentialsEmail({ to: email, prenom, email, password: effectivePassword, loginUrl });
+        await sendCredentialsEmail({ to: email, prenom, email, password: effectivePassword, loginUrl: buildLoginUrl(req) });
         notification.sent = true;
       } catch (e) {
         // Envoi isolé, jamais bloquant : le compte est créé même si l'email échoue (même principe
@@ -85,9 +91,7 @@ router.post('/:id/set-password', requireAuth, requireUserAdmin, async (req, res,
     const notification = { requested: !!notify, sent: false };
     if (notify) {
       try {
-        const scheme = req.get('x-forwarded-proto') || req.protocol;
-        const loginUrl = `${scheme}://${req.get('host')}/login`;
-        await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password: newPassword, loginUrl });
+        await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password: newPassword, loginUrl: buildLoginUrl(req) });
         notification.sent = true;
       } catch (e) {
         // Envoi isolé, jamais bloquant : le mot de passe est déjà changé, l'UI proposera le repli
