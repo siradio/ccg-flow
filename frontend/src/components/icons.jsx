@@ -11,6 +11,12 @@ function Svg({ children }) {
 export function IconDashboard() {
   return <Svg><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="5" rx="1.5" /><rect x="13" y="10" width="8" height="11" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /></Svg>;
 }
+export function IconMenu() {
+  return <Svg><path d="M3 6h18M3 12h18M3 18h18" /></Svg>;
+}
+export function IconClose() {
+  return <Svg><path d="M6 6l12 12M18 6L6 18" /></Svg>;
+}
 export function IconCart() {
   return <Svg><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.6 12.2a2 2 0 0 0 2 1.6h8.1a2 2 0 0 0 2-1.6L21.5 7H6.2" /></Svg>;
 }

@@ -6,6 +6,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
+  IconMenu, IconClose,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -41,6 +42,9 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
+  // Tiroir de navigation mobile : masqué par défaut, ouvert par le bouton hamburger de la topbar.
+  const [navOpen, setNavOpen] = useState(false);
+  const closeNav = () => setNavOpen(false);
 
   const admin = isSuperAdmin(user);
   const userAdmin = isUserAdmin(user);
@@ -48,16 +52,20 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {navOpen && <div className="sidebar-backdrop" onClick={closeNav} />}
+      <aside className={`sidebar${navOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           CCG Flow
+          <button type="button" className="sidebar-close" onClick={closeNav} aria-label="Fermer le menu">
+            <IconClose />
+          </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/" end className={navClass}><IconDashboard /> Tableau de bord</NavLink>
-          {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass}><IconCart /> Demandes d'achat</NavLink>}
-          {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass}><IconBox /> Stock</NavLink>}
-          {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass}><IconBook /> Référentiels</NavLink>}
+          <NavLink to="/" end className={navClass} onClick={closeNav}><IconDashboard /> Tableau de bord</NavLink>
+          {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> Demandes d'achat</NavLink>}
+          {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
+          {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
 
           {userAdmin && (
             <div className="sidebar-group">
@@ -68,7 +76,7 @@ export default function Layout() {
               {paramsOpen && (
                 <div className="sidebar-subnav">
                   {visibleParamsItems.map(({ to, label, Icon }) => (
-                    <NavLink key={to} to={to} className={navClass}><Icon /> {label}</NavLink>
+                    <NavLink key={to} to={to} className={navClass} onClick={closeNav}><Icon /> {label}</NavLink>
                   ))}
                 </div>
               )}
@@ -79,16 +87,18 @@ export default function Layout() {
 
       <div className="app-main">
         <header className="topbar">
-          <span />
+          <button type="button" className="nav-toggle" onClick={() => setNavOpen(true)} aria-label="Ouvrir le menu">
+            <IconMenu />
+          </button>
           <div className="topbar-right">
             <ThemeSwitcher />
             <NotificationBell />
             <span className="user-chip">
               <span className="user-avatar">{initials(user)}</span>
-              {user?.prenom} {user?.nom}
+              <span className="user-name">{user?.prenom} {user?.nom}</span>
             </span>
             <button onClick={() => { logout(); navigate('/login'); }} className="btn btn-secondary btn-sm">
-              <IconLogout /> Déconnexion
+              <IconLogout /> <span className="btn-label">Déconnexion</span>
             </button>
           </div>
         </header>
