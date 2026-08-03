@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
-const env = require('../config/env');
+const settings = require('../modules/settings/settings.service');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo-ccg.png');
 const LOGO_CID = 'logo-ccg';
@@ -40,22 +40,32 @@ function renderMailTemplate({ title, bodyHtml }) {
 </html>`;
 }
 
-let transporter = null;
-function getTransporter() {
-  if (!env.smtp.host) return null;
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: env.smtp.host,
-      port: env.smtp.port,
-      // TLS implicite uniquement sur le port 465 ; le port 587 (Brevo, M365, la plupart des relais)
-      // utilise STARTTLS, négocié automatiquement par nodemailer tant que `secure` est à false et
-      // qu'`ignoreTLS` n'est pas forcé — d'où son retrait, il désactivait purement et simplement le
-      // chiffrement et empêchait toute authentification réelle de fonctionner.
-      secure: Number(env.smtp.port) === 465,
-      auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
-    });
+// Construit un transporteur nodemailer à partir d'une config résolue (base -> .env, voir
+// settings.service.getSmtpConfig). Renvoie null si aucun hôte n'est configuré.
+function buildTransporter(cfg) {
+  if (!cfg || !cfg.host) return null;
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: Number(cfg.port) || 587,
+    // TLS implicite uniquement sur le port 465 ; le port 587 (Brevo, M365, la plupart des relais)
+    // utilise STARTTLS, négocié automatiquement par nodemailer tant que `secure` est à false et
+    // qu'`ignoreTLS` n'est pas forcé — d'où son retrait, il désactivait purement et simplement le
+    // chiffrement et empêchait toute authentification réelle de fonctionner.
+    secure: !!cfg.secure,
+    auth: cfg.user ? { user: cfg.user, pass: cfg.pass } : undefined,
+  });
+}
+
+// La config SMTP est désormais éditable en base (Admin -> Email) sans redéploiement : on relit la
+// config à chaque envoi et on ne reconstruit le transporteur que lorsque sa "version" a changé
+// (compteur incrémenté par settings.setSmtpConfig), pour ne pas recréer un transporteur à chaque mail.
+let cached = { version: -1, transporter: null };
+async function getTransporter() {
+  const cfg = await settings.getSmtpConfig();
+  if (cached.version !== cfg.version) {
+    cached = { version: cfg.version, transporter: buildTransporter(cfg) };
   }
-  return transporter;
+  return { transporter: cached.transporter, cfg };
 }
 
 // Coupe-circuit court : un serveur SMTP qui rejette l'authentification (ex. politique tenant M365
@@ -71,12 +81,12 @@ let lastError = null;
 
 // En dev/test sans SMTP configuré : log en console au lieu d'échouer, pour ne pas bloquer le workflow.
 async function sendMail({ to, subject, text, html, attachments }) {
-  const t = getTransporter();
+  const { transporter, cfg } = await getTransporter();
   // Le logo n'est joint (en inline, via cid) que si un corps HTML utilise le gabarit ci-dessus.
   const allAttachments = html
     ? [...(attachments || []), { filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID }]
     : attachments;
-  if (!t) {
+  if (!transporter) {
     console.log(`[mailer:dev] À: ${to} | Sujet: ${subject}${allAttachments ? ` | ${allAttachments.length} pièce(s) jointe(s)` : ''}`);
     return { dev: true, to, subject };
   }
@@ -84,7 +94,7 @@ async function sendMail({ to, subject, text, html, attachments }) {
     throw lastError || new Error('Serveur SMTP indisponible (dernier échec récent).');
   }
   try {
-    const result = await t.sendMail({ from: env.smtp.from, to, subject, text, html, attachments: allAttachments });
+    const result = await transporter.sendMail({ from: cfg.from, to, subject, text, html, attachments: allAttachments });
     brokenUntil = 0;
     return result;
   } catch (e) {
@@ -94,4 +104,33 @@ async function sendMail({ to, subject, text, html, attachments }) {
   }
 }
 
-module.exports = { sendMail, renderMailTemplate };
+// Envoi d'un email de test depuis l'écran d'administration, avec la config SMTP actuellement
+// enregistrée (base -> .env). Volontairement HORS du coupe-circuit `brokenUntil` : on veut une
+// tentative réelle immédiate et l'erreur brute remontée à l'admin (pour diagnostiquer identifiants
+// / hôte / port), et pouvoir retester aussitôt après correction sans attendre le cooldown.
+async function sendTestMail({ to }) {
+  const cfg = await settings.getSmtpConfig();
+  const transporter = buildTransporter(cfg);
+  if (!transporter) {
+    const err = new Error("Aucun serveur SMTP n'est configuré (renseignez au moins l'hôte).");
+    err.code = 'NO_SMTP';
+    throw err;
+  }
+  const html = renderMailTemplate({
+    title: 'Test de configuration email',
+    bodyHtml: '<p>Cet email confirme que la configuration SMTP de <strong>CCG Flow</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
+  });
+  const result = await transporter.sendMail({
+    from: cfg.from,
+    to,
+    subject: 'CCG Flow — email de test',
+    text: 'Cet email confirme que la configuration SMTP de CCG Flow est fonctionnelle.',
+    html,
+    attachments: [{ filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID }],
+  });
+  // Une config valide remet le coupe-circuit à zéro : les envois métier repartent immédiatement.
+  brokenUntil = 0;
+  return result;
+}
+
+module.exports = { sendMail, sendTestMail, renderMailTemplate };

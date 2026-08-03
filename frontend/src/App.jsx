@@ -11,6 +11,7 @@ import DetailPage from './pages/PurchaseRequests/DetailPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import Users from './pages/Admin/Users';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
+import EmailSettings from './pages/Admin/EmailSettings';
 import TestData from './pages/Admin/TestData';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
         <Route path="admin/workflow" element={<RequireAdmin><WorkflowConfig /></RequireAdmin>} />
+        <Route path="admin/email" element={<RequireAdmin><EmailSettings /></RequireAdmin>} />
         <Route path="admin/test-data" element={<RequireAdmin><TestData /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
