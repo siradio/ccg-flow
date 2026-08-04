@@ -100,7 +100,8 @@ export default function Login() {
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Flow</div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', lineHeight: 1.3 }}>ERP centralisé du groupe CCG</div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 1 }}>
               {mode === 'login' ? 'Connexion' : 'Demande d’accès'}
             </div>
           </div>
