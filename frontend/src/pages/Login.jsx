@@ -6,6 +6,17 @@ import logo from '../assets/logo-web-darklogo.png';
 
 const EMPTY_REQUEST = { nom: '', prenom: '', email: '', telephone: '', fonction: '', entityId: '' };
 
+// L'acrostiche RÉUSSIR — les valeurs du groupe CCG, dans les couleurs de la charte "Nos valeurs".
+const REUSSIR = [
+  { letter: 'R', color: '#3FA34D', label: 'Respect' },
+  { letter: 'É', color: '#2563EB', label: 'Engagement' },
+  { letter: 'U', color: '#F39C12', label: 'Union' },
+  { letter: 'S', color: '#17A2A0', label: 'Satisfaction client' },
+  { letter: 'S', color: '#8E44AD', label: 'Standard de qualité' },
+  { letter: 'I', color: '#F5B301', label: 'Innovation & Intégrité' },
+  { letter: 'R', color: '#E4442F', label: 'Résilience & Rigueur' },
+];
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -68,9 +79,26 @@ export default function Login() {
         <circle cx="1080" cy="160" r="220" />
         <circle cx="120" cy="120" r="140" />
         <text x="850" y="740" textAnchor="middle" className="login-watermark" transform="rotate(-8 850 740)">CCG</text>
-        <text x="350" y="190" textAnchor="middle" className="login-watermark login-watermark-sm" transform="rotate(-8 350 190)">Best</text>
       </svg>
-      <div className="card login-card" style={{ width: mode === 'request' ? 420 : 360 }}>
+      <div className="login-shell">
+        <div className="login-brand">
+          <div className="login-brand-eyebrow">NOS VALEURS</div>
+          <div className="reussir-word" aria-label="RÉUSSIR">
+            {REUSSIR.map((v, i) => <span key={i} style={{ color: v.color }}>{v.letter}</span>)}
+          </div>
+          <ul className="reussir-list">
+            {REUSSIR.map((v, i) => (
+              <li key={i}>
+                <span className="reussir-badge" style={{ background: v.color }}>{v.letter}</span>
+                {v.label}
+              </li>
+            ))}
+          </ul>
+          <p className="login-brand-tagline">
+            Ensemble, nous bâtissons un avenir <strong>durable</strong>, <strong>performant</strong> et centré sur le <strong>client</strong>.
+          </p>
+        </div>
+        <div className="card login-card" style={{ width: mode === 'request' ? 420 : 360 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
@@ -168,6 +196,7 @@ export default function Login() {
             </>
           )
         )}
+        </div>
       </div>
     </div>
   );
