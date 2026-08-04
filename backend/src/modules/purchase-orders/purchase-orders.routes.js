@@ -6,6 +6,7 @@ const prRepo = require('../purchase-requests/purchase-requests.repository');
 const pdf = require('../../utils/pdf');
 const mailer = require('../../utils/mailer');
 const audit = require('../audit/audit.service');
+const branding = require('../referentials/entity-branding.service');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,20 +23,20 @@ async function loadAuthorized(req) {
   return po;
 }
 
-// Génère le PDF du bon de commande (partagé par l'aperçu et l'envoi par email).
+// Génère le PDF du bon de commande (partagé par l'aperçu et l'envoi par email). Utilise le branding
+// de l'entité (logo, signature, cachet) configuré en Admin -> Documents.
 async function buildPoPdf(po) {
   const lines = await prRepo.getLines(po.purchase_request_id);
-  const pr = await prRepo.getById(po.purchase_request_id);
-  const approvals = await prRepo.getApprovalsForPR(po.purchase_request_id);
-  const finalApproval = [...approvals].reverse().find(a => a.statut === 'validee' && a.validated_by_nom);
+  const images = await branding.getEntityImages(po.entity_id);
   return pdf.generatePurchaseOrderPdf({
     purchaseOrder: po,
     purchaseRequest: { numero: po.purchase_request_numero },
     lines,
     entityNom: po.entity_nom,
     supplierNom: po.supplier_nom,
-    emisPar: pr ? `${pr.requester_prenom} ${pr.requester_nom}` : null,
-    approuvePar: finalApproval ? `${finalApproval.validated_by_prenom} ${finalApproval.validated_by_nom}` : null,
+    logoBuffer: images.logo,
+    signatureBuffer: images.signature,
+    stampBuffer: images.stamp,
   });
 }
 

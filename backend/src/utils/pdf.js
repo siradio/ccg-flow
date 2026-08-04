@@ -43,13 +43,15 @@ function renderPdf(drawFn) {
 
 // En-tête commun (logo + identité entreprise + titre du document) — partagé par les deux documents
 // pour que toute évolution de l'identité visuelle s'applique aux deux à la fois.
-function renderLetterhead(doc, title) {
+function renderLetterhead(doc, title, logoBuffer) {
   const top = doc.y;
   try {
-    doc.image(LOGO_PATH, 50, top, { width: 55 });
+    // Logo propre à l'entité s'il est configuré (Admin -> Documents), sinon le logo CCG par défaut.
+    doc.image(logoBuffer || LOGO_PATH, 50, top, { fit: [60, 55] });
   } catch (e) {
-    // Le logo est un plus visuel, jamais bloquant : un fichier manquant/corrompu ne doit pas
-    // empêcher la génération du document.
+    // Le logo est un plus visuel, jamais bloquant : un fichier manquant/corrompu (ou une image
+    // d'entité invalide) ne doit pas empêcher la génération du document — on retombe sur le défaut.
+    try { doc.image(LOGO_PATH, 50, top, { width: 55 }); } catch (_) { /* ni l'un ni l'autre : on continue sans logo */ }
   }
 
   const textX = 115;
@@ -139,25 +141,31 @@ function linesTable(doc, lines, { showPrices = false } = {}) {
   return total;
 }
 
-// Bloc "Émis par / Approuvé par" — noms tirés des données réelles (demandeur, dernière
-// approbation validée), pas de signature manuscrite (hors périmètre applicatif, voir §6 SPEC.md).
-function renderSignatureBlock(doc, { emisPar, approuvePar }) {
-  doc.moveDown(2);
-  const y = doc.y;
-  const colWidth = PAGE_WIDTH / 2 - 10;
+// Bloc de signature unique + cachet, propres à l'entité (configurés en Admin -> Documents). Si les
+// images ne sont pas définies, on laisse une zone vierge au-dessus du trait pour une signature
+// manuscrite. Aligné à droite du document.
+function renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom }) {
+  doc.moveDown(3);
+  const blockW = 240;
+  const x = 50 + PAGE_WIDTH - blockW;
+  const half = blockW / 2;
+  let y = doc.y;
 
-  doc.fontSize(9).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Émis par', 50, y, { width: colWidth });
-  doc.font('Helvetica').fillColor('black').text(emisPar || '—', 50, doc.y, { width: colWidth });
-  doc.moveDown(2);
-  doc.moveTo(50, doc.y).lineTo(50 + colWidth, doc.y).strokeColor('#9ca3af').lineWidth(0.5).stroke();
-  doc.fontSize(8).fillColor(MUTED_GRAY).text('Signature', 50, doc.y + 3, { width: colWidth });
+  doc.fontSize(9).font('Helvetica-Bold').fillColor(BRAND_NAVY)
+    .text(`Pour ${entityNom || COMPANY.nom}`, x, y, { width: blockW, align: 'center' });
 
-  const x2 = 50 + colWidth + 20;
-  doc.fontSize(9).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Approuvé par', x2, y, { width: colWidth });
-  doc.font('Helvetica').fillColor('black').text(approuvePar || '—', x2, y + 14, { width: colWidth });
-  doc.moveTo(x2, y + 44).lineTo(x2 + colWidth, y + 44).strokeColor('#9ca3af').lineWidth(0.5).stroke();
-  doc.fontSize(8).fillColor(MUTED_GRAY).text('Signature', x2, y + 47, { width: colWidth });
+  y = doc.y + 6;
+  const imgAreaH = 85;
+  if (signatureBuffer) {
+    try { doc.image(signatureBuffer, x + 6, y, { fit: [half - 10, imgAreaH] }); } catch (e) { /* image invalide : ignorée */ }
+  }
+  if (stampBuffer) {
+    try { doc.image(stampBuffer, x + half + 4, y, { fit: [half - 10, imgAreaH] }); } catch (e) { /* idem */ }
+  }
 
+  y += imgAreaH + 4;
+  doc.moveTo(x, y).lineTo(x + blockW, y).strokeColor('#9ca3af').lineWidth(0.5).stroke();
+  doc.fontSize(8).font('Helvetica').fillColor(MUTED_GRAY).text('Signature et cachet', x, y + 3, { width: blockW, align: 'center' });
   doc.fillColor('black');
 }
 
@@ -183,9 +191,9 @@ function renderFooters(doc) {
   }
 }
 
-async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supplierNom }) {
+async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supplierNom, logoBuffer }) {
   return renderPdf(doc => {
-    renderLetterhead(doc, 'Demande de devis');
+    renderLetterhead(doc, 'Demande de devis', logoBuffer);
     doc.fontSize(11).font('Helvetica').fillColor('black');
     doc.text(`Entité : ${entityNom}`);
     doc.text(`Référence demande d'achat : ${purchaseRequest.numero}`);
@@ -198,9 +206,9 @@ async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supp
   });
 }
 
-async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, supplierNom, emisPar, approuvePar }) {
+async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, supplierNom, logoBuffer, signatureBuffer, stampBuffer }) {
   return renderPdf(doc => {
-    renderLetterhead(doc, 'Bon de commande');
+    renderLetterhead(doc, 'Bon de commande', logoBuffer);
     doc.fontSize(11).font('Helvetica').fillColor('black');
     doc.text(`Numéro : ${purchaseOrder.numero}`);
     doc.text(`Entité : ${entityNom}`);
@@ -212,7 +220,7 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
     doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
       .text(`Montant total : ${money(purchaseOrder.montant)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
     doc.fillColor('black');
-    renderSignatureBlock(doc, { emisPar, approuvePar });
+    renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom });
   });
 }
 

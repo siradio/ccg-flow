@@ -14,6 +14,9 @@ export function IconDashboard() {
 export function IconMenu() {
   return <Svg><path d="M3 6h18M3 12h18M3 18h18" /></Svg>;
 }
+export function IconFile() {
+  return <Svg><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></Svg>;
+}
 export function IconClose() {
   return <Svg><path d="M6 6l12 12M18 6L6 18" /></Svg>;
 }

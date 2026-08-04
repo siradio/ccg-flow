@@ -6,7 +6,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose,
+  IconMenu, IconClose, IconFile,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -34,6 +34,7 @@ const PARAMS_ITEMS = [
   { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
   { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
   { to: '/admin/email', label: 'Email (SMTP)', Icon: IconMail, superOnly: true },
+  { to: '/admin/documents', label: 'Documents', Icon: IconFile, superOnly: true },
   { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase, superOnly: true },
 ];
 
