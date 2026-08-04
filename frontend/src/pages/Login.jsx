@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import client from '../api/client';
 import logo from '../assets/logo-web-darklogo.png';
+
+const EMPTY_REQUEST = { nom: '', prenom: '', email: '', telephone: '', fonction: '', entityId: '' };
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [mode, setMode] = useState('login'); // 'login' | 'request'
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Demande d'accès
+  const [entities, setEntities] = useState([]);
+  const [req, setReq] = useState(EMPTY_REQUEST);
+  const [reqError, setReqError] = useState('');
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqDone, setReqDone] = useState(false);
+
+  useEffect(() => {
+    if (mode === 'request' && entities.length === 0) {
+      client.get('/access-requests/entities').then(res => setEntities(res.data)).catch(() => {});
+    }
+  }, [mode, entities.length]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -25,6 +43,22 @@ export default function Login() {
     }
   }
 
+  async function submitRequest(e) {
+    e.preventDefault();
+    setReqError('');
+    setReqLoading(true);
+    try {
+      await client.post('/access-requests', { ...req, entityId: Number(req.entityId) });
+      setReqDone(true);
+    } catch (err) {
+      setReqError(err.response?.data?.error || 'Une erreur est survenue.');
+    } finally {
+      setReqLoading(false);
+    }
+  }
+
+  function updateReq(field, value) { setReq(r => ({ ...r, [field]: value })); }
+
   return (
     <div className="login-page">
       <svg className="login-page-art" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -36,28 +70,104 @@ export default function Login() {
         <text x="850" y="740" textAnchor="middle" className="login-watermark" transform="rotate(-8 850 740)">CCG</text>
         <text x="350" y="190" textAnchor="middle" className="login-watermark login-watermark-sm" transform="rotate(-8 350 190)">Best</text>
       </svg>
-      <div className="card login-card" style={{ width: 360 }}>
+      <div className="card login-card" style={{ width: mode === 'request' ? 420 : 360 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Flow</div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Connexion</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              {mode === 'login' ? 'Connexion' : 'Demande d’accès'}
+            </div>
           </div>
         </div>
-        <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
-          <label className="field">
-            Email
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-          </label>
-          <label className="field">
-            Mot de passe
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-          </label>
-          {error && <div className="alert alert-danger">{error}</div>}
-          <button type="submit" disabled={loading} className="btn btn-primary" style={{ justifyContent: 'center' }}>
-            {loading ? 'Connexion…' : 'Se connecter'}
-          </button>
-        </form>
+
+        {mode === 'login' && (
+          <>
+            <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
+              <label className="field">
+                Email
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+              </label>
+              <label className="field">
+                Mot de passe
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+              </label>
+              {error && <div className="alert alert-danger">{error}</div>}
+              <button type="submit" disabled={loading} className="btn btn-primary" style={{ justifyContent: 'center' }}>
+                {loading ? 'Connexion…' : 'Se connecter'}
+              </button>
+            </form>
+            <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--color-text-muted)' }}>
+              Pas encore de compte ?{' '}
+              <button type="button" className="link-button" onClick={() => { setMode('request'); setError(''); }}>
+                Demander un accès
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'request' && (
+          reqDone ? (
+            <div>
+              <div className="alert alert-success" style={{ marginTop: 0 }}>
+                Votre demande a bien été envoyée. Un administrateur la traitera, et vous recevrez vos identifiants
+                par email une fois votre accès validé.
+              </div>
+              <button type="button" className="btn btn-secondary" style={{ justifyContent: 'center', width: '100%' }}
+                onClick={() => { setMode('login'); setReq(EMPTY_REQUEST); setReqDone(false); }}>
+                Retour à la connexion
+              </button>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>
+                Renseignez vos informations : un administrateur validera votre accès et vous recevrez vos identifiants par email.
+              </p>
+              <form onSubmit={submitRequest} className="form-grid" style={{ maxWidth: 'none' }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <label className="field" style={{ flex: 1 }}>
+                    Prénom
+                    <input value={req.prenom} onChange={e => updateReq('prenom', e.target.value)} required />
+                  </label>
+                  <label className="field" style={{ flex: 1 }}>
+                    Nom
+                    <input value={req.nom} onChange={e => updateReq('nom', e.target.value)} required />
+                  </label>
+                </div>
+                <label className="field">
+                  Email professionnel
+                  <input type="email" value={req.email} onChange={e => updateReq('email', e.target.value)} required />
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <label className="field" style={{ flex: 1 }}>
+                    Téléphone
+                    <input value={req.telephone} onChange={e => updateReq('telephone', e.target.value)} />
+                  </label>
+                  <label className="field" style={{ flex: 1 }}>
+                    Entité
+                    <select value={req.entityId} onChange={e => updateReq('entityId', e.target.value)} required>
+                      <option value="" disabled>—</option>
+                      {entities.map(en => <option key={en.id} value={en.id}>{en.code}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  Fonction
+                  <input value={req.fonction} onChange={e => updateReq('fonction', e.target.value)} placeholder="ex. Comptable, Responsable achats…" />
+                </label>
+                {reqError && <div className="alert alert-danger">{reqError}</div>}
+                <button type="submit" disabled={reqLoading} className="btn btn-primary" style={{ justifyContent: 'center' }}>
+                  {reqLoading ? 'Envoi…' : 'Envoyer la demande'}
+                </button>
+              </form>
+              <div style={{ textAlign: 'center', marginTop: 14, fontSize: 13 }}>
+                <button type="button" className="link-button" onClick={() => { setMode('login'); setReqError(''); }}>
+                  ← Retour à la connexion
+                </button>
+              </div>
+            </>
+          )
+        )}
       </div>
     </div>
   );

@@ -17,6 +17,13 @@ router.post('/login', async (req, res, next) => {
     if (!user || !user.actif || !bcrypt.compareSync(password, user.password_hash)) {
       return res.status(401).json({ error: 'Identifiants incorrects ou compte désactivé.' });
     }
+    // Un compte issu d'une demande d'accès non encore traitée ne peut pas se connecter.
+    if (user.access_status === 'pending') {
+      return res.status(403).json({ error: "Votre demande d'accès est en attente de validation par un administrateur." });
+    }
+    if (user.access_status === 'rejected') {
+      return res.status(403).json({ error: "Votre demande d'accès a été refusée. Contactez un administrateur." });
+    }
     const full = await usersService.loadUserWithRoles(user.id);
     // Le token ne porte que l'identité : rôles/modules/BU sont relus en base à chaque requête
     // (voir middleware/auth.js), pour qu'un changement de droits prenne effet immédiatement.

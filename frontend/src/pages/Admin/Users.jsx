@@ -11,6 +11,19 @@ const NIVEAUX = [
   { value: 'edition', label: 'Édition (peut aussi modifier/supprimer)' },
 ];
 
+// Statut consolidé d'un compte : la demande d'accès (pending/rejected) prime sur l'actif/inactif.
+function userStatus(u) {
+  if (u.access_status === 'pending') return 'pending';
+  if (u.access_status === 'rejected') return 'rejected';
+  return u.actif ? 'active' : 'inactive';
+}
+const STATUS_META = {
+  active: { label: 'Actif', bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
+  inactive: { label: 'Désactivé', bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' },
+  pending: { label: 'À valider', bg: 'var(--status-amber-bg)', fg: 'var(--status-amber-fg)' },
+  rejected: { label: 'Rejeté', bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
+};
+
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [entities, setEntities] = useState([]);
@@ -28,11 +41,15 @@ export default function Users() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState({ active: true, inactive: true, pending: true, rejected: true });
+  const [editPanel, setEditPanel] = useState({});     // { [userId]: { nom, prenom, email, telephone, fonction } }
+  const [rejectPanel, setRejectPanel] = useState({}); // { [userId]: note } — panneau de rejet ouvert
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search || `${u.prenom} ${u.nom} ${u.email}`.toLowerCase().includes(search.toLowerCase());
     const matchesRole = !roleFilter || u.roles.some(r => r.role_code === roleFilter);
-    return matchesSearch && matchesRole;
+    const matchesStatus = statusFilter[userStatus(u)];
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
@@ -112,6 +129,55 @@ export default function Users() {
       // aucun retour visible, donnant l'impression que « le bouton ne marche pas ».
       setError(err.response?.data?.error || `Impossible de ${action} cet utilisateur.`);
     }
+  }
+
+  // --- Demandes d'accès (statut "à valider") -------------------------------------------------
+  async function approveAccess(u) {
+    if (!window.confirm(`Valider l'accès de ${u.prenom} ${u.nom} ? Un mot de passe lui sera généré et envoyé par email à ${u.email}.`)) return;
+    setError(''); setNotice(null); setSendingId(u.id);
+    try {
+      const { data } = await client.post(`/users/${u.id}/approve-access`);
+      if (data.notification?.sent) {
+        setNotice({ type: 'success', text: `Accès validé. Identifiants envoyés par email à ${u.email}.` });
+      } else {
+        setNotice({ type: 'warning', text: `Accès validé, mais l'email n'a pas pu être envoyé. Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` });
+      }
+      load();
+    } catch (err) { setError(err.response?.data?.error || 'Échec de la validation.'); }
+    finally { setSendingId(null); }
+  }
+
+  function toggleReject(u) {
+    setRejectPanel(p => (p[u.id] !== undefined ? (() => { const n = { ...p }; delete n[u.id]; return n; })() : { ...p, [u.id]: '' }));
+  }
+  async function rejectAccess(u) {
+    const note = rejectPanel[u.id] || '';
+    setError(''); setNotice(null); setSendingId(u.id);
+    try {
+      await client.post(`/users/${u.id}/reject-access`, { note });
+      setNotice({ type: 'success', text: `Demande de ${u.email} rejetée${note.trim() ? ' (motif envoyé par email)' : ''}.` });
+      setRejectPanel(p => { const n = { ...p }; delete n[u.id]; return n; });
+      load();
+    } catch (err) { setError(err.response?.data?.error || 'Échec du rejet.'); }
+    finally { setSendingId(null); }
+  }
+
+  // --- Édition des informations d'un compte (compléter nom/tél/fonction...) ------------------
+  function toggleEdit(u) {
+    setEditPanel(p => (p[u.id] ? (() => { const n = { ...p }; delete n[u.id]; return n; })()
+      : { ...p, [u.id]: { nom: u.nom, prenom: u.prenom, email: u.email, telephone: u.telephone || '', fonction: u.fonction || '' } }));
+  }
+  async function saveEdit(u) {
+    const f = editPanel[u.id];
+    if (!f) return;
+    setError(''); setNotice(null); setSendingId(u.id);
+    try {
+      await client.put(`/users/${u.id}`, f);
+      setEditPanel(p => { const n = { ...p }; delete n[u.id]; return n; });
+      setNotice({ type: 'success', text: 'Informations mises à jour.' });
+      load();
+    } catch (err) { setError(err.response?.data?.error || 'Échec de la mise à jour.'); }
+    finally { setSendingId(null); }
   }
 
   function togglePwPanel(u) {
@@ -200,36 +266,93 @@ export default function Users() {
           <option value="">Tous les rôles</option>
           {ROLE_CODES.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        {(search || roleFilter) && (
-          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            {filteredUsers.length} / {users.length} utilisateur{users.length > 1 ? 's' : ''}
-          </span>
-        )}
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          {Object.entries(STATUS_META).map(([key, meta]) => {
+            const count = users.filter(u => userStatus(u) === key).length;
+            return (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                <input type="checkbox" checked={statusFilter[key]}
+                  onChange={e => setStatusFilter(s => ({ ...s, [key]: e.target.checked }))} />
+                <span className="badge" style={{ background: meta.bg, color: meta.fg }}>{meta.label}</span>
+                <span style={{ color: 'var(--color-text-faint)' }}>{count}</span>
+              </label>
+            );
+          })}
+        </div>
+        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+          {filteredUsers.length} / {users.length} utilisateur{users.length > 1 ? 's' : ''}
+        </span>
       </div>
 
       {filteredUsers.length === 0 && <p className="empty-row">Aucun utilisateur ne correspond à ce filtre.</p>}
 
       {filteredUsers.map(u => (
         <div key={u.id} className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <strong>{u.prenom} {u.nom}</strong>
-              <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
-              {!u.actif && <em style={{ color: 'var(--color-text-muted)' }}> (désactivé)</em>}
+              <div>
+                <strong>{u.prenom} {u.nom}</strong>
+                <span style={{ color: 'var(--color-text-muted)' }}> — {u.email}</span>
+                {' '}
+                <span className="badge" style={{ background: STATUS_META[userStatus(u)].bg, color: STATUS_META[userStatus(u)].fg }}>
+                  {STATUS_META[userStatus(u)].label}
+                </span>
+              </div>
+              {(u.fonction || u.telephone) && (
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 3 }}>
+                  {[u.fonction, u.telephone].filter(Boolean).join(' · ')}
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <button
-                onClick={() => togglePwPanel(u)}
-                className="btn btn-secondary btn-sm"
-                title="Définir / réinitialiser le mot de passe et l’envoyer par email"
-              >
-                {pwPanel[u.id] ? 'Fermer' : 'Mot de passe'}
-              </button>
-              <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
-                {u.actif ? 'Désactiver' : 'Réactiver'}
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+              {u.access_status === 'pending' ? (
+                <>
+                  <button onClick={() => approveAccess(u)} disabled={sendingId === u.id} className="btn btn-primary btn-sm">
+                    {sendingId === u.id ? '…' : 'Valider l’accès'}
+                  </button>
+                  <button onClick={() => toggleReject(u)} className="btn btn-danger-ghost btn-sm">
+                    {rejectPanel[u.id] !== undefined ? 'Fermer' : 'Rejeter'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => togglePwPanel(u)} className="btn btn-secondary btn-sm" title="Définir / réinitialiser le mot de passe et l’envoyer par email">
+                    {pwPanel[u.id] ? 'Fermer' : 'Mot de passe'}
+                  </button>
+                  <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
+                    {u.actif ? 'Désactiver' : 'Réactiver'}
+                  </button>
+                </>
+              )}
+              <button onClick={() => toggleEdit(u)} className="btn btn-secondary btn-sm">
+                {editPanel[u.id] ? 'Fermer' : 'Éditer'}
               </button>
             </div>
           </div>
+
+          {rejectPanel[u.id] !== undefined && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
+              <textarea placeholder="Motif du rejet (envoyé au demandeur par email)" value={rejectPanel[u.id]}
+                onChange={e => setRejectPanel(p => ({ ...p, [u.id]: e.target.value }))}
+                style={{ display: 'block', width: '100%', marginBottom: 8 }} />
+              <button onClick={() => rejectAccess(u)} disabled={sendingId === u.id} className="btn btn-danger btn-sm">
+                {sendingId === u.id ? 'Rejet…' : 'Confirmer le rejet'}
+              </button>
+            </div>
+          )}
+
+          {editPanel[u.id] && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
+              <div className="form-inline" style={{ flexWrap: 'wrap' }}>
+                <input placeholder="Prénom" value={editPanel[u.id].prenom} onChange={e => setEditPanel(p => ({ ...p, [u.id]: { ...p[u.id], prenom: e.target.value } }))} />
+                <input placeholder="Nom" value={editPanel[u.id].nom} onChange={e => setEditPanel(p => ({ ...p, [u.id]: { ...p[u.id], nom: e.target.value } }))} />
+                <input placeholder="Email" type="email" value={editPanel[u.id].email} onChange={e => setEditPanel(p => ({ ...p, [u.id]: { ...p[u.id], email: e.target.value } }))} />
+                <input placeholder="Téléphone" value={editPanel[u.id].telephone} onChange={e => setEditPanel(p => ({ ...p, [u.id]: { ...p[u.id], telephone: e.target.value } }))} />
+                <input placeholder="Fonction" value={editPanel[u.id].fonction} onChange={e => setEditPanel(p => ({ ...p, [u.id]: { ...p[u.id], fonction: e.target.value } }))} />
+                <button onClick={() => saveEdit(u)} disabled={sendingId === u.id} className="btn btn-primary btn-sm">Enregistrer</button>
+              </div>
+            </div>
+          )}
 
           {pwPanel[u.id] && (
             <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>

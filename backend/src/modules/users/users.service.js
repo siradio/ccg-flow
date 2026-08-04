@@ -3,7 +3,7 @@ const { all, one, run } = require('../../db');
 
 async function loadUserWithRoles(userId) {
   const user = await one(
-    'SELECT id, nom, prenom, email, actif, employee_id, created_at FROM users WHERE id = $1',
+    'SELECT id, nom, prenom, email, actif, access_status, telephone, fonction, employee_id, created_at FROM users WHERE id = $1',
     [userId]
   );
   if (!user) return null;
@@ -59,14 +59,14 @@ async function findByEmail(email) {
 }
 
 async function findById(id) {
-  return one('SELECT id, nom, prenom, email, actif FROM users WHERE id = $1', [id]);
+  return one('SELECT id, nom, prenom, email, actif, access_status, telephone, fonction FROM users WHERE id = $1', [id]);
 }
 
-async function createUser({ nom, prenom, email, password, employeeId }) {
+async function createUser({ nom, prenom, email, password, employeeId, telephone, fonction }) {
   const hash = bcrypt.hashSync(password || 'changeme', 10);
   const row = await one(
-    'INSERT INTO users (nom, prenom, email, password_hash, employee_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-    [nom, prenom, email, hash, employeeId || null]
+    'INSERT INTO users (nom, prenom, email, password_hash, employee_id, telephone, fonction) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [nom, prenom, email, hash, employeeId || null, telephone || null, fonction || null]
   );
   // Rôle demandeur sur toutes les entités par défaut : un compte fraîchement créé peut soumettre
   // une demande d'achat immédiatement, sans qu'un admin ajoute le rôle à la main pour chaque
@@ -82,18 +82,43 @@ async function createUser({ nom, prenom, email, password, employeeId }) {
   return row.id;
 }
 
-async function updateUser(id, { nom, prenom, email, actif, password }) {
+// Création d'une DEMANDE d'accès (depuis la page de connexion) : compte au statut "pending", avec
+// le rôle demandeur sur la seule entité choisie. Un mot de passe aléatoire est posé (inutilisable
+// tant que le compte n'est pas validé et que l'admin n'a pas envoyé d'identifiants).
+async function createPendingUser({ nom, prenom, email, telephone, fonction, entityId, password }) {
+  const hash = bcrypt.hashSync(password, 10);
+  const row = await one(
+    `INSERT INTO users (nom, prenom, email, password_hash, telephone, fonction, access_status)
+     VALUES ($1,$2,$3,$4,$5,$6,'pending') RETURNING id`,
+    [nom, prenom, email, hash, telephone || null, fonction || null]
+  );
+  await run(
+    `INSERT INTO user_entity_roles (user_id, entity_id, role_code) VALUES ($1,$2,'demandeur')
+     ON CONFLICT (user_id, entity_id, role_code) DO NOTHING`,
+    [row.id, entityId]
+  );
+  return row.id;
+}
+
+async function setAccessStatus(id, status) {
+  await run('UPDATE users SET access_status = $1 WHERE id = $2', [status, id]);
+  return loadUserWithRoles(id);
+}
+
+async function updateUser(id, { nom, prenom, email, actif, password, telephone, fonction }) {
   const existing = await one('SELECT * FROM users WHERE id = $1', [id]);
   if (!existing) return null;
   const hash = password ? bcrypt.hashSync(password, 10) : existing.password_hash;
   await run(
-    'UPDATE users SET nom=$1, prenom=$2, email=$3, actif=$4, password_hash=$5 WHERE id=$6',
+    'UPDATE users SET nom=$1, prenom=$2, email=$3, actif=$4, password_hash=$5, telephone=$6, fonction=$7 WHERE id=$8',
     [
       nom ?? existing.nom,
       prenom ?? existing.prenom,
       email ?? existing.email,
       actif === undefined ? existing.actif : actif,
       hash,
+      telephone === undefined ? existing.telephone : telephone,
+      fonction === undefined ? existing.fonction : fonction,
       id,
     ]
   );
@@ -119,7 +144,7 @@ async function getRoleById(roleRowId) {
 }
 
 async function listUsers() {
-  const users = await all('SELECT id, nom, prenom, email, actif, created_at FROM users ORDER BY nom, prenom');
+  const users = await all('SELECT id, nom, prenom, email, actif, access_status, telephone, fonction, created_at FROM users ORDER BY nom, prenom');
   const roles = await all(
     `SELECT uer.id, uer.user_id, uer.entity_id, e.code AS entity_code, uer.role_code
      FROM user_entity_roles uer LEFT JOIN entities e ON e.id = uer.entity_id`
@@ -138,6 +163,7 @@ async function listUsers() {
 }
 
 module.exports = {
-  loadUserWithRoles, findByEmail, findById, createUser, updateUser, addRole, removeRole, getRoleById, listUsers,
+  loadUserWithRoles, findByEmail, findById, createUser, createPendingUser, setAccessStatus, updateUser,
+  addRole, removeRole, getRoleById, listUsers,
   setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, revokeBusinessUnit,
 };

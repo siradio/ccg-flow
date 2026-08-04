@@ -3,7 +3,7 @@ const { requireAuth } = require('../../middleware/auth');
 const { requireUserAdmin, isSuperAdmin, NIVEAUX } = require('../../middleware/permissions');
 const { MODULES, SUB_MODULE_KEYS } = require('../../config/modules');
 const usersService = require('./users.service');
-const { generatePassword, sendCredentialsEmail } = require('./users.email');
+const { generatePassword, sendCredentialsEmail, sendAccessRejectedEmail } = require('./users.email');
 const env = require('../../config/env');
 
 const router = express.Router();
@@ -102,6 +102,50 @@ router.post('/:id/set-password', requireAuth, requireUserAdmin, async (req, res,
     // Mot de passe renvoyé UNIQUEMENT quand il a été généré côté serveur (jamais celui saisi par
     // l'admin, qu'il connaît déjà), pour permettre un repli manuel.
     res.json({ notification, generatedPassword: generated ? newPassword : undefined });
+  } catch (e) { next(e); }
+});
+
+// Valide une demande d'accès (statut pending -> active) : le compte peut désormais se connecter.
+// On génère un mot de passe et on l'envoie par email au demandeur (comme une création classique).
+router.post('/:id/approve-access', requireAuth, requireUserAdmin, async (req, res, next) => {
+  try {
+    const user = await usersService.findById(Number(req.params.id));
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (user.access_status !== 'pending') {
+      return res.status(400).json({ error: "Cette demande n'est pas en attente de validation." });
+    }
+    const password = generatePassword();
+    await usersService.updateUser(user.id, { password });
+    await usersService.setAccessStatus(user.id, 'active');
+
+    const notification = { sent: false };
+    try {
+      await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password, loginUrl: buildLoginUrl(req) });
+      notification.sent = true;
+    } catch (e) {
+      notification.error = e.message;
+    }
+    res.json({ notification, generatedPassword: password });
+  } catch (e) { next(e); }
+});
+
+// Rejette une demande d'accès (statut -> rejected) et notifie le demandeur par email avec le motif.
+router.post('/:id/reject-access', requireAuth, requireUserAdmin, async (req, res, next) => {
+  try {
+    const user = await usersService.findById(Number(req.params.id));
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (user.access_status !== 'pending') {
+      return res.status(400).json({ error: "Cette demande n'est pas en attente de validation." });
+    }
+    await usersService.setAccessStatus(user.id, 'rejected');
+    const notification = { sent: false };
+    try {
+      await sendAccessRejectedEmail({ to: user.email, prenom: user.prenom, note: (req.body && req.body.note) || '' });
+      notification.sent = true;
+    } catch (e) {
+      notification.error = e.message;
+    }
+    res.json({ ok: true, notification });
   } catch (e) { next(e); }
 });
 
