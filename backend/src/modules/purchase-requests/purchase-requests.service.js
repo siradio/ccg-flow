@@ -50,7 +50,7 @@ async function getFullDetailForUser(user, id) {
   return getFullDetail(id);
 }
 
-async function createDraft(user, { entityId, siteId, objet, justification, devise }) {
+async function createDraft(user, { entityId, siteId, objet, justification, devise, businessUnitId }) {
   if (!hasAnyRoleOnEntity(user, entityId)) {
     throw httpError(403, "Vous n'avez aucun rôle sur cette entité.");
   }
@@ -59,10 +59,16 @@ async function createDraft(user, { entityId, siteId, objet, justification, devis
   const template = await workflowEngine.getTemplate(MODULE_CODE);
   if (!template) throw httpError(500, 'Workflow "demande_achat" non configuré.');
 
+  // La Business Unit n'a de sens que pour SOGUIPAL (les BU y sont rattachées côté métier) ; on ne
+  // la persiste que dans ce cas pour éviter une BU parasite sur une autre entité. NULL = « Toutes
+  // les BU » ou non renseignée. Purement informatif, aucun impact sur le circuit.
+  const code = await entityCode(entityId);
+  const buId = code === 'SOGUIPAL' && businessUnitId ? Number(businessUnitId) : null;
+
   let pr = await repo.createDraft({
-    entityId, workflowTemplateId: template.id, requesterId: user.id, siteId, objet, justification, devise,
+    entityId, workflowTemplateId: template.id, requesterId: user.id, siteId, objet, justification, devise, businessUnitId: buId,
   });
-  pr = await repo.setNumero(pr.id, numbering.formatRequestNumber(await entityCode(entityId), pr.id));
+  pr = await repo.setNumero(pr.id, numbering.formatRequestNumber(code, pr.id));
   await audit.logAction({ tableName: 'purchase_requests', recordId: pr.id, purchaseRequestId: pr.id, action: 'create', userId: user.id });
   return getFullDetail(pr.id);
 }

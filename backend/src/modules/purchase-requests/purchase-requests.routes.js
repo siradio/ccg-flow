@@ -13,8 +13,8 @@ router.use(requireSubModule('achats'));
 
 router.post('/', requireAuth, async (req, res, next) => {
   try {
-    const { entityId, siteId, objet, justification, devise } = req.body || {};
-    res.status(201).json(await service.createDraft(req.user, { entityId, siteId, objet, justification, devise }));
+    const { entityId, siteId, objet, justification, devise, businessUnitId } = req.body || {};
+    res.status(201).json(await service.createDraft(req.user, { entityId, siteId, objet, justification, devise, businessUnitId }));
   } catch (e) { next(e); }
 });
 
