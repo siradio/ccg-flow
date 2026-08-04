@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, isSuperAdmin, isUserAdmin, hasModuleAccess, hasSubModuleLevel } from '../auth/AuthContext';
+import client from '../api/client';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconFile,
+  IconMenu, IconClose, IconFile, IconMegaphone, IconImage,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -34,7 +35,7 @@ const PARAMS_ITEMS = [
   { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
   { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
   { to: '/admin/email', label: 'Email (SMTP)', Icon: IconMail, superOnly: true },
-  { to: '/admin/documents', label: 'Documents', Icon: IconFile, superOnly: true },
+  { to: '/admin/documents', label: 'Branding', Icon: IconImage, superOnly: true },
   { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase, superOnly: true },
 ];
 
@@ -43,9 +44,18 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
+  const [docsOpen, setDocsOpen] = useState(location.pathname.startsWith('/documents'));
+  const [docCategories, setDocCategories] = useState([]);
   // Tiroir de navigation mobile : masqué par défaut, ouvert par le bouton hamburger de la topbar.
   const [navOpen, setNavOpen] = useState(false);
   const closeNav = () => setNavOpen(false);
+
+  // Sous-menus du module Documents = ses catégories (pilotées par la base, extensibles).
+  const hasDocuments = hasModuleAccess(user, 'documents');
+  useEffect(() => {
+    if (!hasDocuments) return;
+    client.get('/documents/categories').then(r => setDocCategories(r.data)).catch(() => {});
+  }, [hasDocuments]);
 
   const admin = isSuperAdmin(user);
   const userAdmin = isUserAdmin(user);
@@ -67,6 +77,22 @@ export default function Layout() {
           {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> Demandes d'achat</NavLink>}
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
+          {hasDocuments && (
+            <div className="sidebar-group">
+              <button type="button" className="sidebar-group-toggle" onClick={() => setDocsOpen(o => !o)}>
+                <IconFile /> Documents
+                <span className={`sidebar-chevron${docsOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
+              </button>
+              {docsOpen && (
+                <div className="sidebar-subnav">
+                  {docCategories.map(c => (
+                    <NavLink key={c.id} to={`/documents/${c.slug}`} className={navClass} onClick={closeNav}>{c.nom}</NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {hasModuleAccess(user, 'annonces') && <NavLink to="/annonces" className={navClass} onClick={closeNav}><IconMegaphone /> Infos & Événements</NavLink>}
 
           {userAdmin && (
             <div className="sidebar-group">
