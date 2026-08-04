@@ -863,15 +863,15 @@ a.kpi-tile:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 56px;
+  gap: 36px;
   flex-wrap: wrap;
   width: 100%;
-  max-width: 1060px;
+  max-width: 920px;
   padding: 24px;
   box-sizing: border-box;
 }
 .login-brand {
-  flex: 0 1 440px;
+  flex: 0 1 410px;
   color: #fff;
 }
 .login-brand-eyebrow {
@@ -917,11 +917,13 @@ a.kpi-tile:hover {
   flex-shrink: 0;
 }
 .login-brand-tagline {
-  font-size: 15px;
+  flex: 0 0 100%;
+  text-align: center;
+  font-size: 15.5px;
   line-height: 1.5;
   color: #c7d3ec;
-  max-width: 42ch;
-  margin: 0;
+  max-width: 640px;
+  margin: 6px auto 0;
 }
 .login-brand-tagline strong { color: #fff; font-weight: 700; }
 

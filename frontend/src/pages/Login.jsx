@@ -94,9 +94,6 @@ export default function Login() {
               </li>
             ))}
           </ul>
-          <p className="login-brand-tagline">
-            Ensemble, nous bâtissons un avenir <strong>durable</strong>, <strong>performant</strong> et centré sur le <strong>client</strong>.
-          </p>
         </div>
         <div className="card login-card" style={{ width: '100%', maxWidth: mode === 'request' ? 420 : 360 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
@@ -197,6 +194,9 @@ export default function Login() {
           )
         )}
         </div>
+        <p className="login-brand-tagline">
+          Ensemble, nous bâtissons un avenir <strong>durable</strong>, <strong>performant</strong> et centré sur le <strong>client</strong>.
+        </p>
       </div>
     </div>
   );
