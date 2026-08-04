@@ -2,6 +2,7 @@ const { one } = require('../../db');
 const repo = require('./purchase-requests.repository');
 const poRepo = require('../purchase-orders/purchase-orders.repository');
 const suppliersService = require('../referentials/suppliers.service');
+const branding = require('../referentials/entity-branding.service');
 const attachmentsService = require('../attachments/attachments.service');
 const workflowEngine = require('../workflow/workflow.engine');
 const audit = require('../audit/audit.service');
@@ -189,13 +190,14 @@ async function sendQuoteRequest(user, prId, quoteRequestId) {
   const qr = await repo.getQuoteRequest(quoteRequestId);
   const bodyText = qr?.message?.trim() || defaultQuoteRequestBody(pr.numero);
   const lines = await repo.getLines(prId);
+  const { logo } = await branding.getEntityImages(pr.entity_id);
   const suppliers = await repo.getQuoteRequestSuppliers(quoteRequestId);
   const results = [];
   for (const s of suppliers) {
     if (s.statut !== 'a_envoyer') { results.push({ supplierId: s.supplier_id, skipped: true }); continue; }
     try {
       const buffer = await pdf.generateQuoteRequestPdf({
-        purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom,
+        purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom, logoBuffer: logo,
       });
       await mailer.sendMail({
         to: s.supplier_email,
@@ -240,8 +242,9 @@ async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride) {
   const qr = await repo.getQuoteRequest(s.quote_request_id);
   const bodyText = qr?.message?.trim() || defaultQuoteRequestBody(pr.numero);
   const lines = await repo.getLines(prId);
+  const { logo } = await branding.getEntityImages(pr.entity_id);
   const buffer = await pdf.generateQuoteRequestPdf({
-    purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom,
+    purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom, logoBuffer: logo,
   });
   try {
     await mailer.sendMail({
@@ -273,7 +276,8 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   const supplier = await repo.getQuoteRequestSupplier(qrsId);
   if (!supplier) throw httpError(404, 'Fournisseur sollicité introuvable.');
   const lines = await repo.getLines(prId);
-  return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom });
+  const { logo } = await branding.getEntityImages(pr.entity_id);
+  return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo });
 }
 
 async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }, file) {
