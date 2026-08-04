@@ -98,7 +98,7 @@ export default function Login() {
             Ensemble, nous bâtissons un avenir <strong>durable</strong>, <strong>performant</strong> et centré sur le <strong>client</strong>.
           </p>
         </div>
-        <div className="card login-card" style={{ width: mode === 'request' ? 420 : 360 }}>
+        <div className="card login-card" style={{ width: '100%', maxWidth: mode === 'request' ? 420 : 360 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
@@ -153,11 +153,11 @@ export default function Login() {
               </p>
               <form onSubmit={submitRequest} className="form-grid" style={{ maxWidth: 'none' }}>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <label className="field" style={{ flex: 1 }}>
+                  <label className="field" style={{ flex: 1, minWidth: 0 }}>
                     Prénom
                     <input value={req.prenom} onChange={e => updateReq('prenom', e.target.value)} required />
                   </label>
-                  <label className="field" style={{ flex: 1 }}>
+                  <label className="field" style={{ flex: 1, minWidth: 0 }}>
                     Nom
                     <input value={req.nom} onChange={e => updateReq('nom', e.target.value)} required />
                   </label>
@@ -167,11 +167,11 @@ export default function Login() {
                   <input type="email" value={req.email} onChange={e => updateReq('email', e.target.value)} required />
                 </label>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <label className="field" style={{ flex: 1 }}>
+                  <label className="field" style={{ flex: 1, minWidth: 0 }}>
                     Téléphone
                     <input value={req.telephone} onChange={e => updateReq('telephone', e.target.value)} />
                   </label>
-                  <label className="field" style={{ flex: 1 }}>
+                  <label className="field" style={{ flex: 1, minWidth: 0 }}>
                     Entité
                     <select value={req.entityId} onChange={e => updateReq('entityId', e.target.value)} required>
                       <option value="" disabled>—</option>
