@@ -118,10 +118,34 @@ export default function DetailPage() {
       <section className="card">
         <h2>Informations</h2>
         <p><strong>Entité :</strong> {pr.entity_nom}</p>
+        {pr.entity_code === 'SOGUIPAL' && (
+          <p><strong>Business Unit :</strong> {pr.business_unit_nom || 'Toutes les BU'}</p>
+        )}
         <p><strong>Demandeur :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
         {pr.justification && <p><strong>Justification :</strong> {pr.justification}</p>}
         <p style={{ marginBottom: 0 }}><strong>Montant final :</strong> {pr.montant_final ? `${pr.montant_final} ${pr.devise}` : '—'}</p>
       </section>
+
+      {pr.attachments?.length > 0 && (
+        <section className="card">
+          <h2>Pièces jointes</h2>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {pr.attachments.map(a => (
+              <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button type="button" className="btn btn-secondary btn-sm"
+                  onClick={() => openAuthenticatedFile(`/attachments/${a.id}`)}>
+                  {a.filename}
+                </button>
+                {a.taille != null && (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    {Math.max(1, Math.round(a.taille / 1024))} Ko
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <LinesSection pr={pr} products={products} isRequester={isRequester} guarded={guarded} />
 

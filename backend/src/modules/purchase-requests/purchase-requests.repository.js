@@ -1,12 +1,12 @@
 const { all, one, run } = require('../../db');
 
-async function createDraft({ entityId, workflowTemplateId, requesterId, siteId, objet, justification, devise }) {
+async function createDraft({ entityId, workflowTemplateId, requesterId, siteId, objet, justification, devise, businessUnitId }) {
   return one(
     `INSERT INTO purchase_requests
-       (numero, entity_id, workflow_template_id, requester_user_id, site_id, objet, justification, devise, status)
-     VALUES ('PENDING', $1,$2,$3,$4,$5,$6,$7,'brouillon')
+       (numero, entity_id, business_unit_id, workflow_template_id, requester_user_id, site_id, objet, justification, devise, status)
+     VALUES ('PENDING', $1,$2,$3,$4,$5,$6,$7,$8,'brouillon')
      RETURNING *`,
-    [entityId, workflowTemplateId, requesterId, siteId || null, objet, justification || null, devise || 'GNF']
+    [entityId, businessUnitId || null, workflowTemplateId, requesterId, siteId || null, objet, justification || null, devise || 'GNF']
   );
 }
 
@@ -16,12 +16,13 @@ async function setNumero(id, numero) {
 
 async function getById(id) {
   return one(
-    `SELECT pr.*, e.code AS entity_code, e.nom AS entity_nom,
+    `SELECT pr.*, e.code AS entity_code, e.nom AS entity_nom, bu.nom AS business_unit_nom,
             u.nom AS requester_nom, u.prenom AS requester_prenom,
             cs.code AS current_step_code, cs.nom AS current_step_nom, cs.role_code_requis AS current_step_role
      FROM purchase_requests pr
      JOIN entities e ON e.id = pr.entity_id
      JOIN users u ON u.id = pr.requester_user_id
+     LEFT JOIN business_units bu ON bu.id = pr.business_unit_id
      LEFT JOIN workflow_steps cs ON cs.id = pr.current_step_id
      WHERE pr.id = $1`,
     [id]
