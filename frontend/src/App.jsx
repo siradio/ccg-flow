@@ -9,6 +9,8 @@ import ListPage from './pages/PurchaseRequests/ListPage';
 import CreatePage from './pages/PurchaseRequests/CreatePage';
 import DetailPage from './pages/PurchaseRequests/DetailPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
+import DocumentsPage from './pages/Documents/DocumentsPage';
+import AnnouncementsPage from './pages/Announcements/AnnouncementsPage';
 import Users from './pages/Admin/Users';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import EmailSettings from './pages/Admin/EmailSettings';
@@ -33,6 +35,9 @@ export default function App() {
         <Route path="purchase-requests" element={<RequireModule subModule="achats"><ListPage /></RequireModule>} />
         <Route path="purchase-requests/new" element={<RequireModule subModule="achats"><CreatePage /></RequireModule>} />
         <Route path="purchase-requests/:id" element={<RequireModule subModule="achats"><DetailPage /></RequireModule>} />
+        <Route path="documents" element={<RequireModule subModule="documents"><DocumentsPage /></RequireModule>} />
+        <Route path="documents/:categorie" element={<RequireModule subModule="documents"><DocumentsPage /></RequireModule>} />
+        <Route path="annonces" element={<RequireModule subModule="annonces"><AnnouncementsPage /></RequireModule>} />
         <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
         <Route path="employees/new" element={<RequireModule subModule="rh" minNiveau="ajout"><EmployeesFormPage /></RequireModule>} />
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
