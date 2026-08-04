@@ -112,6 +112,11 @@ async function applyAccessBundle(userId, bundle) {
   return { rolesApplied, modulesApplied, busApplied };
 }
 
+// Journalise une connexion réussie (statistiques d'utilisation, voir module stats).
+async function recordLogin(userId) {
+  await run('INSERT INTO login_events (user_id) VALUES ($1)', [userId]);
+}
+
 async function findByEmail(email) {
   return one('SELECT * FROM users WHERE email = $1', [email]);
 }
@@ -241,5 +246,5 @@ module.exports = {
   loadUserWithRoles, findByEmail, findById, createUser, createPendingUser, setAccessStatus, updateUser,
   addRole, addRoleAllEntities, removeRole, getRoleById, listUsers,
   setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, grantAllBusinessUnits, revokeBusinessUnit,
-  getUserAccessBundle, applyAccessBundle,
+  getUserAccessBundle, applyAccessBundle, recordLogin,
 };

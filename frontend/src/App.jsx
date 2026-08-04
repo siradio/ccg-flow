@@ -12,6 +12,7 @@ import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import DocumentsPage from './pages/Documents/DocumentsPage';
 import AnnouncementsPage from './pages/Announcements/AnnouncementsPage';
 import Users from './pages/Admin/Users';
+import Statistiques from './pages/Admin/Statistiques';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import EmailSettings from './pages/Admin/EmailSettings';
 import DocumentsBranding from './pages/Admin/DocumentsBranding';
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
+        <Route path="admin/stats" element={<RequireAdmin level="user"><Statistiques /></RequireAdmin>} />
         <Route path="admin/workflow" element={<RequireAdmin><WorkflowConfig /></RequireAdmin>} />
         <Route path="admin/email" element={<RequireAdmin><EmailSettings /></RequireAdmin>} />
         <Route path="admin/documents" element={<RequireAdmin><DocumentsBranding /></RequireAdmin>} />
