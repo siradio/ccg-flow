@@ -353,6 +353,18 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
         value={value || ''} onChange={e => onChange(e.target.value)} />
     );
   }
+  // Un <input type="date"> ignore le placeholder (il affiche toujours « jj/mm/aaaa »), donc sans
+  // libellé on ne distingue pas deux dates côte à côte (ex. fabrication vs acquisition). On ajoute
+  // une petite étiquette au-dessus du champ.
+  if (field.type === 'date') {
+    return (
+      <label style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, fontSize: 11, color: 'var(--color-text-muted)' }}>
+        {field.label}
+        <input type="date" required={field.required} value={value || ''}
+          onChange={e => onChange(e.target.value)} style={{ fontSize: 13, color: 'var(--color-text)' }} />
+      </label>
+    );
+  }
   return (
     <input placeholder={field.label} required={field.required} type={field.type || 'text'} value={value || ''}
       onChange={e => onChange(e.target.value)} />
