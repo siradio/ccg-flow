@@ -69,7 +69,7 @@ export default function CreatePage() {
             Entité
             <select value={form.entityId} onChange={e => setForm({ ...form, entityId: e.target.value })} required>
               <option value="" disabled>Sélectionner…</option>
-              {entities.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              {entities.map(e => <option key={e.id} value={e.id}>{e.code}</option>)}
             </select>
           </label>
           <label className="field">

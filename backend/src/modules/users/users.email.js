@@ -58,4 +58,30 @@ async function sendCredentialsEmail({ to, prenom, email, password, loginUrl }) {
   });
 }
 
-module.exports = { generatePassword, sendCredentialsEmail };
+// Notifie le demandeur que sa demande d'accès a été refusée, avec le motif saisi par l'admin.
+async function sendAccessRejectedEmail({ to, prenom, note }) {
+  const motif = (note || '').trim();
+  const bodyHtml = `
+    <p style="margin:0 0 14px;">Bonjour ${esc(prenom)},</p>
+    <p style="margin:0 0 16px;">Votre demande d'accès à <strong>CCG Flow</strong> n'a pas pu être acceptée.</p>
+    ${motif ? `<p style="margin:0 0 16px; padding:12px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#7f1d1d;"><strong>Motif :</strong> ${esc(motif)}</p>` : ''}
+    <p style="margin:0; color:#6b7280; font-size:13px;">Pour toute question, rapprochez-vous de votre administrateur.</p>
+  `;
+  const text = [
+    `Bonjour ${prenom},`,
+    '',
+    "Votre demande d'accès à CCG Flow n'a pas pu être acceptée.",
+    motif ? `Motif : ${motif}` : '',
+    '',
+    'Pour toute question, rapprochez-vous de votre administrateur.',
+  ].filter(l => l !== '').join('\n');
+
+  return sendMail({
+    to,
+    subject: "Votre demande d'accès à CCG Flow",
+    html: renderMailTemplate({ title: "Demande d'accès refusée", bodyHtml }),
+    text,
+  });
+}
+
+module.exports = { generatePassword, sendCredentialsEmail, sendAccessRejectedEmail };
