@@ -69,8 +69,11 @@ const CONFIGS = {
       { key: 'temps_nettoyage_min', label: 'Temps de nettoyage (min)', type: 'number' },
       { key: 'cout_horaire', label: 'Coût par heure', type: 'number' },
       { key: 'oee_cible_pct', label: 'OEE cible (%)', type: 'number' },
+      { key: 'date_fabrication', label: 'Date de fabrication', type: 'date' },
+      { key: 'date_acquisition', label: "Date d'acquisition", type: 'date' },
       { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
       { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'photo', label: 'Photo', type: 'photo' },
     ],
   },
   productCategories: {

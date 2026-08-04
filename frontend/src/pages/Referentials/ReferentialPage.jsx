@@ -30,7 +30,13 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   function startEdit(item) {
     setEditingId(item.id);
     const next = {};
-    for (const f of fields) next[f.key] = item[f.key] ?? (f.type === 'multiEntity' ? [] : '');
+    for (const f of fields) {
+      if (f.type === 'multiEntity') next[f.key] = item[f.key] ?? [];
+      // Une DATE revient en ISO ("2020-01-15T00:00:00.000Z") ; on la ramène à YYYY-MM-DD, format
+      // attendu par <input type="date"> et par la colonne PG (évite tout décalage de fuseau).
+      else if (f.type === 'date') next[f.key] = item[f.key] ? String(item[f.key]).slice(0, 10) : '';
+      else next[f.key] = item[f.key] ?? '';
+    }
     setForm(next);
     // Le formulaire est en bas de page, après le tableau — sans ça, cliquer "Éditer" sur une
     // ligne du haut d'une longue liste (ex. Fournisseurs) ne montre visuellement aucun effet tant
@@ -118,7 +124,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             <tbody>
               {visibleItems.map(item => (
                 <tr key={item.id}>
-                  {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists)}</td>)}
+                  {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint)}</td>)}
                   {canEdit && (
                     <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
                       <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
@@ -141,7 +147,10 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
         <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
           <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? 'Modifier' : 'Ajouter'}</strong>
           {fields.map(f => (
-            <FieldInput key={f.key} field={f} value={form[f.key]} onChange={v => setForm({ ...form, [f.key]: v })} entities={entities} sites={sites} lists={lists} />
+            f.type === 'photo'
+              ? <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
+                  hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />
+              : <FieldInput key={f.key} field={f} value={form[f.key]} onChange={v => setForm({ ...form, [f.key]: v })} entities={entities} sites={sites} lists={lists} />
           ))}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
           <button type="submit" className="btn btn-primary">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
@@ -200,14 +209,93 @@ function filterOptions(field, items, entities, sites, lists = {}) {
   return seen.sort((a, b) => String(a).localeCompare(String(b))).map(v => ({ value: v, label: String(v) }));
 }
 
-function renderValue(field, item, entities, sites, lists = {}) {
+function renderValue(field, item, entities, sites, lists = {}, endpoint = '') {
   const value = item[field.key];
   if (field.type === 'entitySelect') return entities.find(e => e.id === value)?.nom || value;
   if (field.type === 'siteSelect') return sites.find(s => s.id === value)?.nom || value;
   if (field.type === 'fkSelect') return (lists[field.listKey] || []).find(o => o.id === value)?.nom || (value ? value : '—');
   if (field.type === 'multiEntity') return (item.entity_ids || []).map(id => entities.find(e => e.id === id)?.code).filter(Boolean).join(', ');
   if (field.type === 'checkbox') return value ? 'Oui' : 'Non';
+  // Affichage localisé JJ/MM/AAAA depuis la portion date (sans reparser en Date → pas de décalage TZ).
+  if (field.type === 'date') return value ? String(value).slice(0, 10).split('-').reverse().join('/') : '—';
+  if (field.type === 'photo') {
+    return item.has_photo
+      ? <AuthImage src={`${endpoint}/${item.id}/photo`} alt="Photo" style={{ height: 34, borderRadius: 4, border: '1px solid var(--color-border)', display: 'block' }} />
+      : <span style={{ color: 'var(--color-text-faint)' }}>—</span>;
+  }
   return value;
+}
+
+// Affiche une image protégée par authentification : <img src="/api/…"> ne porterait pas le token,
+// donc on récupère les octets en blob puis on crée une URL d'objet (révoquée au démontage).
+// `refreshKey` force un rechargement après remplacement/suppression.
+function AuthImage({ src, alt, style, refreshKey }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let objUrl;
+    let cancelled = false;
+    client.get(src, { responseType: 'blob' })
+      .then(res => { if (!cancelled) { objUrl = URL.createObjectURL(res.data); setUrl(objUrl); } })
+      .catch(() => { if (!cancelled) setUrl(null); });
+    return () => { cancelled = true; if (objUrl) URL.revokeObjectURL(objUrl); };
+  }, [src, refreshKey]);
+  if (!url) return null;
+  return <img src={url} alt={alt || ''} style={style} />;
+}
+
+// Contrôle photo (référentiel machines) : upload / remplacement / suppression via l'endpoint dédié
+// multipart. L'upload cible /:id/photo, donc n'est possible qu'en édition d'une machine existante.
+function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [key, setKey] = useState(0);
+
+  if (!editingId) {
+    return (
+      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', width: '100%' }}>
+        Photo : enregistrez d'abord la machine, puis rouvrez « Éditer » pour en ajouter une.
+      </span>
+    );
+  }
+
+  async function upload(file) {
+    if (!file) return;
+    setErr(''); setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      await client.put(`${endpoint}/${editingId}/photo`, fd);
+      setKey(k => k + 1);
+      if (onChanged) onChanged();
+    } catch (e) { setErr(e.response?.data?.error || 'Échec du téléversement.'); }
+    finally { setBusy(false); }
+  }
+
+  async function remove() {
+    setErr(''); setBusy(true);
+    try {
+      await client.delete(`${endpoint}/${editingId}/photo`);
+      setKey(k => k + 1);
+      if (onChanged) onChanged();
+    } catch (e) { setErr(e.response?.data?.error || 'Échec de la suppression.'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      {hasPhoto && (
+        <AuthImage src={`${endpoint}/${editingId}/photo`} refreshKey={key} alt="Photo machine"
+          style={{ height: 48, borderRadius: 6, border: '1px solid var(--color-border)' }} />
+      )}
+      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+        {busy ? '…' : (hasPhoto ? 'Remplacer la photo' : 'Ajouter une photo')}
+        <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
+          onChange={e => upload(e.target.files?.[0])} />
+      </label>
+      {hasPhoto && <button type="button" className="btn btn-danger btn-sm" onClick={remove} disabled={busy}>Retirer</button>}
+      {err && <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: 12 }}>{err}</span>}
+    </span>
+  );
 }
 
 export function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
