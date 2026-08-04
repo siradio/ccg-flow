@@ -33,6 +33,7 @@ function stockLinkTarget(user) {
 // absent) ; Workflow/Données de test restent réservés aux vrais super_admin.
 const PARAMS_ITEMS = [
   { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
+  { to: '/admin/stats', label: 'Statistiques', Icon: IconDashboard },
   { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
   { to: '/admin/email', label: 'Email (SMTP)', Icon: IconMail, superOnly: true },
   { to: '/admin/documents', label: 'Branding', Icon: IconImage, superOnly: true },
