@@ -13,6 +13,7 @@ app.use(express.json({ limit: '15mb' }));
 app.use('/api/auth', require('./modules/auth/auth.routes'));
 app.use('/api/access-requests', require('./modules/access-requests/access-requests.routes'));
 app.use('/api/users', require('./modules/users/users.routes'));
+app.use('/api/access-profiles', require('./modules/access-profiles/access-profiles.routes'));
 app.use('/api/entities', require('./modules/referentials/entities.routes'));
 app.use('/api/sites', require('./modules/referentials/sites.routes'));
 app.use('/api/warehouses', require('./modules/referentials/warehouses.routes'));

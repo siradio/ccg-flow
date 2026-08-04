@@ -35,6 +35,8 @@ export default function Users() {
   const [pwPanel, setPwPanel] = useState({}); // { [userId]: { password, notify } } — panneau "Mot de passe" ouvert
   const [roleForm, setRoleForm] = useState({});
   const [buForm, setBuForm] = useState({});
+  const [profiles, setProfiles] = useState([]);   // profils d'accès réutilisables
+  const [quick, setQuick] = useState({});          // { [userId]: { copyFrom, profileId, saveOpen, saveName, saveDesc } }
   const [error, setError] = useState('');
   // Chaque carte utilisateur est longue (rôles + grille module/sous-module + BU) — sans filtre,
   // retrouver un utilisateur précis dans une longue liste veut dire défiler devant tous les autres.
@@ -53,8 +55,10 @@ export default function Users() {
   });
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
+  function loadProfiles() { client.get('/access-profiles').then(res => setProfiles(res.data)); }
   useEffect(() => {
     load();
+    loadProfiles();
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/users/sub-module-catalog').then(res => setModuleCatalog(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
@@ -65,7 +69,12 @@ export default function Users() {
     setError('');
     setNotice(null);
     try {
-      const { data } = await client.post('/users', form);
+      const payload = { ...form, copyFromUserId: form.copyFromUserId ? Number(form.copyFromUserId) : undefined };
+      const { data } = await client.post('/users', payload);
+      // Application d'un profil juste après la création (option du formulaire) — additif au compte créé.
+      if (form.applyProfileId && data?.id) {
+        try { await client.post(`/access-profiles/${form.applyProfileId}/apply/${data.id}`); } catch { /* non bloquant : le compte est créé */ }
+      }
       const who = `${form.prenom} ${form.nom} (${form.email})`;
       if (form.notify && data.notification?.sent) {
         setNotice({ type: 'success', text: `Utilisateur créé. Identifiants envoyés par email à ${form.email}.` });
@@ -81,10 +90,63 @@ export default function Users() {
     } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
   }
 
+
+  // --- Attribution rapide des accès : copier depuis un autre compte, appliquer/enregistrer un profil ---
+  async function copyAccessFrom(userId) {
+    const src = quick[userId]?.copyFrom;
+    if (!src) return;
+    setError(''); setNotice(null);
+    try {
+      await client.post(`/users/${userId}/copy-access-from`, { sourceUserId: Number(src) });
+      setQuick(q => ({ ...q, [userId]: { ...q[userId], copyFrom: '' } }));
+      setNotice({ type: 'success', text: 'Accès copiés depuis le compte source.' });
+      load();
+    } catch (err) { setError(err.response?.data?.error || 'Échec de la copie des accès.'); }
+  }
+
+  async function applyProfile(userId) {
+    const pid = quick[userId]?.profileId;
+    if (!pid) return;
+    setError(''); setNotice(null);
+    try {
+      const { data } = await client.post(`/access-profiles/${pid}/apply/${userId}`);
+      const r = data.applied || {};
+      setQuick(q => ({ ...q, [userId]: { ...q[userId], profileId: '' } }));
+      setNotice({ type: 'success', text: `Profil appliqué (${r.rolesApplied || 0} rôle(s), ${r.modulesApplied || 0} module(s), ${r.busApplied || 0} BU).` });
+      load();
+    } catch (err) { setError(err.response?.data?.error || "Échec de l'application du profil."); }
+  }
+
+  async function saveAsProfile(userId) {
+    const st = quick[userId] || {};
+    const nom = (st.saveName || '').trim();
+    if (!nom) return;
+    setError(''); setNotice(null);
+    try {
+      await client.post(`/access-profiles/from-user/${userId}`, { nom, description: (st.saveDesc || '').trim() });
+      setQuick(q => ({ ...q, [userId]: { ...q[userId], saveOpen: false, saveName: '', saveDesc: '' } }));
+      setNotice({ type: 'success', text: `Profil « ${nom} » enregistré — applicable à tout utilisateur.` });
+      loadProfiles();
+    } catch (err) { setError(err.response?.data?.error || "Échec de l'enregistrement du profil."); }
+  }
+
+  async function deleteProfile(id, nom) {
+    if (!window.confirm(`Supprimer le profil « ${nom} » ? Les utilisateurs déjà configurés ne sont pas modifiés.`)) return;
+    setError(''); setNotice(null);
+    try {
+      await client.delete(`/access-profiles/${id}`);
+      loadProfiles();
+    } catch (err) { setError(err.response?.data?.error || 'Échec de la suppression du profil.'); }
+  }
+
   async function addRole(userId) {
     const rf = roleForm[userId] || {};
     if (!rf.role_code) return;
-    await client.post(`/users/${userId}/roles`, { entity_id: GLOBAL_ROLES.includes(rf.role_code) ? null : Number(rf.entity_id), role_code: rf.role_code });
+    const isGlobal = GLOBAL_ROLES.includes(rf.role_code);
+    // Rôle métier : une entité (id) OU 'all' (« Toutes les entités ») doit être choisie.
+    if (!isGlobal && !rf.entity_id) return;
+    const entity_id = isGlobal ? null : (rf.entity_id === 'all' ? 'all' : Number(rf.entity_id));
+    await client.post(`/users/${userId}/roles`, { entity_id, role_code: rf.role_code });
     setRoleForm({ ...roleForm, [userId]: {} });
     load();
   }
@@ -105,7 +167,7 @@ export default function Users() {
   async function addBusinessUnit(userId) {
     const businessUnitId = buForm[userId];
     if (!businessUnitId) return;
-    await client.post(`/users/${userId}/business-units`, { business_unit_id: Number(businessUnitId) });
+    await client.post(`/users/${userId}/business-units`, { business_unit_id: businessUnitId === 'all' ? 'all' : Number(businessUnitId) });
     setBuForm({ ...buForm, [userId]: '' });
     load();
   }
@@ -236,12 +298,49 @@ export default function Users() {
               <input type="checkbox" checked={form.notify} onChange={e => setForm({ ...form, notify: e.target.checked })} />
               Notifier par email
             </label>
+            <select value={form.copyFromUserId || ''} onChange={e => setForm({ ...form, copyFromUserId: e.target.value })} title="Reprend rôles, accès modules et BU du compte choisi">
+              <option value="">Copier les accès de… (optionnel)</option>
+              {users.filter(u => u.access_status !== 'pending').map(u => (
+                <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.email}</option>
+              ))}
+            </select>
+            {profiles.length > 0 && (
+              <select value={form.applyProfileId || ''} onChange={e => setForm({ ...form, applyProfileId: e.target.value })} title="Le profil sera appliqué juste après la création">
+                <option value="">…ou appliquer un profil</option>
+                {profiles.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+              </select>
+            )}
             <button type="submit" className="btn btn-primary">Créer</button>
           </form>
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
             Si « Notifier par email » est coché, l'utilisateur reçoit ses identifiants et un lien de connexion. Laissez le mot de passe vide pour en générer un automatiquement.
           </p>
           {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
+        </div>
+      )}
+
+      {profiles.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <strong>Profils d'accès</strong>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              Modèles réutilisables (rôles + accès modules + BU) — appliquez-les à un utilisateur en un clic ci-dessous.
+            </span>
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {profiles.map(p => {
+              const d = p.data || {};
+              const summary = `${(d.roles || []).length} rôle(s) · ${(d.subModules || []).length} module(s) · ${(d.businessUnits || []).length} BU`;
+              return (
+                <span key={p.id} className="badge" style={{ background: 'var(--color-primary-bg, var(--color-border))', color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  title={`${p.description ? p.description + ' — ' : ''}${summary}`}>
+                  <strong>{p.nom}</strong>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>({summary})</span>
+                  <button onClick={() => deleteProfile(p.id, p.nom)} className="btn-icon" aria-label="Supprimer le profil">×</button>
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -382,6 +481,49 @@ export default function Users() {
             </div>
           )}
 
+          {u.access_status !== 'pending' && (
+            <div style={{ marginTop: 12, padding: '8px 10px', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                Attribution rapide
+              </div>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="form-inline">
+                  <select value={quick[u.id]?.copyFrom || ''} onChange={e => setQuick(q => ({ ...q, [u.id]: { ...q[u.id], copyFrom: e.target.value } }))}>
+                    <option value="">Copier les accès de…</option>
+                    {users.filter(x => x.id !== u.id && x.access_status !== 'pending').map(x => (
+                      <option key={x.id} value={x.id}>{x.prenom} {x.nom} — {x.email}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => copyAccessFrom(u.id)} className="btn btn-secondary btn-sm" disabled={!quick[u.id]?.copyFrom}>Copier</button>
+                </div>
+                {profiles.length > 0 && (
+                  <div className="form-inline">
+                    <select value={quick[u.id]?.profileId || ''} onChange={e => setQuick(q => ({ ...q, [u.id]: { ...q[u.id], profileId: e.target.value } }))}>
+                      <option value="">Appliquer un profil…</option>
+                      {profiles.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                    </select>
+                    <button onClick={() => applyProfile(u.id)} className="btn btn-secondary btn-sm" disabled={!quick[u.id]?.profileId}>Appliquer</button>
+                  </div>
+                )}
+                <button onClick={() => setQuick(q => ({ ...q, [u.id]: { ...q[u.id], saveOpen: !q[u.id]?.saveOpen } }))} className="btn btn-secondary btn-sm">
+                  {quick[u.id]?.saveOpen ? 'Annuler' : 'Enregistrer comme profil'}
+                </button>
+              </div>
+              {quick[u.id]?.saveOpen && (
+                <div className="form-inline" style={{ marginTop: 8 }}>
+                  <input placeholder="Nom du profil (ex. Responsable Achat SOGUIPAL)" value={quick[u.id]?.saveName || ''}
+                    onChange={e => setQuick(q => ({ ...q, [u.id]: { ...q[u.id], saveName: e.target.value } }))} style={{ minWidth: 260 }} />
+                  <input placeholder="Description (optionnel)" value={quick[u.id]?.saveDesc || ''}
+                    onChange={e => setQuick(q => ({ ...q, [u.id]: { ...q[u.id], saveDesc: e.target.value } }))} style={{ minWidth: 200 }} />
+                  <button onClick={() => saveAsProfile(u.id)} className="btn btn-primary btn-sm" disabled={!(quick[u.id]?.saveName || '').trim()}>Enregistrer le profil</button>
+                </div>
+              )}
+              <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--color-text-faint)' }}>
+                Copier ou appliquer un profil <b>s'ajoute</b> aux accès existants (rien n'est retiré).
+              </p>
+            </div>
+          )}
+
           <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>
           <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {u.roles.map(r => (
@@ -400,6 +542,7 @@ export default function Users() {
             {roleForm[u.id]?.role_code && !GLOBAL_ROLES.includes(roleForm[u.id]?.role_code) && (
               <select value={roleForm[u.id]?.entity_id || ''} onChange={e => setRoleForm({ ...roleForm, [u.id]: { ...roleForm[u.id], entity_id: e.target.value } })}>
                 <option value="">Entité…</option>
+                <option value="all">Toutes les entités</option>
                 {entities.map(en => <option key={en.id} value={en.id}>{en.nom}</option>)}
               </select>
             )}
@@ -428,6 +571,7 @@ export default function Users() {
           <div className="form-inline" style={{ marginTop: 10 }}>
             <select value={buForm[u.id] || ''} onChange={e => setBuForm({ ...buForm, [u.id]: e.target.value })}>
               <option value="">Business Unit…</option>
+              <option value="all">Toutes les BU</option>
               {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
             </select>
             <button onClick={() => addBusinessUnit(u.id)} className="btn btn-primary btn-sm">+ Accorder la BU</button>
