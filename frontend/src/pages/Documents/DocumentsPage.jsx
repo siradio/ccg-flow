@@ -30,6 +30,8 @@ export default function DocumentsPage() {
   const [error, setError] = useState('');
   const [newCat, setNewCat] = useState('');
   const [showNewCat, setShowNewCat] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   const currentSlug = categorie || (categories[0] && categories[0].slug);
   const currentCat = categories.find(c => c.slug === currentSlug);
@@ -67,6 +69,12 @@ export default function DocumentsPage() {
     loadDocs(currentSlug);
   }
 
+  async function refreshCategories() {
+    const r = await client.get('/documents/categories');
+    setCategories(r.data);
+    return r.data;
+  }
+
   async function addCategory() {
     if (!newCat.trim()) return;
     setError('');
@@ -74,11 +82,35 @@ export default function DocumentsPage() {
       const { data } = await client.post('/documents/categories', { nom: newCat.trim() });
       setNewCat('');
       setShowNewCat(false);
-      const r = await client.get('/documents/categories');
-      setCategories(r.data);
+      await refreshCategories();
       navigate(`/documents/${data.slug}`);
     } catch (err) {
       setError(err.response?.data?.error || 'Échec de l’ajout de la catégorie.');
+    }
+  }
+
+  async function renameCategory() {
+    if (!currentCat || !renameValue.trim()) return;
+    setError('');
+    try {
+      await client.put(`/documents/categories/${currentCat.id}`, { nom: renameValue.trim() });
+      setRenaming(false);
+      await refreshCategories();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Échec du renommage.');
+    }
+  }
+
+  async function deleteCategory() {
+    if (!currentCat) return;
+    if (!window.confirm(`Supprimer la catégorie « ${currentCat.nom} » ? Les documents qu'elle contient sont conservés (ils deviennent « sans catégorie »).`)) return;
+    setError('');
+    try {
+      await client.delete(`/documents/categories/${currentCat.id}`);
+      const cats = await refreshCategories();
+      navigate(cats.length ? `/documents/${cats[0].slug}` : '/documents');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Échec de la suppression.');
     }
   }
 
@@ -117,6 +149,24 @@ export default function DocumentsPage() {
           )
         )}
       </div>
+
+      {canEdit && currentCat && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+          {renaming ? (
+            <>
+              <input value={renameValue} onChange={e => setRenameValue(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', minWidth: 200 }} />
+              <button className="btn btn-primary btn-sm" onClick={renameCategory} disabled={!renameValue.trim()}>Enregistrer</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setRenaming(false)}>Annuler</button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Catégorie « {currentCat.nom} » :</span>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setRenaming(true); setRenameValue(currentCat.nom); }}>Renommer</button>
+              <button className="btn btn-danger-ghost btn-sm" onClick={deleteCategory}>Supprimer</button>
+            </>
+          )}
+        </div>
+      )}
 
       {showForm && canAdd && (
         <section className="card">
