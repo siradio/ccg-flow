@@ -35,6 +35,18 @@ router.post('/categories', requireSubModule('documents', 'edition'), async (req,
   } catch (e) { next(e); }
 });
 
+// Renommage : on ne change QUE le nom affiché, jamais le slug (qui sert d'URL et de sous-menu),
+// pour ne pas casser les liens/onglets existants.
+router.put('/categories/:id', requireSubModule('documents', 'edition'), async (req, res, next) => {
+  try {
+    const nom = (req.body && req.body.nom || '').trim();
+    if (!nom) return res.status(400).json({ error: 'Le nom est obligatoire.' });
+    const row = await one('UPDATE document_categories SET nom = $1 WHERE id = $2 RETURNING id, nom, slug, ordre', [nom, Number(req.params.id)]);
+    if (!row) return res.status(404).json({ error: 'Catégorie introuvable.' });
+    res.json(row);
+  } catch (e) { next(e); }
+});
+
 router.delete('/categories/:id', requireSubModule('documents', 'edition'), async (req, res, next) => {
   try {
     // Les documents rattachés basculent en "sans catégorie" (ON DELETE SET NULL) plutôt que d'être
