@@ -43,6 +43,36 @@ async function getAchatsKpi() {
      LIMIT 5`
   );
 
+  // Performance par étape de validation vs SLA configuré : temps réel passé = decided_at − created_at
+  // (voir migration 034). Le respect du SLA est calculé ligne par ligne contre le SLA de la version
+  // d'étape concernée ; on n'agrège que les validations réellement décidées.
+  const slaRows = await all(
+    `SELECT ws.code, ws.nom, MIN(ws.ordre) AS ordre, MAX(ws.sla_jours)::int AS sla_jours,
+            COUNT(*)::int AS n,
+            AVG(EXTRACT(EPOCH FROM (a.decided_at - a.created_at)) / 86400.0)::float AS delai_moyen_jours,
+            COUNT(*) FILTER (
+              WHERE ws.sla_jours IS NOT NULL AND (a.decided_at - a.created_at) <= (ws.sla_jours * INTERVAL '1 day')
+            )::int AS n_dans_sla,
+            COUNT(*) FILTER (WHERE ws.sla_jours IS NOT NULL)::int AS n_avec_sla
+     FROM approvals a
+     JOIN workflow_steps ws ON ws.id = a.workflow_step_id
+     WHERE a.decided_at IS NOT NULL AND a.statut <> 'en_attente'
+       -- Exclut les validations d'avant la mise en service du SLA : leur created_at a été posé par
+       -- défaut à la date de migration (postérieure à leur decided_at), ce qui donnerait un délai
+       -- négatif. On ne mesure que les validations dont le cycle complet est postérieur.
+       AND a.decided_at >= a.created_at
+     GROUP BY ws.code, ws.nom
+     ORDER BY ordre`
+  );
+  const slaParEtape = slaRows.map(r => ({
+    code: r.code,
+    nom: r.nom,
+    sla_jours: r.sla_jours,
+    n: r.n,
+    delaiMoyenJours: r.delai_moyen_jours,
+    tauxRespectSla: r.n_avec_sla > 0 ? r.n_dans_sla / r.n_avec_sla : null,
+  }));
+
   return {
     prByStatus,
     prByEntity,
@@ -50,6 +80,7 @@ async function getAchatsKpi() {
     tauxRefus,
     delaiMoyenJours: delai.jours,
     topFournisseurs,
+    slaParEtape,
   };
 }
 
