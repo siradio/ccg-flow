@@ -67,6 +67,20 @@ const CONFIGS = {
       { key: 'statut', label: 'Statut', type: 'select', options: MISSION_STATUTS, default: 'Planifiée' },
     ],
   },
+  garages: {
+    title: 'Garages partenaires', endpoint: '/garages', subModuleKey: 'logistique.maintenance',
+    filters: ['sous_contrat', 'ville'],
+    fields: [
+      { key: 'nom', label: 'Nom', required: true },
+      { key: 'ville', label: 'Ville' },
+      { key: 'sous_contrat', label: 'Sous contrat', type: 'checkbox' },
+      { key: 'specialites', label: 'Spécialités (ex. moteur · freinage)' },
+      { key: 'efficacite_pct', label: 'Efficacité (%)', type: 'number' },
+      { key: 'telephone', label: 'Téléphone' },
+      { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+      { key: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+  },
   types: {
     title: 'Types de véhicule', endpoint: '/vehicle-types', subModuleKey: 'logistique.parc',
     fields: [

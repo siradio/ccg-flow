@@ -42,6 +42,8 @@ app.use('/api/drivers', require('./modules/logistique/drivers.routes'));
 app.use('/api/missions', require('./modules/logistique/missions.routes'));
 app.use('/api/checklists', require('./modules/logistique/checklists.routes'));
 app.use('/api/vehicle-documents', require('./modules/logistique/vehicle-documents.routes'));
+app.use('/api/garages', require('./modules/logistique/garages.routes'));
+app.use('/api/pannes', require('./modules/logistique/pannes.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
