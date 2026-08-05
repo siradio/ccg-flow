@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate, NavLink, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ReferentialPage from '../Referentials/ReferentialPage';
+import LogistiqueSubnav from './LogistiqueSubnav';
 
 // Module Logistique. Réutilise la page CRUD générique des référentiels (mêmes composants, mêmes
 // permissions par sous-module), sous une sous-navigation propre au module.
@@ -75,14 +76,6 @@ const CONFIGS = {
   },
 };
 
-// Missions a son propre sous-module ; les autres écrans dépendent du Parc.
-const NAV = [
-  ['vehicules', 'Véhicules', 'logistique.parc'],
-  ['conducteurs', 'Conducteurs', 'logistique.parc'],
-  ['missions', 'Missions', 'logistique.missions'],
-  ['types', 'Types de véhicule', 'logistique.parc'],
-];
-
 export default function LogistiqueIndex() {
   const { type } = useParams();
   const { user } = useAuth();
@@ -117,15 +110,9 @@ export default function LogistiqueIndex() {
     return <p>Cet écran du module Logistique ne vous a pas été accordé.</p>;
   }
 
-  const allowedNav = NAV.filter(([, , sub]) => hasSubModuleLevel(user, sub));
-
   return (
     <div>
-      <nav className="subnav">
-        {allowedNav.map(([key, label]) => (
-          <NavLink key={key} to={`/logistique/${key}`} className={({ isActive }) => isActive ? 'active' : undefined}>{label}</NavLink>
-        ))}
-      </nav>
+      <LogistiqueSubnav />
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
         filters={config.filters || []}

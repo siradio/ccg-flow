@@ -10,6 +10,7 @@ import CreatePage from './pages/PurchaseRequests/CreatePage';
 import DetailPage from './pages/PurchaseRequests/DetailPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import LogistiqueIndex from './pages/Logistique/LogistiqueIndex';
+import ChecklistsPage from './pages/Logistique/ChecklistsPage';
 import LiensPage from './pages/Liens/LiensPage';
 import Users from './pages/Admin/Users';
 import Statistiques from './pages/Admin/Statistiques';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
+        <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/:type" element={<LogistiqueIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
         <Route path="admin/stats" element={<RequireAdmin level="user"><Statistiques /></RequireAdmin>} />
