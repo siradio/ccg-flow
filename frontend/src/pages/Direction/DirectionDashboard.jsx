@@ -110,10 +110,13 @@ export default function DirectionDashboard() {
   const [gran, setGran] = useState({ stock: 'semaine', production: 'semaine', rh: 'mois' });
   const [customRange, setCustomRange] = useState({ stock: { from: '', to: today() }, production: { from: '', to: today() }, rh: { from: '', to: today() } });
   const [series, setSeries] = useState({});
+  const [bus, setBus] = useState([]);
+  const [buFilter, setBuFilter] = useState({ stock: '', production: '' });
 
   useEffect(() => {
     if (!canView) return;
     client.get('/direction/dashboard').then(r => setD(r.data)).catch(() => setErr(true));
+    client.get('/business-units').then(r => setBus(r.data)).catch(() => {});
   }, [canView]);
 
   function periodParams(rub) {
@@ -127,10 +130,11 @@ export default function DirectionDashboard() {
     if (!canView || !['stock', 'production', 'rh'].includes(activeTab)) return;
     const p = periodParams(activeTab);
     if (!p.from) return;
-    client.get(`/direction/evolution?rubrique=${activeTab}&granularity=${p.granularity}&date_from=${p.from}&date_to=${p.to}`)
+    const bu = buFilter[activeTab];
+    client.get(`/direction/evolution?rubrique=${activeTab}&granularity=${p.granularity}&date_from=${p.from}&date_to=${p.to}${bu ? `&business_unit_id=${bu}` : ''}`)
       .then(r => setSeries(s => ({ ...s, [activeTab]: r.data }))).catch(() => {});
     // eslint-disable-next-line
-  }, [canView, activeTab, gran, customRange]);
+  }, [canView, activeTab, gran, customRange, buFilter]);
 
   function toggle(k) {
     setPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(PREF_KEY, JSON.stringify(next)); return next; });
@@ -146,12 +150,23 @@ export default function DirectionDashboard() {
   const rhEvoData = (series.rh ?? []).map(e => ({ x: fmtBucket(gran.rh, e.bucket), valeur: e.valeur }));
   const setG = (rub, v) => setGran(g => ({ ...g, [rub]: v }));
   const setR = (rub, r) => setCustomRange(c => ({ ...c, [rub]: r }));
+
+  // Filtre BU (côté client) pour les totaux et le détail ; l'évolution est refiltrée côté serveur.
+  const selStockBu = bus.find(b => String(b.id) === String(buFilter.stock))?.nom;
+  const stockParBuView = buFilter.stock ? d.stock.parBu.filter(b => b.bu_nom === selStockBu) : d.stock.parBu.filter(b => b.valeur > 0);
+  const stockValeurView = buFilter.stock ? stockParBuView.reduce((s, b) => s + Number(b.valeur), 0) : d.stock.valeurTotale;
+  const stockProduitsView = buFilter.stock ? (d.stock.produits || []).filter(r => r.bu_nom === selStockBu) : (d.stock.produits || []);
+  const selProdBu = bus.find(b => String(b.id) === String(buFilter.production))?.nom;
+  const prodParBuView = buFilter.production ? d.production.parBu.filter(b => b.bu_nom === selProdBu) : d.production.parBu;
+  const prodHierView = buFilter.production ? prodParBuView.reduce((s, b) => s + Number(b.total), 0) : d.production.hier;
+  const prodProduitsView = buFilter.production ? (d.production.produits || []).filter(r => r.bu_nom === selProdBu) : (d.production.produits || []);
+  const buOptions = <><option value="">Toutes les BU</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</>;
   const veh = d.logistique;
   const rh = d.rh || { total: 0, actifs: 0, parBu: [] };
 
   const CARDS = {
     achats: (
-      <ModuleCard key="achats" title="🧾 Achats" to="/purchase-requests" accent="#7c3aed">
+      <ModuleCard key="achats" title="🧾 Achats" accent="#7c3aed">
         <StatRow items={[
           { label: 'En cours', value: nf(d.achats.enCours), color: '#7c3aed' },
           { label: 'BC générés', value: nf(d.achats.bcGeneres), color: '#15803d' },
@@ -167,8 +182,11 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     stock: (
-      <ModuleCard key="stock" title="📦 Stock produits finis" to="/stock/releve-jour?vue=suivi" accent="#2454e0">
-        <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(d.stock.valeurTotale)} <span style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>GNF</span></div>
+      <ModuleCard key="stock" title="📦 Stock produits finis" accent="#2454e0">
+        <div style={{ marginBottom: 8 }}>
+          <select value={buFilter.stock} onChange={e => setBuFilter(f => ({ ...f, stock: e.target.value }))}>{buOptions}</select>
+        </div>
+        <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(stockValeurView)} <span style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>GNF</span></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}>
           {pill(`${d.stock.rupture} rupture`, true, 'var(--status-red-bg,#fee2e2)', 'var(--status-red-fg,#b91c1c)')}
           {pill(`${d.stock.alerte} sous seuil`, true, 'var(--status-amber-bg,#fef3c7)', 'var(--status-amber-fg,#b45309)')}
@@ -191,14 +209,14 @@ export default function DirectionDashboard() {
           </div>
         ) : <p className="empty-row" style={{ margin: '4px 0' }}>Peu de relevés sur les dernières semaines.</p>}
         <div style={{ marginTop: 6 }}>
-          {d.stock.parBu.filter(b => b.valeur > 0).map((b, i) => (
+          {stockParBuView.map((b, i) => (
             <div key={b.bu_nom} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
               <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: BU_COLORS[i % BU_COLORS.length], marginRight: 6 }} />{b.bu_nom}</span>
               <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{money(b.valeur)}</strong>
             </div>
           ))}
         </div>
-        {(d.stock.produits || []).length > 0 && (
+        {stockProduitsView.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — relevé du jour · théorique · écart</div>
             <div style={{ maxHeight: 190, overflowY: 'auto' }}>
@@ -207,7 +225,7 @@ export default function DirectionDashboard() {
                   <th style={{ textAlign: 'left', fontWeight: 600, padding: '2px 0' }}>Produit</th>
                   <th style={{ textAlign: 'right' }}>Relevé</th><th style={{ textAlign: 'right' }}>Théo.</th><th style={{ textAlign: 'right' }}>Écart</th>
                 </tr></thead>
-                <tbody>{d.stock.produits.map(r => (
+                <tbody>{stockProduitsView.map(r => (
                   <tr key={r.product_id}>
                     <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.releve)}</td>
@@ -222,11 +240,13 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     production: (
-      <ModuleCard key="production" title="🏭 Production (veille)" to="/production/releve?vue=suivi" accent="#0f766e">
+      <ModuleCard key="production" title="🏭 Production (veille)" accent="#0f766e">
+        <div style={{ marginBottom: 8 }}>
+          <select value={buFilter.production} onChange={e => setBuFilter(f => ({ ...f, production: e.target.value }))}>{buOptions}</select>
+        </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{nf(d.production.hier)}</div>
-          <Delta value={prodDelta} />
-          <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>vs avant-veille ({nf(d.production.avantHier)})</span>
+          <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{nf(prodHierView)}</div>
+          {!buFilter.production && <><Delta value={prodDelta} /><span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>vs avant-veille ({nf(d.production.avantHier)})</span></>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '8px 0 2px' }}>
           <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Évolution de la production</span>
@@ -245,14 +265,14 @@ export default function DirectionDashboard() {
           </div>
         ) : <p className="empty-row" style={{ margin: '10px 0 0' }}>Peu de données de production sur les dernières semaines.</p>}
         <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
-          {d.production.parBu.length ? d.production.parBu.map(b => `${b.bu_nom} : ${nf(b.total)}`).join(' · ') : 'Aucune production saisie hier.'}
+          {prodParBuView.length ? prodParBuView.map(b => `${b.bu_nom} : ${nf(b.total)}`).join(' · ') : 'Aucune production saisie hier.'}
         </div>
-        {(d.production.produits || []).length > 0 && (
+        {prodProduitsView.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — production de la veille</div>
             <div style={{ maxHeight: 170, overflowY: 'auto' }}>
               <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
-                <tbody>{d.production.produits.map((r, i) => (
+                <tbody>{prodProduitsView.map((r, i) => (
                   <tr key={i}>
                     <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.total)}</td>
@@ -274,22 +294,16 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     logistique: (
-      <ModuleCard key="logistique" title="🚚 Logistique" to="/logistique/vehicules" accent="#b45309">
-        <StatRow items={[
-          { label: 'Véhicules', value: nf(veh.veh_total) },
-          { label: 'Disponibles', value: nf(veh.veh_dispo), color: '#15803d' },
-          { label: 'En mission', value: nf(veh.veh_mission), color: '#1d4ed8' },
-          { label: 'Maintenance', value: nf(veh.veh_maint), color: '#b45309' },
-        ]} />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          {pill(`${veh.missions_actives} mission(s) en cours`, true, 'var(--color-primary-soft)', 'var(--color-primary)')}
-          {pill(`${veh.pannes_ouvertes} panne(s) ouverte(s)`, veh.pannes_ouvertes > 0, 'var(--status-amber-bg,#fef3c7)', 'var(--status-amber-fg,#b45309)')}
-          {pill(`${veh.accidents_ouverts} accident(s) en cours`, veh.accidents_ouverts > 0, 'var(--status-red-bg,#fee2e2)', 'var(--status-red-fg,#b91c1c)')}
+      <ModuleCard key="logistique" title="🚚 Logistique" accent="#94a3b8">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '26px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+          <div style={{ fontSize: 34 }}>🚧</div>
+          <div style={{ fontWeight: 700, marginTop: 6 }}>Module Logistique à venir</div>
+          <div style={{ fontSize: 12.5, marginTop: 2 }}>Les indicateurs logistique s'afficheront ici une fois le module déployé.</div>
         </div>
       </ModuleCard>
     ),
     rh: (
-      <ModuleCard key="rh" title="👥 RH — Effectif" to="/employees" accent="#0891b2">
+      <ModuleCard key="rh" title="👥 RH — Effectif" accent="#0891b2">
         <StatRow items={[
           { label: 'Actifs', value: nf(rh.actifs), color: '#0891b2' },
           { label: 'Total', value: nf(rh.total) },

@@ -160,7 +160,8 @@ router.get('/evolution', requireSubModule('direction'), async (req, res, next) =
     const visible = visibleBusinessUnitIds(req.user);
     const params = [from, to];
     let buScope = '';
-    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); buScope = `AND p.business_unit_id = ANY($${params.length})`; }
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); buScope += ` AND p.business_unit_id = $${params.length}`; }
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); buScope += ` AND p.business_unit_id = ANY($${params.length})`; }
 
     if (rub === 'stock') {
       return res.json(await all(
