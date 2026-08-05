@@ -14,6 +14,7 @@ const MODULES = [
     subModules: [
       // Nouveau module Stock (refonte — grand livre de mouvements). Voir feature/refonte-module-stock.
       { key: 'stock.tableau_bord', label: 'Tableau de bord Stock' },
+      { key: 'stock.releve_jour', label: 'Relevé du jour (produits finis)' },
       { key: 'stock.saisie', label: 'Saisie des mouvements' },
       { key: 'stock.consultation', label: 'Consultation & stock actuel' },
       { key: 'stock.inventaires', label: 'Inventaires' },

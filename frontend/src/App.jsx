@@ -36,6 +36,7 @@ import StockValorisation from './pages/Stock/StockValorisation';
 import StockTransferts from './pages/Stock/StockTransferts';
 import StockInventaires from './pages/Stock/StockInventaires';
 import StockImport from './pages/Stock/StockImport';
+import StockReleveJour from './pages/Stock/StockReleveJour';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="kpi" element={<Navigate to="/" replace />} />
         <Route path="stock/referentiels" element={<RequireModule subModule="stock.referentiels"><StockReferentiels /></RequireModule>} />
         <Route path="stock/tableau-bord" element={<RequireModule subModule="stock.tableau_bord"><StockTableauBord /></RequireModule>} />
+        <Route path="stock/releve-jour" element={<RequireModule subModule="stock.releve_jour"><StockReleveJour /></RequireModule>} />
         <Route path="stock/saisie-mouvement" element={<RequireModule subModule="stock.saisie"><MouvementForm /></RequireModule>} />
         <Route path="stock/saisie-mp" element={<RequireModule subModule="stock.saisie"><MouvementMP /></RequireModule>} />
         <Route path="stock/journal" element={<RequireModule subModule="stock.consultation"><MouvementsJournal /></RequireModule>} />
