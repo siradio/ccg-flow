@@ -76,6 +76,7 @@ router.get('/dashboard', requireSubModule('stock.releve_jour'), async (req, res,
     const date = /^\d{4}-\d{2}-\d{2}/.test(String(req.query.date || '')) ? String(req.query.date).slice(0, 10) : new Date().toISOString().slice(0, 10);
     const where = ['se.date_stock <= $1', "p.type_article IS DISTINCT FROM 'matiere_premiere'", 'p.actif = true'];
     const params = [date];
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
     const visible = visibleBusinessUnitIds(req.user);
     if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
     const rows = await all(
@@ -88,7 +89,9 @@ router.get('/dashboard', requireSubModule('stock.releve_jour'), async (req, res,
        LEFT JOIN (SELECT product_id, SUM(stock_actuel) AS qty FROM v_stock_balances GROUP BY product_id) bal ON bal.product_id = se.product_id
        WHERE ${where.join(' AND ')}
        ORDER BY se.product_id, se.date_stock DESC`, params);
-    res.json(rows.map(r => ({ ...r, ecart: Number(r.releve) - Number(r.theorique) })));
+    res.json(rows
+      .map(r => ({ ...r, ecart: Number(r.releve) - Number(r.theorique) }))
+      .sort((a, b) => (a.bu_nom || '').localeCompare(b.bu_nom || '') || (a.designation || '').localeCompare(b.designation || '')));
   } catch (e) { next(e); }
 });
 

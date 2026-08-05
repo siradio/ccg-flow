@@ -48,6 +48,7 @@ export default function StockReleveJour() {
   const [edits, setEdits] = useState({});
   const [msg, setMsg] = useState('');
   const [suiviDate, setSuiviDate] = useState(today());
+  const [suiviBu, setSuiviBu] = useState('');
   const [dash, setDash] = useState([]);
 
   useEffect(() => { if (canView) client.get('/business-units').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
@@ -61,7 +62,11 @@ export default function StockReleveJour() {
     }).catch(() => {});
   }
   useEffect(() => { if (canView && tab === 'saisie') loadGrid(); /* eslint-disable-next-line */ }, [canView, tab, buId, date]);
-  useEffect(() => { if (canView && tab === 'suivi') client.get(`/stock-releve/dashboard?date=${suiviDate}`).then(r => setDash(r.data)).catch(() => {}); }, [canView, tab, suiviDate]);
+  useEffect(() => {
+    if (!(canView && tab === 'suivi')) return;
+    const qs = `date=${suiviDate}${suiviBu ? `&business_unit_id=${suiviBu}` : ''}`;
+    client.get(`/stock-releve/dashboard?${qs}`).then(r => setDash(r.data)).catch(() => {});
+  }, [canView, tab, suiviDate, suiviBu]);
 
   const saisieExport = useMemo(() => grid.map(r => {
     const q = edits[r.product_id]?.quantite;
@@ -139,6 +144,11 @@ export default function StockReleveJour() {
         <>
           <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className="field">Situation au<input type="date" value={suiviDate} onChange={e => setSuiviDate(e.target.value)} /></label>
+            <label className="field" style={{ minWidth: 170 }}>Business Unit
+              <select value={suiviBu} onChange={e => setSuiviBu(e.target.value)}>
+                <option value="">Toutes</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+              </select>
+            </label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>Dernier relevé connu de chaque produit à cette date</div>
           </div>
           {dash.length === 0 && <p className="empty-row">Aucun relevé enregistré.</p>}
