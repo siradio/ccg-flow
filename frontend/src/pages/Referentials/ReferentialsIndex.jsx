@@ -92,16 +92,37 @@ const CONFIGS = {
   },
   products: {
     title: 'Produits', endpoint: '/products', subModuleKey: 'referentiels.products',
-    // "Catégorie" (produit fini / matière première / consommable…) tient lieu de type de produit :
-    // c'est l'axe de classification demandé, filtrable directement ici.
-    filters: ['category_id', 'business_unit_id', 'entity_ids'],
+    // Un seul référentiel gère produits finis, matières premières et consommables : la distinction
+    // se fait par « Type d'article ». Les champs propres aux matières premières n'apparaissent que
+    // lorsque ce type est « matière première » (showIf).
+    filters: ['type_article', 'category_id', 'business_unit_id', 'entity_ids'],
     fields: [
+      { key: 'type_article', label: 'Type d\'article', type: 'select', options: ['produit_fini', 'matiere_premiere', 'consommable', 'autre'], default: 'produit_fini' },
       { key: 'code', label: 'Code' },
       { key: 'designation', label: 'Désignation', required: true },
+      { key: 'code_barres', label: 'Code-barres' },
       { key: 'category_id', label: 'Catégorie', type: 'fkSelect', listKey: 'categories', required: true },
+      { key: 'sous_categorie', label: 'Sous-catégorie' },
+      { key: 'marque', label: 'Marque' },
       { key: 'business_unit_id', label: 'Business Unit', type: 'fkSelect', listKey: 'businessUnits' },
-      { key: 'unite', label: 'Unité' },
-      { key: 'seuil_alerte_stock', label: 'Seuil d\'alerte stock', type: 'number' },
+      { key: 'unite', label: 'Unité de stockage' },
+      { key: 'unite_vente', label: 'Unité de vente' },
+      // Champs spécifiques matières premières (production / consommation).
+      { key: 'unite_conso', label: 'Unité de consommation', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
+      { key: 'coef_conversion', label: 'Coefficient de conversion', type: 'number', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
+      { key: 'fournisseur_principal_id', label: 'Fournisseur principal', type: 'fkSelect', listKey: 'suppliers', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
+      // Coûts & valorisation.
+      { key: 'cout_standard', label: 'Coût standard', type: 'number' },
+      { key: 'prix_vente_ht', label: 'Prix de vente HT', type: 'number' },
+      { key: 'methode_valorisation', label: 'Méthode de valorisation', type: 'select', options: ['cmp', 'cout_standard', 'dernier_achat', 'fifo'], default: 'cmp' },
+      // Seuils & gestion.
+      { key: 'seuil_alerte_stock', label: 'Seuil d\'alerte (min)', type: 'number' },
+      { key: 'stock_securite', label: 'Stock de sécurité (critique)', type: 'number' },
+      { key: 'seuil_max', label: 'Seuil maximum (surstock)', type: 'number' },
+      { key: 'delai_reappro_jours', label: 'Délai de réappro (jours)', type: 'number' },
+      { key: 'gere_par_lot', label: 'Géré par lot', type: 'checkbox' },
+      { key: 'gere_peremption', label: 'Gère la péremption', type: 'checkbox' },
+      { key: 'duree_conservation_jours', label: 'Durée de conservation (jours)', type: 'number', showIf: { field: 'gere_peremption', equals: true } },
       { key: 'entity_ids', label: 'Entités', type: 'multiEntity' },
     ],
   },
@@ -129,12 +150,14 @@ export default function ReferentialsIndex() {
   const [sites, setSites] = useState([]);
   const [categories, setCategories] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   useEffect(() => {
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/sites').then(res => setSites(res.data));
     client.get('/product-categories').then(res => setCategories(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
+    client.get('/suppliers').then(res => setSuppliers(res.data)).catch(() => {});
   }, []);
 
   const allowedNav = NAV.filter(([key]) => hasSubModuleLevel(user, CONFIGS[key].subModuleKey));
@@ -154,7 +177,7 @@ export default function ReferentialsIndex() {
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
         filters={config.filters || []}
-        entities={entities} sites={sites} lists={{ categories, businessUnits }}
+        entities={entities} sites={sites} lists={{ categories, businessUnits, suppliers }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
       />

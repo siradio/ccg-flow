@@ -19,12 +19,13 @@ function initials(user) {
   return `${user?.prenom?.[0] || ''}${user?.nom?.[0] || ''}`.toUpperCase();
 }
 
-// Le lien "Stock" doit pointer vers un sous-module réellement accordé — un utilisateur qui n'a
-// que Mouvement Stock (sans Stock du Jour, désormais possible depuis la refonte des permissions,
-// §2.3 SPEC.md) ne doit pas atterrir sur un écran qui lui refuse l'accès.
+// Le lien "Stock" pointe vers le premier écran réellement accordé du module (refonte grand livre).
 function stockLinkTarget(user) {
-  if (isSuperAdmin(user) || hasSubModuleLevel(user, 'stock.saisie_jour')) return '/stock/saisie';
-  return '/stock/mouvements';
+  if (isSuperAdmin(user) || hasSubModuleLevel(user, 'stock.tableau_bord')) return '/stock/tableau-bord';
+  if (hasSubModuleLevel(user, 'stock.consultation')) return '/stock/etat';
+  if (hasSubModuleLevel(user, 'stock.saisie')) return '/stock/saisie-mouvement';
+  if (hasSubModuleLevel(user, 'stock.referentiels')) return '/stock/referentiels';
+  return '/stock/tableau-bord';
 }
 
 // Rangés sous un onglet "Paramètres" repliable plutôt que mélangés aux liens de nav principaux —

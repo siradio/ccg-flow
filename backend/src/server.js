@@ -33,9 +33,19 @@ app.use('/api/dashboard', require('./modules/dashboard/dashboard.routes'));
 app.use('/api/settings', require('./modules/settings/settings.routes'));
 app.use('/api/kpi', require('./modules/kpi/kpi.routes'));
 app.use('/api/liens', require('./modules/liens/liens.routes'));
-app.use('/api/stock', require('./modules/stock/stock.routes'));
+// Anciens écrans Stock (« Stock du Jour » / « Mouvement Stock ») retirés — refonte grand livre.
+// Les tables stock_entries / stock_movements sont conservées en base (données préservées), mais les
+// endpoints ne sont plus exposés. À supprimer définitivement après validation de la bascule.
 app.use('/api/prices', require('./modules/prices/prices.routes'));
-app.use('/api/stock-movements', require('./modules/stock-movements/stock-movements.routes'));
+// Refonte Stock (feature/refonte-module-stock) — nouveaux référentiels du Lot 0.
+app.use('/api/stock-movement-types', require('./modules/stock/movement-types.routes'));
+app.use('/api/stock-locations', require('./modules/stock/locations.routes'));
+app.use('/api/stock-mouvements', require('./modules/stock/movements.routes'));
+app.use('/api/stock-actuel', require('./modules/stock/current-stock.routes'));
+app.use('/api/stock-lots', require('./modules/stock/lots.routes'));
+app.use('/api/stock-transferts', require('./modules/stock/transfers.routes'));
+app.use('/api/stock-inventaires', require('./modules/stock/inventories.routes'));
+app.use('/api/stock-import', require('./modules/stock/import.routes'));
 app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
 app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/drivers', require('./modules/logistique/drivers.routes'));
@@ -78,6 +88,8 @@ async function start() {
     console.log('   Pense à lancer "npm run seed" la première fois pour peupler la base.');
     // Planificateur des alertes d'échéance des documents véhicule (vérif quotidienne).
     require('./modules/logistique/echeance-alerts').startEcheanceAlerts();
+    // Planificateur des alertes de péremption des lots (refonte Stock).
+    require('./modules/stock/peremption-alerts').startPeremptionAlerts();
   });
 }
 

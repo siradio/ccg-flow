@@ -1,27 +1,30 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 
-// Premier niveau de navigation du module Stock : deux sections indépendantes, chacune avec ses
-// propres sous-onglets (voir StockSubnav.jsx pour Stock du Jour) — Mouvement Stock (§3.9 SPEC.md)
-// est volontairement minimal pour l'instant, base posée mais pas finalisée. Chaque onglet est
-// désormais conditionné à son propre sous-module (§2.3) : les deux sont accordables
-// indépendamment depuis la refonte du système de permissions.
-const MOUVEMENT_PREFIX = '/stock/mouvements';
+// Navigation du module Stock. Refonte (grand livre) : les écrans du nouveau module d'abord, puis
+// les anciens écrans (Stock du Jour / Mouvement Stock) conservés le temps de la migration.
+const NAV = [
+  ['/stock/tableau-bord', 'Tableau de bord', 'stock.tableau_bord'],
+  ['/stock/saisie-mouvement', 'Saisie produit fini', 'stock.saisie'],
+  ['/stock/saisie-mp', 'Saisie matière première', 'stock.saisie'],
+  ['/stock/journal', 'Mouvements', 'stock.consultation'],
+  ['/stock/etat', 'Stock actuel', 'stock.consultation'],
+  ['/stock/lots', 'Lots', 'stock.consultation'],
+  ['/stock/transferts', 'Transferts', 'stock.transferts'],
+  ['/stock/inventaires', 'Inventaires', 'stock.inventaires'],
+  ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
+  ['/stock/import', 'Import', 'stock.import'],
+  ['/stock/referentiels', 'Paramétrage', 'stock.referentiels'],
+];
 
 export default function StockSectionNav() {
   const { user } = useAuth();
-  const location = useLocation();
-  const mouvementActive = location.pathname.startsWith(MOUVEMENT_PREFIX);
-  const stockDuJourActive = location.pathname.startsWith('/stock/') && !mouvementActive;
-
+  const allowed = NAV.filter(([, , sub]) => hasSubModuleLevel(user, sub));
   return (
     <nav className="subnav">
-      {hasSubModuleLevel(user, 'stock.saisie_jour') && (
-        <NavLink to="/stock/saisie" className={() => (stockDuJourActive ? 'active' : undefined)}>Stock du Jour</NavLink>
-      )}
-      {hasSubModuleLevel(user, 'stock.mouvements') && (
-        <NavLink to={MOUVEMENT_PREFIX} className={() => (mouvementActive ? 'active' : undefined)}>Mouvement Stock</NavLink>
-      )}
+      {allowed.map(([to, label]) => (
+        <NavLink key={to} to={to} end className={({ isActive }) => (isActive ? 'active' : undefined)}>{label}</NavLink>
+      ))}
     </nav>
   );
 }
