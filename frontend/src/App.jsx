@@ -40,6 +40,7 @@ import StockLots from './pages/Stock/StockLots';
 import StockValorisation from './pages/Stock/StockValorisation';
 import StockTransferts from './pages/Stock/StockTransferts';
 import StockInventaires from './pages/Stock/StockInventaires';
+import StockImport from './pages/Stock/StockImport';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="stock/valorisation" element={<RequireModule subModule="stock.valorisation"><StockValorisation /></RequireModule>} />
         <Route path="stock/transferts" element={<RequireModule subModule="stock.transferts"><StockTransferts /></RequireModule>} />
         <Route path="stock/inventaires" element={<RequireModule subModule="stock.inventaires"><StockInventaires /></RequireModule>} />
+        <Route path="stock/import" element={<RequireModule subModule="stock.import"><StockImport /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />

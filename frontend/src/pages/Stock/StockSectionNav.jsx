@@ -13,6 +13,7 @@ const NAV = [
   ['/stock/transferts', 'Transferts', 'stock.transferts'],
   ['/stock/inventaires', 'Inventaires', 'stock.inventaires'],
   ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
+  ['/stock/import', 'Import', 'stock.import'],
   ['/stock/referentiels', 'Référentiels', 'stock.referentiels'],
   // Anciens écrans — retirés en fin de refonte.
   ['/stock/saisie', 'Stock du Jour (ancien)', 'stock.saisie_jour'],
