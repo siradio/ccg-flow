@@ -37,6 +37,8 @@ app.use('/api/announcements', require('./modules/announcements/announcements.rou
 app.use('/api/stock', require('./modules/stock/stock.routes'));
 app.use('/api/prices', require('./modules/prices/prices.routes'));
 app.use('/api/stock-movements', require('./modules/stock-movements/stock-movements.routes'));
+app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
+app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

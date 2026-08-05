@@ -163,7 +163,11 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
 export function emptyForm(fields) {
   const f = {};
-  for (const field of fields) f[field.key] = field.type === 'multiEntity' ? [] : field.type === 'checkbox' ? !!field.default : '';
+  for (const field of fields) {
+    f[field.key] = field.type === 'multiEntity' ? []
+      : field.type === 'checkbox' ? !!field.default
+      : (field.default ?? ''); // honore une valeur par défaut (ex. statut = 'actif' sur un select)
+  }
   return f;
 }
 
@@ -253,7 +257,7 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
   if (!editingId) {
     return (
       <span style={{ fontSize: 12, color: 'var(--color-text-muted)', width: '100%' }}>
-        Photo : enregistrez d'abord la machine, puis rouvrez « Éditer » pour en ajouter une.
+        Photo : enregistrez d'abord la fiche, puis rouvrez « Éditer » pour en ajouter une.
       </span>
     );
   }

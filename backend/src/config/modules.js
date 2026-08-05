@@ -27,6 +27,12 @@ const MODULES = [
   },
   // Deviendra sous-modulé (Personnel / Congés & absences / Évaluation) quand ces écrans existeront
   // réellement — pas avant, pour ne pas exposer dans l'admin des cases à cocher menant à du vide.
+  {
+    key: 'logistique', label: 'Logistique',
+    subModules: [
+      { key: 'logistique.parc', label: 'Parc (véhicules)' },
+    ],
+  },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },
   { key: 'documents', label: 'Documents (manuels de procédures)', subModules: [] },
   { key: 'annonces', label: 'Infos & Événements', subModules: [] },
