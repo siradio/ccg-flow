@@ -351,10 +351,10 @@ export default function DirectionDashboard() {
           <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>⚙ Personnaliser</button>
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 20 }}>
-          <HeroStat label="Valeur du stock (GNF)" value={money(d.stock.valeurTotale)} sub={`${d.stock.nbProduits} produits suivis`} />
-          <HeroStat label="Production de la veille" value={nf(d.production.hier)} sub={<span>vs avant-veille <Delta value={prodDelta} /></span>} />
-          <HeroStat label="Achats en cours" value={nf(d.achats.enCours)} sub={`${d.achats.bcGeneres} bons de commande générés`} />
-          <HeroStat label="Effectif actif" value={nf(rh.actifs)} sub={`${rh.total} au total`} />
+          {prefs.stock && <HeroStat label="Valeur du stock (GNF)" value={money(d.stock.valeurTotale)} sub={`${d.stock.nbProduits} produits suivis`} />}
+          {prefs.production && <HeroStat label="Production de la veille" value={nf(d.production.hier)} sub={<span>vs avant-veille <Delta value={prodDelta} /></span>} />}
+          {prefs.achats && <HeroStat label="Achats en cours" value={nf(d.achats.enCours)} sub={`${d.achats.bcGeneres} bons de commande générés`} />}
+          {prefs.rh && <HeroStat label="Effectif actif" value={nf(rh.actifs)} sub={`${rh.total} au total`} />}
         </div>
       </div>
 
