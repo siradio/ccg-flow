@@ -36,6 +36,8 @@ import MouvementForm from './pages/Stock/MouvementForm';
 import MouvementMP from './pages/Stock/MouvementMP';
 import MouvementsJournal from './pages/Stock/MouvementsJournal';
 import StockActuel from './pages/Stock/StockActuel';
+import StockLots from './pages/Stock/StockLots';
+import StockValorisation from './pages/Stock/StockValorisation';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -66,6 +68,8 @@ export default function App() {
         <Route path="stock/saisie-mp" element={<RequireModule subModule="stock.saisie"><MouvementMP /></RequireModule>} />
         <Route path="stock/journal" element={<RequireModule subModule="stock.consultation"><MouvementsJournal /></RequireModule>} />
         <Route path="stock/etat" element={<RequireModule subModule="stock.consultation"><StockActuel /></RequireModule>} />
+        <Route path="stock/lots" element={<RequireModule subModule="stock.consultation"><StockLots /></RequireModule>} />
+        <Route path="stock/valorisation" element={<RequireModule subModule="stock.valorisation"><StockValorisation /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />

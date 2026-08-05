@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import LotPicker from './LotPicker';
 
 // Refonte Stock (Lot 1) — Saisie d'un mouvement de stock (produits finis). La quantité est TOUJOURS
 // positive ; le sens du type (entrée / sortie) détermine l'impact sur le solde. Un produit
@@ -20,6 +21,7 @@ export default function MouvementForm() {
   const [products, setProducts] = useState([]);
   const [locations, setLocations] = useState([]);
   const [form, setForm] = useState(empty());
+  const [lotSel, setLotSel] = useState({ lot_id: '', lot: null });
   const [msg, setMsg] = useState(null);
   const [error, setError] = useState('');
 
@@ -41,6 +43,7 @@ export default function MouvementForm() {
   const selectedProduct = buProducts.find(p => String(p.id) === String(form.product_id));
 
   function set(k, v) {
+    if (k === 'product_id' || k === 'type_id' || k === 'business_unit_id') setLotSel({ lot_id: '', lot: null });
     setForm(f => {
       const next = { ...f, [k]: v };
       if (k === 'business_unit_id') { next.product_id = ''; next.location_id = ''; }
@@ -66,9 +69,11 @@ export default function MouvementForm() {
         location_id: form.location_id ? Number(form.location_id) : null, product_id: Number(form.product_id),
         quantite: Number(form.quantite), prix_unitaire: form.prix_unitaire === '' ? null : Number(form.prix_unitaire),
         reference_document: form.reference_document, numero_bon: form.numero_bon, commentaire: form.commentaire,
+        lot_id: lotSel.lot_id || null, lot: lotSel.lot || null,
       });
       setMsg({ reference: data.reference });
       setForm(f => ({ ...empty(), business_unit_id: f.business_unit_id, location_id: f.location_id, type_id: f.type_id }));
+      setLotSel({ lot_id: '', lot: null });
     } catch (err) { setError(err.response?.data?.error || 'Erreur à l\'enregistrement.'); }
   }
 
@@ -121,6 +126,7 @@ export default function MouvementForm() {
                 <input type="number" min="0" step="0.01" value={form.prix_unitaire} onChange={e => set('prix_unitaire', e.target.value)} placeholder="optionnel" />
               </label>
             </div>
+            <LotPicker product={selectedProduct} sens={selectedType?.sens} locationId={form.location_id} value={lotSel} onChange={setLotSel} />
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <label className="field" style={{ flex: 1, minWidth: 150 }}>Référence document
                 <input value={form.reference_document} onChange={e => set('reference_document', e.target.value)} placeholder="BR, BS, facture…" />

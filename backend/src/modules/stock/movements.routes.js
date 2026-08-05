@@ -68,7 +68,7 @@ router.post('/', requireCreate, async (req, res, next) => {
     if (!buId) return res.status(400).json({ error: 'Business Unit requise.' });
     if (!canWriteBusinessUnit(req.user, buId)) return res.status(403).json({ error: "Vous n'avez pas l'accès en écriture sur cette Business Unit." });
     const lines = Array.isArray(b.lines) && b.lines.length ? b.lines
-      : (b.product_id ? [{ product_id: b.product_id, quantite: b.quantite, prix_unitaire: b.prix_unitaire }] : []);
+      : (b.product_id ? [{ product_id: b.product_id, quantite: b.quantite, prix_unitaire: b.prix_unitaire, lot_id: b.lot_id, lot: b.lot }] : []);
     if (!lines.length) return res.status(400).json({ error: 'Au moins une ligne (produit + quantité) est requise.' });
     for (const l of lines) {
       if (!l.product_id) return res.status(400).json({ error: 'Produit requis sur chaque ligne.' });
@@ -86,12 +86,40 @@ router.post('/', requireCreate, async (req, res, next) => {
          b.ordre_fabrication || null, b.ligne_production || null, num(b.produit_fini_id),
          b.lot_fournisseur || null, b.statut_qualite || null, req.user.id]);
       await tx.run(`UPDATE stock_ledger SET reference = $1 WHERE id = $2`, [`MV-${String(m.id).padStart(5, '0')}`, m.id]);
+      const type = await tx.one('SELECT sens FROM stock_movement_types WHERE id = $1', [Number(b.type_id)]);
       for (const l of lines) {
+        const pid = Number(l.product_id);
+        const qty = Number(l.quantite);
         const pu = num(l.prix_unitaire);
-        const val = pu != null ? Number(l.quantite) * pu : null;
+        const val = pu != null ? qty * pu : null;
+        // Lot : soit un lot existant (sortie FEFO), soit un nouveau lot à créer (réception).
+        let lotId = num(l.lot_id);
+        if (!lotId && l.lot && l.lot.numero_lot) {
+          const nl = await tx.one(
+            `INSERT INTO stock_lots (product_id, numero_lot, date_fabrication, date_peremption, date_reception,
+               quantite_initiale, location_id, created_by)
+             VALUES ($1,$2,$3,$4,COALESCE($5,CURRENT_DATE),$6,$7,$8) RETURNING id`,
+            [pid, l.lot.numero_lot, l.lot.date_fabrication || null, l.lot.date_peremption || null,
+             l.lot.date_reception || null, qty, num(b.location_id), req.user.id]);
+          lotId = nl.id;
+        }
+        // Valorisation CMP : mise à jour du coût moyen pondéré à chaque entrée valorisée (calcul
+        // AVANT insertion de la ligne pour utiliser le stock antérieur).
+        if (type && type.sens === 'entree' && pu != null) {
+          const oldQtyRow = await tx.one(
+            `SELECT COALESCE(SUM(CASE t.sens WHEN 'entree' THEN ml.quantite WHEN 'sortie' THEN -ml.quantite ELSE 0 END),0) AS qty
+             FROM stock_ledger_lines ml JOIN stock_ledger mm ON mm.id = ml.movement_id
+             JOIN stock_movement_types t ON t.id = mm.type_id
+             WHERE ml.product_id = $1 AND mm.statut = 'valide'`, [pid]);
+          const oldQty = Number(oldQtyRow.qty);
+          const prow = await tx.one('SELECT cout_moyen_pondere, cout_standard FROM products WHERE id = $1', [pid]);
+          const oldCMP = Number(prow.cout_moyen_pondere ?? prow.cout_standard ?? pu);
+          const newCMP = oldQty > 0 ? (oldQty * oldCMP + qty * pu) / (oldQty + qty) : pu;
+          await tx.run('UPDATE products SET cout_moyen_pondere = $1 WHERE id = $2', [newCMP, pid]);
+        }
         await tx.run(
-          `INSERT INTO stock_ledger_lines (movement_id, product_id, quantite, prix_unitaire, valeur)
-           VALUES ($1,$2,$3,$4,$5)`, [m.id, Number(l.product_id), Number(l.quantite), pu, val]);
+          `INSERT INTO stock_ledger_lines (movement_id, product_id, quantite, lot_id, prix_unitaire, valeur)
+           VALUES ($1,$2,$3,$4,$5,$6)`, [m.id, pid, qty, lotId, pu, val]);
       }
       return m.id;
     });

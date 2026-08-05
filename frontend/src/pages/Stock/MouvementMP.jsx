@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import LotPicker from './LotPicker';
 
 // Refonte Stock (Lot 4) — Saisie d'un mouvement de MATIÈRE PREMIÈRE. Même moteur (grand livre) que
 // les produits finis, avec en plus le rattachement production : ordre de fabrication, ligne/atelier,
@@ -25,6 +26,7 @@ export default function MouvementMP() {
   const [products, setProducts] = useState([]);
   const [locations, setLocations] = useState([]);
   const [form, setForm] = useState(empty());
+  const [lotSel, setLotSel] = useState({ lot_id: '', lot: null });
   const [msg, setMsg] = useState(null);
   const [error, setError] = useState('');
 
@@ -43,6 +45,7 @@ export default function MouvementMP() {
   const selectedProduct = mpProducts.find(p => String(p.id) === String(form.product_id));
 
   function set(k, v) {
+    if (k === 'product_id' || k === 'type_id' || k === 'business_unit_id') setLotSel({ lot_id: '', lot: null });
     setForm(f => {
       const next = { ...f, [k]: v };
       if (k === 'business_unit_id') { next.product_id = ''; next.location_id = ''; next.produit_fini_id = ''; }
@@ -71,9 +74,11 @@ export default function MouvementMP() {
         ordre_fabrication: form.ordre_fabrication, ligne_production: form.ligne_production,
         produit_fini_id: form.produit_fini_id ? Number(form.produit_fini_id) : null,
         lot_fournisseur: form.lot_fournisseur, statut_qualite: form.statut_qualite, commentaire: form.commentaire,
+        lot_id: lotSel.lot_id || null, lot: lotSel.lot || null,
       });
       setMsg({ reference: data.reference });
       setForm(f => ({ ...empty(), business_unit_id: f.business_unit_id, location_id: f.location_id, type_id: f.type_id }));
+      setLotSel({ lot_id: '', lot: null });
     } catch (err) { setError(err.response?.data?.error || 'Erreur à l\'enregistrement.'); }
   }
 
@@ -133,6 +138,7 @@ export default function MouvementMP() {
                 <input value={form.lot_fournisseur} onChange={e => set('lot_fournisseur', e.target.value)} placeholder="optionnel" />
               </label>
             </div>
+            <LotPicker product={selectedProduct} sens={selectedType?.sens} locationId={form.location_id} value={lotSel} onChange={setLotSel} />
 
             <fieldset style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '10px 14px', margin: '4px 0' }}>
               <legend style={{ fontSize: 13, fontWeight: 600, padding: '0 6px' }}>Rattachement production (optionnel)</legend>

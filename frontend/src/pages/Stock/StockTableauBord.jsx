@@ -24,11 +24,13 @@ export default function StockTableauBord() {
   const canView = hasSubModuleLevel(user, 'stock.tableau_bord');
   const [stock, setStock] = useState([]);
   const [mvts, setMvts] = useState([]);
+  const [echeances, setEcheances] = useState([]);
 
   useEffect(() => {
     if (!canView) return;
     client.get('/stock-actuel').then(r => setStock(r.data)).catch(() => {});
     client.get('/stock-mouvements').then(r => setMvts(r.data.slice(0, 8))).catch(() => {});
+    client.get('/stock-lots/echeances?jours=30').then(r => setEcheances(r.data)).catch(() => {});
   }, [canView]);
 
   const kpi = useMemo(() => {
@@ -60,6 +62,7 @@ export default function StockTableauBord() {
         <Kpi label="En alerte" value={fmt(kpi.alerte)} color={STATUT_STYLE.Alerte} />
         <Kpi label="En rupture" value={fmt(kpi.rupture)} color={STATUT_STYLE.Rupture} />
         <Kpi label="En surstock" value={fmt(kpi.surstock)} color={STATUT_STYLE.Surstock} />
+        <Kpi label="Proches péremption (30j)" value={fmt(echeances.length)} color={echeances.length ? STATUT_STYLE.Alerte : undefined} />
       </div>
 
       {stock.length === 0 && <p className="empty-row">Aucune donnée de stock — enregistrez des mouvements pour alimenter le tableau de bord.</p>}
@@ -91,6 +94,20 @@ export default function StockTableauBord() {
                 <tr key={`${r.product_id}-${r.location_id}`}><td>{r.designation}</td>
                   <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(r.stock_actuel)}</td>
                   <td><span style={{ color: STATUT_STYLE[r.statut], fontWeight: 700 }}>{r.statut}</span></td></tr>
+              ))}</tbody>
+            </table></div>
+          )}
+        </section>
+
+        <section className="card">
+          <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>Proches de la péremption (30 j)</h2>
+          {echeances.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>Aucun lot proche de la péremption.</p> : (
+            <div className="table-wrap"><table>
+              <thead><tr><th>Produit</th><th>Lot</th><th className="num">Reste</th><th>Délai</th></tr></thead>
+              <tbody>{echeances.slice(0, 10).map(l => (
+                <tr key={l.id}><td>{l.designation}</td><td>{l.numero_lot}</td>
+                  <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(l.quantite_restante)}</td>
+                  <td style={{ color: Number(l.jours_avant_peremption) < 0 ? '#b91c1c' : '#b45309', fontWeight: 600 }}>{Number(l.jours_avant_peremption) < 0 ? `Périmé ${-l.jours_avant_peremption}j` : `${l.jours_avant_peremption}j`}</td></tr>
               ))}</tbody>
             </table></div>
           )}

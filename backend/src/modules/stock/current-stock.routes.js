@@ -33,8 +33,13 @@ router.get('/', requireSubModule('stock.consultation'), async (req, res, next) =
               COALESCE(b.total_entrees, 0) AS total_entrees,
               COALESCE(b.total_sorties, 0) AS total_sorties,
               COALESCE(b.valeur_flux, 0)   AS valeur_flux,
-              p.seuil_alerte_stock, p.stock_securite, p.seuil_max,
-              COALESCE(p.cout_standard, p.cout_moyen_pondere, p.prix_suggere_gnf) AS cout_unitaire
+              p.seuil_alerte_stock, p.stock_securite, p.seuil_max, p.methode_valorisation,
+              COALESCE(
+                CASE p.methode_valorisation
+                  WHEN 'cmp' THEN p.cout_moyen_pondere
+                  WHEN 'cout_standard' THEN p.cout_standard
+                  ELSE NULL END,
+                p.cout_moyen_pondere, p.cout_standard, p.prix_suggere_gnf) AS cout_unitaire
        FROM v_stock_balances b
        JOIN products p ON p.id = b.product_id
        LEFT JOIN business_units bu ON bu.id = p.business_unit_id

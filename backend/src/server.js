@@ -41,6 +41,7 @@ app.use('/api/stock-movement-types', require('./modules/stock/movement-types.rou
 app.use('/api/stock-locations', require('./modules/stock/locations.routes'));
 app.use('/api/stock-mouvements', require('./modules/stock/movements.routes'));
 app.use('/api/stock-actuel', require('./modules/stock/current-stock.routes'));
+app.use('/api/stock-lots', require('./modules/stock/lots.routes'));
 app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
 app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/drivers', require('./modules/logistique/drivers.routes'));
@@ -83,6 +84,8 @@ async function start() {
     console.log('   Pense à lancer "npm run seed" la première fois pour peupler la base.');
     // Planificateur des alertes d'échéance des documents véhicule (vérif quotidienne).
     require('./modules/logistique/echeance-alerts').startEcheanceAlerts();
+    // Planificateur des alertes de péremption des lots (refonte Stock).
+    require('./modules/stock/peremption-alerts').startPeremptionAlerts();
   });
 }
 

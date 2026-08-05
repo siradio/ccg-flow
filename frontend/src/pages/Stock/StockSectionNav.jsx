@@ -9,6 +9,8 @@ const NAV = [
   ['/stock/saisie-mp', 'Saisie matière première', 'stock.saisie'],
   ['/stock/journal', 'Mouvements', 'stock.consultation'],
   ['/stock/etat', 'Stock actuel', 'stock.consultation'],
+  ['/stock/lots', 'Lots', 'stock.consultation'],
+  ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
   ['/stock/referentiels', 'Référentiels', 'stock.referentiels'],
   // Anciens écrans — retirés en fin de refonte.
   ['/stock/saisie', 'Stock du Jour (ancien)', 'stock.saisie_jour'],
