@@ -7,7 +7,7 @@ import LogistiqueSubnav from './LogistiqueSubnav';
 
 // Module Logistique. Réutilise la page CRUD générique des référentiels (mêmes composants, mêmes
 // permissions par sous-module), sous une sous-navigation propre au module.
-const STATUTS = ['actif', 'immobilise', 'reforme'];
+const STATUTS = ['Disponible', 'En mission', 'Maintenance', 'Immobilisé', 'Réformé'];
 const MISSION_STATUTS = ['Planifiée', 'En cours', 'Terminée', 'Annulée'];
 const fullName = e => `${e.prenom || ''} ${e.nom || ''}`.trim();
 
@@ -23,7 +23,7 @@ const CONFIGS = {
       { key: 'annee', label: 'Année', type: 'number' },
       { key: 'entity_id', label: 'Entité (facultatif)', type: 'fkSelect', listKey: 'entities' },
       { key: 'site_id', label: 'Site', type: 'fkSelect', listKey: 'sites' },
-      { key: 'statut', label: 'Statut', type: 'select', options: STATUTS, default: 'actif' },
+      { key: 'statut', label: 'Statut', type: 'select', options: STATUTS, default: 'Disponible' },
       { key: 'compteur_km', label: 'Compteur (km)', type: 'number' },
       { key: 'date_mise_circulation', label: 'Mise en circulation', type: 'date' },
       { key: 'date_acquisition', label: "Date d'acquisition", type: 'date' },
