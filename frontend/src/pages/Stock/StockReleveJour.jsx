@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
@@ -50,6 +51,11 @@ export default function StockReleveJour() {
   const [suiviDate, setSuiviDate] = useState(today());
   const [suiviBu, setSuiviBu] = useState('');
   const [dash, setDash] = useState([]);
+  // Évolution : granularité (semaine/mois/perso), produit (vide = total BU), plage perso.
+  const [evoGran, setEvoGran] = useState('semaine');
+  const [evoProduct, setEvoProduct] = useState('');
+  const [evoRange, setEvoRange] = useState({ from: '', to: today() });
+  const [evo, setEvo] = useState([]);
 
   useEffect(() => { if (canView) client.get('/business-units').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
 
@@ -68,10 +74,32 @@ export default function StockReleveJour() {
     client.get(`/stock-releve/dashboard?${qs}`).then(r => setDash(r.data)).catch(() => {});
   }, [canView, tab, suiviDate, suiviBu]);
 
+  function evoParams() {
+    const t = today();
+    if (evoGran === 'mois') { const d = new Date(); d.setMonth(d.getMonth() - 11); return { granularity: 'mois', from: d.toISOString().slice(0, 10), to: t }; }
+    if (evoGran === 'personnalise') { return { granularity: 'jour', from: evoRange.from, to: evoRange.to || t }; }
+    const d = new Date(); d.setDate(d.getDate() - 83); return { granularity: 'semaine', from: d.toISOString().slice(0, 10), to: t };
+  }
+  useEffect(() => {
+    if (!(canView && tab === 'suivi')) return;
+    const p = evoParams();
+    if (!p.from) { setEvo([]); return; }
+    const qs = `granularity=${p.granularity}&date_from=${p.from}&date_to=${p.to}${suiviBu ? `&business_unit_id=${suiviBu}` : ''}${evoProduct ? `&product_id=${evoProduct}` : ''}`;
+    client.get(`/stock-releve/evolution?${qs}`).then(r => setEvo(r.data)).catch(() => setEvo([]));
+    // eslint-disable-next-line
+  }, [canView, tab, evoGran, evoProduct, suiviBu, evoRange]);
+
   const saisieExport = useMemo(() => grid.map(r => {
     const q = edits[r.product_id]?.quantite;
     return { ...r, releve: q === '' || q == null ? '' : Number(q), ecart: q === '' || q == null ? '' : Number(q) - Number(r.theorique) };
   }), [grid, edits]);
+
+  const fmtBucket = b => {
+    const s = String(b).slice(0, 10);
+    if (evoGran === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
+    return s.split('-').slice(1).reverse().join('/');
+  };
+  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur }));
 
   if (!canView) return <div><StockSectionNav /><p>Le relevé du jour ne vous a pas été accordé.</p></div>;
 
@@ -151,6 +179,42 @@ export default function StockReleveJour() {
             </label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>Dernier relevé connu de chaque produit à cette date</div>
           </div>
+          <section className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 16 }}>Évolution du stock</h2>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select value={evoProduct} onChange={e => setEvoProduct(e.target.value)} style={{ minWidth: 160 }}>
+                  <option value="">Total de la BU</option>
+                  {dash.map(r => <option key={r.product_id} value={r.product_id}>{r.code ? r.code + ' — ' : ''}{r.designation}</option>)}
+                </select>
+                <select value={evoGran} onChange={e => setEvoGran(e.target.value)}>
+                  <option value="semaine">Par semaine (12 sem.)</option>
+                  <option value="mois">Par mois (12 mois)</option>
+                  <option value="personnalise">Personnalisé</option>
+                </select>
+                {evoGran === 'personnalise' && (
+                  <>
+                    <input type="date" value={evoRange.from} onChange={e => setEvoRange(r => ({ ...r, from: e.target.value }))} />
+                    <input type="date" value={evoRange.to} onChange={e => setEvoRange(r => ({ ...r, to: e.target.value }))} />
+                  </>
+                )}
+              </div>
+            </div>
+            {evoData.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>Pas de relevé sur la période choisie.</p> : (
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer>
+                  <LineChart data={evoData} margin={{ top: 6, right: 12, bottom: 6, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="x" fontSize={11} />
+                    <YAxis fontSize={11} width={64} tickFormatter={fmt} />
+                    <Tooltip formatter={v => fmt(v)} />
+                    <Line type="monotone" dataKey="valeur" stroke="var(--color-primary, #2454e0)" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </section>
+
           {dash.length === 0 && <p className="empty-row">Aucun relevé enregistré.</p>}
           {dash.length > 0 && (
             <div className="card" style={{ padding: 0 }}>

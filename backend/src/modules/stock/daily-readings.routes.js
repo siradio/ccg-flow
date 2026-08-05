@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(requireAuth);
 const { create: requireCreate } = requireSubModuleWrite('stock.releve_jour');
 const num = v => (v === '' || v === null || v === undefined ? null : Number(v));
+const isDate = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
 
 // Grille d'un jour pour une BU : tous les produits finis + relevé saisi + théorique + écart.
 router.get('/grid', requireSubModule('stock.releve_jour'), async (req, res, next) => {
@@ -67,6 +68,33 @@ router.get('/series', requireSubModule('stock.releve_jour'), async (req, res, ne
     res.json(await all(
       `SELECT date_stock, quantite FROM stock_entries WHERE product_id = $1 ORDER BY date_stock ASC LIMIT 180`,
       [Number(req.query.product_id)]));
+  } catch (e) { next(e); }
+});
+
+// Évolution agrégée par période (jour/semaine/mois) : chaque point = dernier relevé de la période
+// (le stock est un niveau). product_id optionnel → total de la BU (somme des derniers relevés par
+// produit et par bucket). Sert au graphique d'évolution du Suivi Direction.
+router.get('/evolution', requireSubModule('stock.releve_jour'), async (req, res, next) => {
+  try {
+    const unit = ({ jour: 'day', semaine: 'week', mois: 'month' })[req.query.granularity] || 'week';
+    const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : null;
+    if (!from) return res.status(400).json({ error: 'date_from requis.' });
+    const where = ['se.date_stock BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'", 'p.actif = true'];
+    const params = [from, to];
+    if (req.query.product_id) { params.push(Number(req.query.product_id)); where.push(`se.product_id = $${params.length}`); }
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
+    res.json(await all(
+      `WITH lpb AS (
+         SELECT DISTINCT ON (se.product_id, date_trunc('${unit}', se.date_stock))
+                se.product_id, date_trunc('${unit}', se.date_stock) AS bucket, se.quantite
+         FROM stock_entries se JOIN products p ON p.id = se.product_id
+         WHERE ${where.join(' AND ')}
+         ORDER BY se.product_id, date_trunc('${unit}', se.date_stock), se.date_stock DESC
+       )
+       SELECT bucket, SUM(quantite)::float AS valeur FROM lpb GROUP BY bucket ORDER BY bucket`, params));
   } catch (e) { next(e); }
 });
 
