@@ -7,7 +7,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconFile, IconImage, IconTruck, IconLink,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -45,20 +45,11 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
-  const [docsOpen, setDocsOpen] = useState(location.pathname.startsWith('/documents'));
-  const [docCategories, setDocCategories] = useState([]);
   const [liensOpen, setLiensOpen] = useState(location.pathname.startsWith('/liens'));
   const [liensCategories, setLiensCategories] = useState([]);
   // Tiroir de navigation mobile : masqué par défaut, ouvert par le bouton hamburger de la topbar.
   const [navOpen, setNavOpen] = useState(false);
   const closeNav = () => setNavOpen(false);
-
-  // Sous-menus du module Documents = ses catégories (pilotées par la base, extensibles).
-  const hasDocuments = hasModuleAccess(user, 'documents');
-  useEffect(() => {
-    if (!hasDocuments) return;
-    client.get('/documents/categories').then(r => setDocCategories(r.data)).catch(() => {});
-  }, [hasDocuments]);
 
   // Sous-menus du module « Liens utiles » = ses catégories (pilotées par la base, extensibles).
   const hasLiens = hasModuleAccess(user, 'liens');
@@ -88,21 +79,6 @@ export default function Layout() {
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
           {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> Logistique</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
-          {hasDocuments && (
-            <div className="sidebar-group">
-              <button type="button" className="sidebar-group-toggle" onClick={() => setDocsOpen(o => !o)}>
-                <IconFile /> Documents
-                <span className={`sidebar-chevron${docsOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
-              </button>
-              {docsOpen && (
-                <div className="sidebar-subnav">
-                  {docCategories.map(c => (
-                    <NavLink key={c.id} to={`/documents/${c.slug}`} className={navClass} onClick={closeNav}>{c.nom}</NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           {hasLiens && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>
