@@ -26,6 +26,9 @@ export function IconImage() {
 export function IconClose() {
   return <Svg><path d="M6 6l12 12M18 6L6 18" /></Svg>;
 }
+export function IconTruck() {
+  return <Svg><rect x="1" y="6" width="13" height="10" rx="1.5" /><path d="M14 9h4l3 3v4h-7z" /><circle cx="6" cy="18" r="1.6" /><circle cx="18" cy="18" r="1.6" /></Svg>;
+}
 export function IconCart() {
   return <Svg><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3h2.6l2.6 12.2a2 2 0 0 0 2 1.6h8.1a2 2 0 0 0 2-1.6L21.5 7H6.2" /></Svg>;
 }

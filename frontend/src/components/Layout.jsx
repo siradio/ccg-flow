@@ -7,7 +7,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconFile, IconMegaphone, IconImage,
+  IconMenu, IconClose, IconFile, IconMegaphone, IconImage, IconTruck,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -77,6 +77,7 @@ export default function Layout() {
           <NavLink to="/" end className={navClass} onClick={closeNav}><IconDashboard /> Tableau de bord</NavLink>
           {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> Demandes d'achat</NavLink>}
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
+          {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> Logistique</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
           {hasDocuments && (
             <div className="sidebar-group">
