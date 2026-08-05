@@ -1,7 +1,8 @@
 const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSubModule, requireSubModuleWrite } = require('../../middleware/permissions');
+const { requireSubModule, requireSubModuleWrite, requireSuperAdmin } = require('../../middleware/permissions');
+const alerts = require('./echeance-alerts');
 
 // Documents & échéances véhicule (métadonnées + lien, pas de fichier). CRUD explicite (plutôt que la
 // factory) pour exposer l'endpoint /echeances agrégé. Rattaché au sous-module Parc.
@@ -24,6 +25,18 @@ router.get('/echeances', requireSubModule('logistique.parc'), async (req, res, n
        WHERE d.date_fin IS NOT NULL
        ORDER BY d.date_fin ASC`
     ));
+  } catch (e) { next(e); }
+});
+
+// Envoi immédiat du récap des échéances (test / relance manuelle), aux destinataires configurés
+// ou, à défaut, à l'utilisateur connecté. Réservé au super_admin (config d'alerte = niveau admin).
+router.post('/echeances/test-alert', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const { jours, emails } = await alerts.getConfig();
+    const to = emails.length ? emails : [req.user.email].filter(Boolean);
+    if (!to.length) return res.status(400).json({ error: 'Aucun destinataire (configurez des emails ou ayez une adresse sur votre compte).' });
+    const r = await alerts.sendDigestTo(to, jours || 30);
+    res.json({ ...r, to });
   } catch (e) { next(e); }
 });
 
