@@ -9,6 +9,8 @@
 // requireSubModule(...) dans permissions.js — aucun autre changement structurel nécessaire.
 const MODULES = [
   { key: 'achats', label: "Demandes d'achat", subModules: [] },
+  // Tableau de bord Direction (vue exécutive DG) — agrège stock, production, logistique, achats.
+  { key: 'direction', label: 'Direction', subModules: [] },
   {
     key: 'stock', label: 'Stock',
     subModules: [

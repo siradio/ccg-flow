@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RequireModule from './components/RequireModule';
 import RequireAdmin from './components/RequireAdmin';
 import Dashboard from './pages/Dashboard/Dashboard';
+import DirectionDashboard from './pages/Direction/DirectionDashboard';
 import ListPage from './pages/PurchaseRequests/ListPage';
 import CreatePage from './pages/PurchaseRequests/CreatePage';
 import DetailPage from './pages/PurchaseRequests/DetailPage';
@@ -48,6 +49,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
+        <Route path="direction" element={<RequireModule subModule="direction"><DirectionDashboard /></RequireModule>} />
         <Route path="purchase-requests" element={<RequireModule subModule="achats"><ListPage /></RequireModule>} />
         <Route path="purchase-requests/new" element={<RequireModule subModule="achats"><CreatePage /></RequireModule>} />
         <Route path="purchase-requests/:id" element={<RequireModule subModule="achats"><DetailPage /></RequireModule>} />
