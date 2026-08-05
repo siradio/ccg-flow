@@ -28,9 +28,11 @@ export default function PannesPage() {
 
   const [pannes, setPannes] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [garages, setGarages] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm());
   const [current, setCurrent] = useState(null); // panne ouverte (détail + photos)
+  const [repFor, setRepFor] = useState(null);    // { panneId, garage_id, cout } — envoi en réparation
   const [photoVer, setPhotoVer] = useState(0);
   const [error, setError] = useState('');
 
@@ -39,7 +41,18 @@ export default function PannesPage() {
     if (!canView) return;
     load();
     client.get('/vehicles').then(r => setVehicles(r.data)).catch(() => {});
+    client.get('/garages').then(r => setGarages(r.data)).catch(() => {});
   }, [canView]);
+
+  async function sendToReparation() {
+    if (!repFor.garage_id) { setError('Choisissez un garage.'); return; }
+    setError('');
+    try {
+      await client.post('/reparations', { panne_id: repFor.panneId, garage_id: Number(repFor.garage_id), cout: repFor.cout });
+      setRepFor(null);
+      load();
+    } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
+  }
 
   if (!canView) return <div><LogistiqueSubnav /><p>Cet écran du module Logistique ne vous a pas été accordé.</p></div>;
 
@@ -149,6 +162,7 @@ export default function PannesPage() {
                   <td>{p.n_photos > 0 ? `📷 ${p.n_photos}` : '—'}</td>
                   {canEdit && (
                     <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
+                      {p.statut === 'Déclarée' && <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} onClick={() => { setRepFor({ panneId: p.id, garage_id: '', cout: '' }); setError(''); }}>→ Réparation</button>}
                       <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => openDetail(p.id)}>Photos</button>
                       <button className="btn btn-danger btn-sm" onClick={() => removePanne(p)}>Supprimer</button>
                     </td>
@@ -159,6 +173,27 @@ export default function PannesPage() {
           </table>
         </div>
       </div>
+
+      {repFor && (
+        <section className="card" style={{ marginTop: 12 }}>
+          <strong style={{ fontSize: 15 }}>Envoyer en réparation</strong>
+          <div className="form-inline" style={{ marginTop: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="field">Garage
+              <select value={repFor.garage_id} onChange={e => setRepFor(r => ({ ...r, garage_id: e.target.value }))} required>
+                <option value="" disabled>Choisir…</option>
+                {garages.map(g => <option key={g.id} value={g.id}>{g.nom}{g.ville ? ` — ${g.ville}` : ''}{g.sous_contrat ? ' (sous contrat)' : ''}</option>)}
+              </select>
+            </label>
+            <label className="field">Coût estimé (optionnel)
+              <input type="number" value={repFor.cout} onChange={e => setRepFor(r => ({ ...r, cout: e.target.value }))} />
+            </label>
+            <button className="btn btn-primary btn-sm" onClick={sendToReparation}>Confirmer</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setRepFor(null)}>Annuler</button>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-faint)', margin: '8px 0 0' }}>Le véhicule passera automatiquement en « Maintenance ». La clôture (écran Garages) le repassera « Disponible ».</p>
+          {error && <div className="alert alert-danger" style={{ marginTop: 8 }}>{error}</div>}
+        </section>
+      )}
 
       {current && (
         <section className="card" style={{ marginTop: 12 }}>
