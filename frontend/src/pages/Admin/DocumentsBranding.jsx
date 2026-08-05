@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Branding par entité (logo d'entête, signature, cachet) appliqué aux documents générés
 // (demande de devis, bon de commande). Réservé au super_admin.
@@ -34,6 +35,7 @@ function BrandingPreview({ entityId, kind, present, reloadKey }) {
 }
 
 export default function DocumentsBranding() {
+  const confirm = useConfirm();
   const [entities, setEntities] = useState([]);
   const [flags, setFlags] = useState({}); // { [entityId]: { logo, signature, stamp } }
   const [reloadKey, setReloadKey] = useState(0);
@@ -67,7 +69,7 @@ export default function DocumentsBranding() {
   }
 
   async function remove(entityId, kind) {
-    if (!window.confirm('Supprimer cette image ?')) return;
+    if (!(await confirm('Supprimer cette image ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
     setError('');
     setBusy(`${entityId}-${kind}`);
     try {

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import client from '../../api/client';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Réservé au super_admin (lien de nav masqué pour les autres, backend gate via requireSuperAdmin) —
 // génère/efface des demandes d'achat de test via le VRAI circuit (purchase-requests.service.js),
 // jamais des lignes SQL à la main, pour ne jamais dériver des règles métier réelles. Le vidage ne
 // touche jamais aux référentiels (fournisseurs, produits, entités...) ni aux comptes utilisateurs.
 export default function TestData() {
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState(null);
@@ -26,12 +28,14 @@ export default function TestData() {
   }
 
   async function clearTestData() {
-    if (!window.confirm(
+    const ok = await confirm(
       "Vider les données de test ? Ceci supprime DÉFINITIVEMENT toutes les demandes d'achat (devis, " +
       'bons de commande, pièces jointes, historique), les saisies de stock, l\'historique des prix et ' +
       'les notifications. Les référentiels (entités, sites, produits, fournisseurs) et les comptes ' +
-      'utilisateurs ne sont PAS touchés. Cette action est irréversible.'
-    )) return;
+      'utilisateurs ne sont PAS touchés. Cette action est irréversible.',
+      { danger: true, confirmLabel: 'Vider' }
+    );
+    if (!ok) return;
     setError('');
     setResult(null);
     setClearing(true);

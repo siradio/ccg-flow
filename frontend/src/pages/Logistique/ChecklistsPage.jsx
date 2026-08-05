@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import LogistiqueSubnav from './LogistiqueSubnav';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 const TYPES = ['Départ', 'Retour', 'Hebdomadaire', 'Autre'];
 const STATUT_OPTS = [['na', '—'], ['ok', 'OK'], ['ko', 'KO']];
@@ -45,6 +46,7 @@ export default function ChecklistsPage() {
 
 // ─── Réalisations ──────────────────────────────────────────────────────────────────────────
 function RunsView({ canAdd, canEdit }) {
+  const confirm = useConfirm();
   const [runs, setRuns] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -117,7 +119,7 @@ function RunsView({ canAdd, canEdit }) {
   }
 
   async function removeRun(r) {
-    if (!window.confirm(`Supprimer cette checklist (${r.template_nom} — ${r.vehicle_immat}) ?`)) return;
+    if (!(await confirm(`Supprimer cette checklist (${r.template_nom} — ${r.vehicle_immat}) ?`, { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`/checklists/runs/${r.id}`);
     loadRuns();
   }
@@ -238,6 +240,7 @@ function RunsView({ canAdd, canEdit }) {
 
 // ─── Modèles ───────────────────────────────────────────────────────────────────────────────
 function ModelsView({ canAdd, canEdit }) {
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState([]);
   const [form, setForm] = useState(emptyModel());
   const [showForm, setShowForm] = useState(false);
@@ -270,7 +273,7 @@ function ModelsView({ canAdd, canEdit }) {
     } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
   }
   async function remove(t) {
-    if (!window.confirm(`Supprimer le modèle « ${t.nom} » ?`)) return;
+    if (!(await confirm(`Supprimer le modèle « ${t.nom} » ?`, { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`/checklists/templates/${t.id}`);
     load();
   }

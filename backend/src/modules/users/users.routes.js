@@ -223,6 +223,16 @@ router.get('/sub-module-catalog', requireAuth, requireUserAdmin, (req, res) => {
   res.json(MODULES);
 });
 
+// Doit rester déclaré après les routes GET à segment fixe ci-dessus (ex. /sub-module-catalog),
+// sinon ':id' les intercepterait — Express matche dans l'ordre de déclaration.
+router.get('/:id', requireAuth, requireUserAdmin, async (req, res, next) => {
+  try {
+    const user = await usersService.loadUserWithRoles(Number(req.params.id));
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    res.json(user);
+  } catch (e) { next(e); }
+});
+
 // Upsert : une seule ligne par (user, sous-module), le niveau est fourni dès l'octroi — plus
 // d'état intermédiaire "accordé mais niveau par défaut" (voir SPEC.md §2.3).
 router.put('/:id/sub-modules/:key', requireAuth, requireUserAdmin, async (req, res, next) => {

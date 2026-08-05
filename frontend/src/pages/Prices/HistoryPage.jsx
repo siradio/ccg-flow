@@ -5,6 +5,7 @@ import PricesSubnav from './PricesSubnav';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 const DEVISES = ['GNF', 'USD', 'EUR'];
 
@@ -13,6 +14,7 @@ function today() {
 }
 
 export default function HistoryPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const canAdd = hasSubModuleLevel(user, 'referentiels.prix', 'ajout');
   const canEdit = hasSubModuleLevel(user, 'referentiels.prix', 'edition');
@@ -129,7 +131,7 @@ export default function HistoryPage() {
   }
 
   async function deleteEntry(id) {
-    if (!window.confirm('Supprimer cette entrée de prix ?')) return;
+    if (!(await confirm('Supprimer cette entrée de prix ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`/prices/${id}`);
     load();
   }

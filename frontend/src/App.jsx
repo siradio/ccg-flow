@@ -17,7 +17,8 @@ import LogistiqueGarages from './pages/Logistique/LogistiqueGarages';
 import AccidentsPage from './pages/Logistique/AccidentsPage';
 import CartographiePage from './pages/Logistique/CartographiePage';
 import LiensPage from './pages/Liens/LiensPage';
-import Users from './pages/Admin/Users';
+import UsersListPage from './pages/Admin/Users/ListPage';
+import UsersDetailPage from './pages/Admin/Users/DetailPage';
 import Statistiques from './pages/Admin/Statistiques';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import EmailSettings from './pages/Admin/EmailSettings';
@@ -81,7 +82,8 @@ export default function App() {
         <Route path="logistique/accidents" element={<AccidentsPage />} />
         <Route path="logistique/cartographie" element={<CartographiePage />} />
         <Route path="logistique/:type" element={<LogistiqueIndex />} />
-        <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
+        <Route path="admin/users" element={<RequireAdmin level="user"><UsersListPage /></RequireAdmin>} />
+        <Route path="admin/users/:id" element={<RequireAdmin level="user"><UsersDetailPage /></RequireAdmin>} />
         <Route path="admin/stats" element={<RequireAdmin level="user"><Statistiques /></RequireAdmin>} />
         <Route path="admin/workflow" element={<RequireAdmin><WorkflowConfig /></RequireAdmin>} />
         <Route path="admin/email" element={<RequireAdmin><EmailSettings /></RequireAdmin>} />
