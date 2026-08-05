@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 const EMPTY_FORM = {
   matricule: '', nom: '', prenom: '', poste: '', departement: '',
@@ -13,6 +14,7 @@ export default function FormPage() {
   const { id } = useParams();
   const isNew = !id;
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
@@ -86,7 +88,7 @@ export default function FormPage() {
   }
 
   async function onDelete() {
-    if (!window.confirm('Supprimer définitivement cet employé ?')) return;
+    if (!(await confirm('Supprimer définitivement cet employé ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`/employees/${id}`);
     navigate('/employees');
   }

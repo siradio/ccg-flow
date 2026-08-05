@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import client from '../../api/client';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Éditeur simple des étapes du workflow "demande_achat" — voir SPEC.md §3.2 : le moteur lit
 // cette configuration en base, l'enchaînement des étapes n'est jamais codé en dur côté serveur.
@@ -12,6 +13,7 @@ const PROTECTED_CODES = ['expression_besoin', 'soumission', 'analyse_achat', 'de
 const ROLE_OPTIONS = ['service_achat', 'controle_gestion', 'finances', 'validateur_besoin'];
 
 export default function WorkflowConfig() {
+  const confirm = useConfirm();
   const [template, setTemplate] = useState(null);
   const [steps, setSteps] = useState([]);
   const [savedMessage, setSavedMessage] = useState('');
@@ -40,7 +42,7 @@ export default function WorkflowConfig() {
     setSavedMessage('');
   }
 
-  function deleteStep(id) {
+  async function deleteStep(id) {
     setError('');
     const target = steps.find(s => s.id === id);
     if (!target) return;
@@ -49,7 +51,8 @@ export default function WorkflowConfig() {
       setError(`Impossible de supprimer "${target.nom}" : l'étape "${orphaned.nom}" y revient en cas de refus. Change d'abord son "Retour vers".`);
       return;
     }
-    if (!window.confirm(`Supprimer l'étape "${target.nom}" ? Cette action n'est effective qu'après avoir cliqué sur Enregistrer. Si des demandes d'achat sont déjà passées par cette étape, une nouvelle version du circuit sera créée automatiquement : elles continueront sur l'ancien circuit, les nouvelles demandes utiliseront celui-ci.`)) return;
+    const ok = await confirm(`Supprimer l'étape "${target.nom}" ? Cette action n'est effective qu'après avoir cliqué sur Enregistrer. Si des demandes d'achat sont déjà passées par cette étape, une nouvelle version du circuit sera créée automatiquement : elles continueront sur l'ancien circuit, les nouvelles demandes utiliseront celui-ci.`, { danger: true, confirmLabel: 'Supprimer' });
+    if (!ok) return;
     const remaining = steps.filter(s => s.id !== id).sort((a, b) => a.ordre - b.ordre);
     setSteps(remaining.map((s, i) => ({ ...s, ordre: i + 1 })));
     setSavedMessage('');

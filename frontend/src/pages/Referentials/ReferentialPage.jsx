@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Page CRUD générique pour un référentiel "simple" (une table, champs plats + éventuels entity_ids).
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
 export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false }) {
+  const confirm = useConfirm();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields));
   const [editingId, setEditingId] = useState(null);
@@ -73,7 +75,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   }
 
   async function onDelete(id) {
-    if (!window.confirm('Supprimer cet élément ?')) return;
+    if (!(await confirm('Supprimer cet élément ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`${endpoint}/${id}`);
     load();
   }

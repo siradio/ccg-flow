@@ -357,6 +357,43 @@ tbody tr:hover .sticky-col {
 .alert-success { background: var(--color-success-bg); color: var(--color-success-fg); }
 .alert-warning { background: var(--color-warning-bg); color: var(--color-warning-fg); }
 
+/* ─── Modale de confirmation (remplace window.confirm) ──────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 14, 26, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 2000;
+}
+
+.modal-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 22px;
+  max-width: 440px;
+  width: 100%;
+}
+
+.modal-card p {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  white-space: pre-line;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ─── Badges (statuts, rôles) ──────────────────────────────────────── */
 
 .badge {

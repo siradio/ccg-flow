@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, NavLink, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Normalise l'URL saisie pour un lien cliquable : sans schéma, on préfixe https:// (sinon le
 // navigateur l'interpréterait comme un chemin relatif à l'app).
@@ -10,6 +11,7 @@ function hrefOf(url) {
 }
 
 export default function LiensPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { categorie } = useParams();
   const navigate = useNavigate();
@@ -53,7 +55,7 @@ export default function LiensPage() {
   }
 
   async function remove(l) {
-    if (!window.confirm(`Supprimer « ${l.titre} » ?`)) return;
+    if (!(await confirm(`Supprimer « ${l.titre} » ?`, { danger: true, confirmLabel: 'Supprimer' }))) return;
     await client.delete(`/liens/${l.id}`);
     loadLinks(currentSlug);
   }
@@ -92,7 +94,7 @@ export default function LiensPage() {
 
   async function deleteCategory() {
     if (!currentCat) return;
-    if (!window.confirm(`Supprimer la catégorie « ${currentCat.nom} » ? Les liens qu'elle contient sont conservés (ils deviennent « sans catégorie »).`)) return;
+    if (!(await confirm(`Supprimer la catégorie « ${currentCat.nom} » ? Les liens qu'elle contient sont conservés (ils deviennent « sans catégorie »).`, { danger: true, confirmLabel: 'Supprimer' }))) return;
     setError('');
     try {
       await client.delete(`/liens/categories/${currentCat.id}`);
