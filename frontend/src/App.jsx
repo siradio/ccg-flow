@@ -10,7 +10,6 @@ import CreatePage from './pages/PurchaseRequests/CreatePage';
 import DetailPage from './pages/PurchaseRequests/DetailPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import LogistiqueIndex from './pages/Logistique/LogistiqueIndex';
-import DocumentsPage from './pages/Documents/DocumentsPage';
 import LiensPage from './pages/Liens/LiensPage';
 import Users from './pages/Admin/Users';
 import Statistiques from './pages/Admin/Statistiques';
@@ -37,8 +36,6 @@ export default function App() {
         <Route path="purchase-requests" element={<RequireModule subModule="achats"><ListPage /></RequireModule>} />
         <Route path="purchase-requests/new" element={<RequireModule subModule="achats"><CreatePage /></RequireModule>} />
         <Route path="purchase-requests/:id" element={<RequireModule subModule="achats"><DetailPage /></RequireModule>} />
-        <Route path="documents" element={<RequireModule subModule="documents"><DocumentsPage /></RequireModule>} />
-        <Route path="documents/:categorie" element={<RequireModule subModule="documents"><DocumentsPage /></RequireModule>} />
         <Route path="liens" element={<RequireModule subModule="liens"><LiensPage /></RequireModule>} />
         <Route path="liens/:categorie" element={<RequireModule subModule="liens"><LiensPage /></RequireModule>} />
         <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
