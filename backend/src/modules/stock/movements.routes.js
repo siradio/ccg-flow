@@ -75,18 +75,20 @@ router.post('/', requireCreate, async (req, res, next) => {
       if (!(Number(l.quantite) > 0)) return res.status(400).json({ error: 'La quantité doit être strictement positive.' });
     }
     const result = await withTransaction(async (tx) => {
+      // Statut initial selon le type : 'a_valider' si le type exige une validation (sinon 'valide').
+      const type = await tx.one('SELECT sens, requiert_validation FROM stock_movement_types WHERE id = $1', [Number(b.type_id)]);
+      const statut = type.requiert_validation ? 'a_valider' : 'valide';
       const m = await tx.one(
         `INSERT INTO stock_ledger (date_mouvement, type_id, business_unit_id, location_id, statut,
             reference_document, numero_bon, fournisseur_id, commentaire,
             ordre_fabrication, ligne_production, produit_fini_id, lot_fournisseur, statut_qualite,
             created_by, validated_by)
-         VALUES (COALESCE($1, CURRENT_DATE),$2,$3,$4,'valide',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14) RETURNING *`,
-        [b.date_mouvement || null, Number(b.type_id), buId, num(b.location_id),
+         VALUES (COALESCE($1, CURRENT_DATE),$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        [b.date_mouvement || null, Number(b.type_id), buId, num(b.location_id), statut,
          b.reference_document || null, b.numero_bon || null, num(b.fournisseur_id), b.commentaire || null,
          b.ordre_fabrication || null, b.ligne_production || null, num(b.produit_fini_id),
-         b.lot_fournisseur || null, b.statut_qualite || null, req.user.id]);
+         b.lot_fournisseur || null, b.statut_qualite || null, req.user.id, statut === 'valide' ? req.user.id : null]);
       await tx.run(`UPDATE stock_ledger SET reference = $1 WHERE id = $2`, [`MV-${String(m.id).padStart(5, '0')}`, m.id]);
-      const type = await tx.one('SELECT sens FROM stock_movement_types WHERE id = $1', [Number(b.type_id)]);
       for (const l of lines) {
         const pid = Number(l.product_id);
         const qty = Number(l.quantite);
@@ -105,7 +107,7 @@ router.post('/', requireCreate, async (req, res, next) => {
         }
         // Valorisation CMP : mise à jour du coût moyen pondéré à chaque entrée valorisée (calcul
         // AVANT insertion de la ligne pour utiliser le stock antérieur).
-        if (type && type.sens === 'entree' && pu != null) {
+        if (statut === 'valide' && type.sens === 'entree' && pu != null) {
           const oldQtyRow = await tx.one(
             `SELECT COALESCE(SUM(CASE t.sens WHEN 'entree' THEN ml.quantite WHEN 'sortie' THEN -ml.quantite ELSE 0 END),0) AS qty
              FROM stock_ledger_lines ml JOIN stock_ledger mm ON mm.id = ml.movement_id
@@ -135,6 +137,28 @@ router.post('/:id/annuler', requireEdit, async (req, res, next) => {
     if (m.statut === 'annule') return res.status(400).json({ error: 'Mouvement déjà annulé.' });
     if (!canWriteBusinessUnit(req.user, m.business_unit_id)) return res.status(403).json({ error: 'Accès BU refusé.' });
     const row = await one(`UPDATE stock_ledger SET statut = 'annule' WHERE id = $1 RETURNING *`, [m.id]);
+    res.json(row);
+  } catch (e) { next(e); }
+});
+
+// Workflow : validation / refus d'un mouvement en attente ('a_valider').
+router.post('/:id/valider', requireEdit, async (req, res, next) => {
+  try {
+    const m = await one('SELECT * FROM stock_ledger WHERE id = $1', [Number(req.params.id)]);
+    if (!m) return res.status(404).json({ error: 'Mouvement introuvable.' });
+    if (m.statut !== 'a_valider') return res.status(400).json({ error: 'Ce mouvement n\'est pas en attente de validation.' });
+    if (!canWriteBusinessUnit(req.user, m.business_unit_id)) return res.status(403).json({ error: 'Accès BU refusé.' });
+    const row = await one("UPDATE stock_ledger SET statut = 'valide', validated_by = $1 WHERE id = $2 RETURNING *", [req.user.id, m.id]);
+    res.json(row);
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/refuser', requireEdit, async (req, res, next) => {
+  try {
+    const m = await one('SELECT * FROM stock_ledger WHERE id = $1', [Number(req.params.id)]);
+    if (!m) return res.status(404).json({ error: 'Mouvement introuvable.' });
+    if (m.statut !== 'a_valider') return res.status(400).json({ error: 'Ce mouvement n\'est pas en attente de validation.' });
+    const row = await one("UPDATE stock_ledger SET statut = 'refuse' WHERE id = $1 RETURNING *", [m.id]);
     res.json(row);
   } catch (e) { next(e); }
 });

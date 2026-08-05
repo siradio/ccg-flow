@@ -42,6 +42,8 @@ app.use('/api/stock-locations', require('./modules/stock/locations.routes'));
 app.use('/api/stock-mouvements', require('./modules/stock/movements.routes'));
 app.use('/api/stock-actuel', require('./modules/stock/current-stock.routes'));
 app.use('/api/stock-lots', require('./modules/stock/lots.routes'));
+app.use('/api/stock-transferts', require('./modules/stock/transfers.routes'));
+app.use('/api/stock-inventaires', require('./modules/stock/inventories.routes'));
 app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
 app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/drivers', require('./modules/logistique/drivers.routes'));

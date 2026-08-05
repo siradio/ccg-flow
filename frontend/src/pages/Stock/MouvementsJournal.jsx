@@ -39,6 +39,8 @@ export default function MouvementsJournal() {
     if (!window.confirm(`Annuler le mouvement ${m.reference} ? Il sortira du solde mais restera dans l'historique.`)) return;
     await client.post(`/stock-mouvements/${m.id}/annuler`, {}); load(); if (detail?.id === m.id) openDetail(m.id);
   }
+  async function valider(m) { await client.post(`/stock-mouvements/${m.id}/valider`, {}); load(); if (detail?.id === m.id) openDetail(m.id); }
+  async function refuser(m) { if (!window.confirm(`Refuser le mouvement ${m.reference} ?`)) return; await client.post(`/stock-mouvements/${m.id}/refuser`, {}); load(); if (detail?.id === m.id) openDetail(m.id); }
 
   return (
     <div>
@@ -59,7 +61,7 @@ export default function MouvementsJournal() {
         </label>
         <label className="field" style={{ minWidth: 120 }}>Statut
           <select value={filters.statut} onChange={e => setFilters(f => ({ ...f, statut: e.target.value }))}>
-            <option value="">Tous</option><option value="valide">Validé</option><option value="annule">Annulé</option>
+            <option value="">Tous</option><option value="a_valider">À valider</option><option value="valide">Validé</option><option value="annule">Annulé</option><option value="refuse">Refusé</option>
           </select>
         </label>
         <label className="field">Du<input type="date" value={filters.date_from} onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))} /></label>
@@ -85,6 +87,10 @@ export default function MouvementsJournal() {
                     <td><span style={{ color: STATUT_COLOR[m.statut] || '#6b7280', fontWeight: 600, textTransform: 'capitalize' }}>{m.statut}</span></td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => openDetail(m.id)}>Détail</button>
+                      {canEdit && m.statut === 'a_valider' && <>
+                        <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} onClick={() => valider(m)}>Valider</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => refuser(m)}>Refuser</button>
+                      </>}
                       {canEdit && m.statut === 'valide' && <button className="btn btn-danger btn-sm" onClick={() => annuler(m)}>Annuler</button>}
                     </td>
                   </tr>
