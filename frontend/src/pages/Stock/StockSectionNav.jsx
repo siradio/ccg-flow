@@ -12,7 +12,8 @@ export default function StockSectionNav() {
   const { user } = useAuth();
   const location = useLocation();
   const mouvementActive = location.pathname.startsWith(MOUVEMENT_PREFIX);
-  const stockDuJourActive = location.pathname.startsWith('/stock/') && !mouvementActive;
+  const referentielsActive = location.pathname.startsWith('/stock/referentiels');
+  const stockDuJourActive = location.pathname.startsWith('/stock/') && !mouvementActive && !referentielsActive;
 
   return (
     <nav className="subnav">
@@ -21,6 +22,9 @@ export default function StockSectionNav() {
       )}
       {hasSubModuleLevel(user, 'stock.mouvements') && (
         <NavLink to={MOUVEMENT_PREFIX} className={() => (mouvementActive ? 'active' : undefined)}>Mouvement Stock</NavLink>
+      )}
+      {hasSubModuleLevel(user, 'stock.referentiels') && (
+        <NavLink to="/stock/referentiels" className={() => (referentielsActive ? 'active' : undefined)}>Référentiels Stock</NavLink>
       )}
     </nav>
   );

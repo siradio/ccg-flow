@@ -25,6 +25,29 @@ async function run(text, params = []) {
   return pool.query(text, params);
 }
 
+// Exécute `cb` dans une transaction sur un client dédié (BEGIN/COMMIT, ROLLBACK sur erreur).
+// `cb` reçoit un objet { all, one, run } lié au client — à utiliser pour toute opération
+// multi-tables devant être atomique (ex. validation d'un mouvement de stock : lignes + lots + solde).
+async function withTransaction(cb) {
+  const client = await pool.connect();
+  const tx = {
+    all: async (text, params = []) => (await client.query(text, params)).rows,
+    one: async (text, params = []) => (await client.query(text, params)).rows[0] || null,
+    run: (text, params = []) => client.query(text, params),
+  };
+  try {
+    await client.query('BEGIN');
+    const result = await cb(tx);
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 // Exécute les fichiers migrations/*.sql dans l'ordre alphabétique, une seule fois chacun.
 async function runMigrations() {
   await pool.query(`
@@ -58,4 +81,4 @@ async function runMigrations() {
   }
 }
 
-module.exports = { pool, all, one, run, runMigrations };
+module.exports = { pool, all, one, run, withTransaction, runMigrations };

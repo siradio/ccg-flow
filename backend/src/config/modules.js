@@ -12,8 +12,18 @@ const MODULES = [
   {
     key: 'stock', label: 'Stock',
     subModules: [
-      { key: 'stock.saisie_jour', label: 'Stock du Jour' },
-      { key: 'stock.mouvements', label: 'Mouvement Stock' },
+      // Nouveau module Stock (refonte — grand livre de mouvements). Voir feature/refonte-module-stock.
+      { key: 'stock.tableau_bord', label: 'Tableau de bord Stock' },
+      { key: 'stock.saisie', label: 'Saisie des mouvements' },
+      { key: 'stock.consultation', label: 'Consultation & stock actuel' },
+      { key: 'stock.inventaires', label: 'Inventaires' },
+      { key: 'stock.transferts', label: 'Transferts' },
+      { key: 'stock.valorisation', label: 'Valorisation' },
+      { key: 'stock.referentiels', label: 'Référentiels Stock' },
+      { key: 'stock.import', label: 'Import des mouvements' },
+      // Anciens sous-modules — conservés le temps de la migration, retirés en fin de refonte.
+      { key: 'stock.saisie_jour', label: 'Stock du Jour (ancien)' },
+      { key: 'stock.mouvements', label: 'Mouvement Stock (ancien)' },
     ],
   },
   {

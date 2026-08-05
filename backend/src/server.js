@@ -36,6 +36,9 @@ app.use('/api/liens', require('./modules/liens/liens.routes'));
 app.use('/api/stock', require('./modules/stock/stock.routes'));
 app.use('/api/prices', require('./modules/prices/prices.routes'));
 app.use('/api/stock-movements', require('./modules/stock-movements/stock-movements.routes'));
+// Refonte Stock (feature/refonte-module-stock) — nouveaux référentiels du Lot 0.
+app.use('/api/stock-movement-types', require('./modules/stock/movement-types.routes'));
+app.use('/api/stock-locations', require('./modules/stock/locations.routes'));
 app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
 app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/drivers', require('./modules/logistique/drivers.routes'));
