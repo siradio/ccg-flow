@@ -87,4 +87,26 @@ router.get('/series', requireSubModule('production.suivi'), async (req, res, nex
   } catch (e) { next(e); }
 });
 
+// Évolution de la production par période (jour/semaine/mois) : SOMME produite par bucket (la
+// production est un flux). product_id optionnel → total de la BU. Pour le graphique d'évolution.
+router.get('/evolution', requireSubModule('production.suivi'), async (req, res, next) => {
+  try {
+    const unit = ({ jour: 'day', semaine: 'week', mois: 'month' })[req.query.granularity] || 'semaine';
+    const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : null;
+    if (!from) return res.status(400).json({ error: 'date_from requis.' });
+    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'", 'p.actif = true'];
+    const params = [from, to];
+    if (req.query.product_id) { params.push(Number(req.query.product_id)); where.push(`pe.product_id = $${params.length}`); }
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
+    res.json(await all(
+      `SELECT date_trunc('${unit}', pe.date_production) AS bucket, SUM(pe.quantite)::float AS valeur
+       FROM production_entries pe JOIN products p ON p.id = pe.product_id
+       WHERE ${where.join(' AND ')}
+       GROUP BY bucket ORDER BY bucket`, params));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { ExportButtons } from '../../utils/exportData';
@@ -46,6 +46,9 @@ export default function ProductionReleve() {
   const [msg, setMsg] = useState('');
   const [period, setPeriod] = useState({ from: monthStart(), to: today(), bu: '' });
   const [suivi, setSuivi] = useState([]);
+  const [evoGran, setEvoGran] = useState('semaine');
+  const [evoProduct, setEvoProduct] = useState('');
+  const [evo, setEvo] = useState([]);
 
   useEffect(() => { if (canView) client.get('/business-units').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
 
@@ -63,6 +66,11 @@ export default function ProductionReleve() {
     const qs = `date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}`;
     client.get(`/production/dashboard?${qs}`).then(r => setSuivi(r.data)).catch(() => {});
   }, [canSuivi, tab, period]);
+  useEffect(() => {
+    if (!canSuivi || tab !== 'suivi' || !period.from) { setEvo([]); return; }
+    const qs = `granularity=${evoGran}&date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}${evoProduct ? `&product_id=${evoProduct}` : ''}`;
+    client.get(`/production/evolution?${qs}`).then(r => setEvo(r.data)).catch(() => setEvo([]));
+  }, [canSuivi, tab, period, evoGran, evoProduct]);
 
   if (!canView) return <p>Le module Production ne vous a pas été accordé.</p>;
 
@@ -77,6 +85,12 @@ export default function ProductionReleve() {
   const totalJour = Object.values(edits).reduce((s, v) => s + (Number(v.quantite) || 0), 0);
   const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '' }));
   const totalPeriode = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
+  const fmtBucket = b => {
+    const s = String(b).slice(0, 10);
+    if (evoGran === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
+    return s.split('-').slice(1).reverse().join('/');
+  };
+  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur }));
 
   return (
     <div>
@@ -157,6 +171,37 @@ export default function ProductionReleve() {
                   </ResponsiveContainer>
                 </div>
               </section>
+
+              <section className="card" style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                  <h2 style={{ margin: 0, fontSize: 16 }}>Évolution de la production</h2>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select value={evoProduct} onChange={e => setEvoProduct(e.target.value)} style={{ minWidth: 160 }}>
+                      <option value="">Total de la BU</option>
+                      {suivi.map(r => <option key={r.product_id} value={r.product_id}>{r.code ? r.code + ' — ' : ''}{r.designation}</option>)}
+                    </select>
+                    <select value={evoGran} onChange={e => setEvoGran(e.target.value)}>
+                      <option value="jour">Par jour</option>
+                      <option value="semaine">Par semaine</option>
+                      <option value="mois">Par mois</option>
+                    </select>
+                  </div>
+                </div>
+                {evoData.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>Pas de production sur la période.</p> : (
+                  <div style={{ width: '100%', height: 260 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={evoData} margin={{ top: 6, right: 12, bottom: 6, left: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="x" fontSize={11} />
+                        <YAxis fontSize={11} width={60} tickFormatter={fmt} />
+                        <Tooltip formatter={v => fmt(v)} />
+                        <Line type="monotone" dataKey="valeur" stroke="var(--color-primary, #2454e0)" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </section>
+
               <div className="card" style={{ padding: 0 }}>
                 <div className="table-wrap">
                   <table>
