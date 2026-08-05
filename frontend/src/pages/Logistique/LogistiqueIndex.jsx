@@ -28,6 +28,20 @@ const CONFIGS = {
       { key: 'photo', label: 'Photo', type: 'photo' },
     ],
   },
+  conducteurs: {
+    title: 'Conducteurs', endpoint: '/drivers', subModuleKey: 'logistique.parc',
+    filters: ['actif'],
+    fields: [
+      { key: 'nom', label: 'Nom', required: true },
+      { key: 'prenom', label: 'Prénom' },
+      { key: 'employee_id', label: 'Employé (si interne)', type: 'fkSelect', listKey: 'employees' },
+      { key: 'telephone', label: 'Téléphone' },
+      { key: 'permis_numero', label: 'N° de permis' },
+      { key: 'permis_categories', label: 'Catégories de permis' },
+      { key: 'permis_validite', label: 'Validité du permis', type: 'date' },
+      { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+    ],
+  },
   types: {
     title: 'Types de véhicule', endpoint: '/vehicle-types', subModuleKey: 'logistique.parc',
     fields: [
@@ -37,7 +51,7 @@ const CONFIGS = {
   },
 };
 
-const NAV = [['vehicules', 'Véhicules'], ['types', 'Types de véhicule']];
+const NAV = [['vehicules', 'Véhicules'], ['conducteurs', 'Conducteurs'], ['types', 'Types de véhicule']];
 
 export default function LogistiqueIndex() {
   const { type } = useParams();
@@ -45,11 +59,15 @@ export default function LogistiqueIndex() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [sites, setSites] = useState([]);
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     client.get('/vehicle-types').then(res => setVehicleTypes(res.data)).catch(() => {});
     client.get('/entities').then(res => setEntities(res.data)).catch(() => {});
     client.get('/sites').then(res => setSites(res.data)).catch(() => {});
+    // Liste des employés pour lier un conducteur interne à sa fiche RH. En dégradé gracieux si
+    // l'utilisateur n'a pas l'accès RH : le lien reste vide, on saisit alors nom/prénom à la main.
+    client.get('/employees').then(res => setEmployees(res.data.map(e => ({ id: e.id, nom: `${e.prenom || ''} ${e.nom || ''}`.trim() })))).catch(() => {});
   }, []);
 
   const canParc = hasSubModuleLevel(user, 'logistique.parc');
@@ -68,7 +86,7 @@ export default function LogistiqueIndex() {
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
         filters={config.filters || []}
-        entities={entities} sites={sites} lists={{ vehicleTypes, entities, sites }}
+        entities={entities} sites={sites} lists={{ vehicleTypes, entities, sites, employees }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
       />
