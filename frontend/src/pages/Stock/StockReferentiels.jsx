@@ -65,15 +65,14 @@ export default function StockReferentiels() {
         <h1 className="page-title" style={{ margin: 0 }}>Référentiels Stock</h1>
         <p className="page-subtitle" style={{ margin: '4px 0 0' }}>Types de mouvement (avec leur impact sur le stock) et localisations physiques.</p>
       </div>
-      <nav className="subnav">
+      <div style={{ display: 'flex', gap: 8, margin: '10px 0 14px', flexWrap: 'wrap' }}>
         {TABS.map(([key, label]) => (
           <button key={key} type="button" onClick={() => setTab(key)}
-            className={tab === key ? 'active' : undefined}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}>
+            className={`btn btn-sm ${tab === key ? 'btn-primary' : 'btn-secondary'}`}>
             {label}
           </button>
         ))}
-      </nav>
+      </div>
       <ReferentialPage
         key={tab} title={config.title} endpoint={config.endpoint} fields={config.fields}
         filters={config.filters || []}
