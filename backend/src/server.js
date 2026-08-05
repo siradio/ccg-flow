@@ -46,6 +46,7 @@ app.use('/api/garages', require('./modules/logistique/garages.routes'));
 app.use('/api/pannes', require('./modules/logistique/pannes.routes'));
 app.use('/api/reparations', require('./modules/logistique/reparations.routes'));
 app.use('/api/accidents', require('./modules/logistique/accidents.routes'));
+app.use('/api/positions', require('./modules/logistique/positions.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

@@ -10,6 +10,7 @@ const NAV = [
   ['/logistique/checklists', 'Checklists', 'logistique.checklists'],
   ['/logistique/pannes', 'Pannes', 'logistique.maintenance'],
   ['/logistique/accidents', 'Accidents', 'logistique.accidents'],
+  ['/logistique/cartographie', 'Cartographie', 'logistique.suivi'],
   ['/logistique/garages', 'Garages', 'logistique.maintenance'],
   ['/logistique/documents', 'Documents & échéances', 'logistique.parc'],
   ['/logistique/types', 'Types de véhicule', 'logistique.parc'],
