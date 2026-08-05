@@ -30,12 +30,15 @@ const CONFIGS = {
   },
   conducteurs: {
     title: 'Conducteurs', endpoint: '/drivers', subModuleKey: 'logistique.parc',
-    filters: ['actif'],
-    // Chauffeur interne : on choisit l'employé → nom/prénom/téléphone se remplissent tout seuls
-    // (modifiables). Chauffeur externe/intérimaire : on laisse « Employé » vide et on saisit le nom.
+    filters: ['type_conducteur', 'actif'],
+    // Type = dimension de stats (interne vs prestataire). Interne → on choisit l'employé (chauffeur)
+    // et nom/prénom/téléphone se remplissent tout seuls. Prestataire → société + saisie manuelle.
     fields: [
+      { key: 'type_conducteur', label: 'Type de conducteur', type: 'select', options: ['Interne', 'Prestataire'], default: 'Interne' },
       { key: 'employee_id', label: 'Employé (chauffeur interne)', type: 'fkSelect', listKey: 'employees',
-        autofill: { nom: '_nom', prenom: '_prenom', telephone: '_tel' } },
+        autofill: { nom: '_nom', prenom: '_prenom', telephone: '_tel' },
+        showIf: { field: 'type_conducteur', equals: 'Interne' } },
+      { key: 'societe', label: 'Société (prestataire)', showIf: { field: 'type_conducteur', equals: 'Prestataire' } },
       { key: 'nom', label: 'Nom', required: true },
       { key: 'prenom', label: 'Prénom' },
       { key: 'telephone', label: 'Téléphone' },
