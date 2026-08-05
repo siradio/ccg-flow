@@ -36,7 +36,7 @@ const MODULES = [
   },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },
   { key: 'documents', label: 'Documents (manuels de procédures)', subModules: [] },
-  { key: 'annonces', label: 'Infos & Événements', subModules: [] },
+  { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
     key: 'referentiels', label: 'Référentiels',
     subModules: [
