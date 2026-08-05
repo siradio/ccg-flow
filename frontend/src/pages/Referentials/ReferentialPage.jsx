@@ -150,7 +150,9 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             f.type === 'photo'
               ? <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
                   hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />
-              : <FieldInput key={f.key} field={f} value={form[f.key]} onChange={v => setForm({ ...form, [f.key]: v })} entities={entities} sites={sites} lists={lists} />
+              : <FieldInput key={f.key} field={f} value={form[f.key]}
+                  onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
+                  entities={entities} sites={sites} lists={lists} />
           ))}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
           <button type="submit" className="btn btn-primary">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
@@ -159,6 +161,19 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       )}
     </div>
   );
+}
+
+// Applique un changement de champ, avec auto-remplissage optionnel : un champ `fkSelect` porteur
+// d'un `autofill { champCible: propOption }` recopie, à la sélection, des propriétés de l'option
+// choisie vers d'autres champs (ex. choisir un employé pré-remplit nom/prénom/téléphone du
+// conducteur). Les valeurs restent modifiables ; désélectionner ne réécrase pas la saisie manuelle.
+function applyFieldChange(prev, field, value, lists = {}) {
+  const next = { ...prev, [field.key]: value };
+  if (field.autofill && value !== '' && value != null) {
+    const opt = (lists[field.listKey] || []).find(o => String(o.id) === String(value));
+    if (opt) for (const [target, src] of Object.entries(field.autofill)) next[target] = opt[src] ?? '';
+  }
+  return next;
 }
 
 export function emptyForm(fields) {
