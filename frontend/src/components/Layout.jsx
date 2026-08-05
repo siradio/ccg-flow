@@ -28,6 +28,12 @@ function stockLinkTarget(user) {
   return '/stock/tableau-bord';
 }
 
+// Le lien "Production" pointe vers la saisie si accordée, sinon vers le suivi (consultation).
+function productionLinkTarget(user) {
+  if (isSuperAdmin(user) || hasSubModuleLevel(user, 'production.releve')) return '/production/releve';
+  return '/production/suivi';
+}
+
 // Rangés sous un onglet "Paramètres" repliable plutôt que mélangés aux liens de nav principaux —
 // ce sont des écrans d'administration, pas des modules métier du quotidien, donc pas au même
 // niveau de visibilité par défaut. "Utilisateurs" est aussi accessible à support_it (superOnly
@@ -79,6 +85,7 @@ export default function Layout() {
           {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> Demandes d'achat</NavLink>}
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
           {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> Logistique</NavLink>}
+          {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> Production</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
           {hasLiens && (
             <div className="sidebar-group">

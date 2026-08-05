@@ -46,6 +46,15 @@ const MODULES = [
       { key: 'logistique.suivi', label: 'Cartographie / suivi GPS' },
     ],
   },
+  // Module Production — démarre avec le relevé de production journalière ; s'enrichira (planification,
+  // ordres de fabrication, rendement, OEE…) au fur et à mesure de l'expression du besoin.
+  {
+    key: 'production', label: 'Production',
+    subModules: [
+      { key: 'production.releve', label: 'Relevé de production journalière' },
+      { key: 'production.suivi', label: 'Suivi de production' },
+    ],
+  },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },
   { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
