@@ -7,7 +7,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconFile, IconMegaphone, IconImage, IconTruck,
+  IconMenu, IconClose, IconFile, IconImage, IconTruck, IconLink,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -47,6 +47,8 @@ export default function Layout() {
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
   const [docsOpen, setDocsOpen] = useState(location.pathname.startsWith('/documents'));
   const [docCategories, setDocCategories] = useState([]);
+  const [liensOpen, setLiensOpen] = useState(location.pathname.startsWith('/liens'));
+  const [liensCategories, setLiensCategories] = useState([]);
   // Tiroir de navigation mobile : masqué par défaut, ouvert par le bouton hamburger de la topbar.
   const [navOpen, setNavOpen] = useState(false);
   const closeNav = () => setNavOpen(false);
@@ -57,6 +59,13 @@ export default function Layout() {
     if (!hasDocuments) return;
     client.get('/documents/categories').then(r => setDocCategories(r.data)).catch(() => {});
   }, [hasDocuments]);
+
+  // Sous-menus du module « Liens utiles » = ses catégories (pilotées par la base, extensibles).
+  const hasLiens = hasModuleAccess(user, 'liens');
+  useEffect(() => {
+    if (!hasLiens) return;
+    client.get('/liens/categories').then(r => setLiensCategories(r.data)).catch(() => {});
+  }, [hasLiens]);
 
   const admin = isSuperAdmin(user);
   const userAdmin = isUserAdmin(user);
@@ -94,7 +103,21 @@ export default function Layout() {
               )}
             </div>
           )}
-          {hasModuleAccess(user, 'annonces') && <NavLink to="/annonces" className={navClass} onClick={closeNav}><IconMegaphone /> Infos & Événements</NavLink>}
+          {hasLiens && (
+            <div className="sidebar-group">
+              <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>
+                <IconLink /> Liens utiles
+                <span className={`sidebar-chevron${liensOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
+              </button>
+              {liensOpen && (
+                <div className="sidebar-subnav">
+                  {liensCategories.map(c => (
+                    <NavLink key={c.id} to={`/liens/${c.slug}`} className={navClass} onClick={closeNav}>{c.nom}</NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {userAdmin && (
             <div className="sidebar-group">

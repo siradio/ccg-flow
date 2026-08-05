@@ -33,7 +33,7 @@ app.use('/api/dashboard', require('./modules/dashboard/dashboard.routes'));
 app.use('/api/settings', require('./modules/settings/settings.routes'));
 app.use('/api/kpi', require('./modules/kpi/kpi.routes'));
 app.use('/api/documents', require('./modules/documents/documents.routes'));
-app.use('/api/announcements', require('./modules/announcements/announcements.routes'));
+app.use('/api/liens', require('./modules/liens/liens.routes'));
 app.use('/api/stock', require('./modules/stock/stock.routes'));
 app.use('/api/prices', require('./modules/prices/prices.routes'));
 app.use('/api/stock-movements', require('./modules/stock-movements/stock-movements.routes'));
