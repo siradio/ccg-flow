@@ -21,9 +21,6 @@ const MODULES = [
       { key: 'stock.valorisation', label: 'Valorisation' },
       { key: 'stock.referentiels', label: 'Référentiels Stock' },
       { key: 'stock.import', label: 'Import des mouvements' },
-      // Anciens sous-modules — conservés le temps de la migration, retirés en fin de refonte.
-      { key: 'stock.saisie_jour', label: 'Stock du Jour (ancien)' },
-      { key: 'stock.mouvements', label: 'Mouvement Stock (ancien)' },
     ],
   },
   {

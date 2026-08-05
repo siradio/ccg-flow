@@ -15,9 +15,6 @@ const NAV = [
   ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
   ['/stock/import', 'Import', 'stock.import'],
   ['/stock/referentiels', 'Référentiels', 'stock.referentiels'],
-  // Anciens écrans — retirés en fin de refonte.
-  ['/stock/saisie', 'Stock du Jour (ancien)', 'stock.saisie_jour'],
-  ['/stock/mouvements', 'Mouvement Stock (ancien)', 'stock.mouvements'],
 ];
 
 export default function StockSectionNav() {

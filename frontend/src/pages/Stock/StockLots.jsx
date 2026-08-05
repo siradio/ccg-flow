@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel, isSuperAdmin } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import { ExportButtons } from '../../utils/exportData';
+
+const EXPORT_COLS = [
+  { key: 'product_code', label: 'Code' }, { key: 'designation', label: 'Désignation' },
+  { key: 'numero_lot', label: 'Lot' }, { key: 'bu_nom', label: 'Business Unit' },
+  { key: 'location_nom', label: 'Localisation' }, { key: 'quantite_restante', label: 'Reste' },
+  { key: 'date_fabrication', label: 'Fabrication' }, { key: 'date_peremption', label: 'Péremption' },
+  { key: 'jours_avant_peremption', label: 'Jours restants' },
+];
 
 // Refonte Stock (Lot 2) — Lots & péremption. Quantité restante dérivée du grand livre. Statut de
 // péremption calculé côté client. Panneau de configuration des alertes email (super_admin).
@@ -85,7 +94,10 @@ export default function StockLots() {
           <h1 className="page-title" style={{ margin: 0 }}>Lots &amp; péremption</h1>
           <p className="page-subtitle" style={{ margin: '4px 0 0' }}>Quantité restante par lot (dérivée des mouvements) et suivi des dates de péremption — logique FEFO.</p>
         </div>
-        {canAdd && <button className="btn btn-primary" onClick={() => { setShowForm(s => !s); setError(''); }}>{showForm ? 'Annuler' : '+ Nouveau lot'}</button>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <ExportButtons filename="lots_stock" columns={EXPORT_COLS} rows={lots} />
+          {canAdd && <button className="btn btn-primary" onClick={() => { setShowForm(s => !s); setError(''); }}>{showForm ? 'Annuler' : '+ Nouveau lot'}</button>}
+        </div>
       </div>
 
       {showForm && canAdd && (

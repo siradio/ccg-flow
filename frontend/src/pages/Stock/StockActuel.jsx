@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import { ExportButtons } from '../../utils/exportData';
+
+const EXPORT_COLS = [
+  { key: 'product_code', label: 'Code' }, { key: 'designation', label: 'Désignation' },
+  { key: 'bu_nom', label: 'Business Unit' }, { key: 'location_nom', label: 'Localisation' },
+  { key: 'total_entrees', label: 'Entrées' }, { key: 'total_sorties', label: 'Sorties' },
+  { key: 'stock_actuel', label: 'Stock actuel' }, { key: 'seuil_alerte_stock', label: 'Seuil' },
+  { key: 'valeur_stock', label: 'Valeur' }, { key: 'statut', label: 'Statut' },
+];
 
 // Refonte Stock (Lot 1) — Stock actuel : solde dérivé du grand livre, par produit × localisation,
 // avec statut calculé (OK / Alerte / Critique / Rupture / Surstock) et valorisation.
@@ -44,8 +53,13 @@ export default function StockActuel() {
   return (
     <div>
       <StockSectionNav />
-      <h1 className="page-title" style={{ margin: '0 0 4px' }}>Stock actuel</h1>
-      <p className="page-subtitle" style={{ margin: '0 0 12px' }}>Solde calculé à partir des mouvements (entrées − sorties), par produit et localisation.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 className="page-title" style={{ margin: '0 0 4px' }}>Stock actuel</h1>
+          <p className="page-subtitle" style={{ margin: '0 0 12px' }}>Solde calculé à partir des mouvements (entrées − sorties), par produit et localisation.</p>
+        </div>
+        <ExportButtons filename="stock_actuel" columns={EXPORT_COLS} rows={filtered} />
+      </div>
 
       <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field" style={{ minWidth: 160 }}>Business Unit

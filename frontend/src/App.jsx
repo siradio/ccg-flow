@@ -25,11 +25,6 @@ import DocumentsBranding from './pages/Admin/DocumentsBranding';
 import TestData from './pages/Admin/TestData';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
-import StockEntryPage from './pages/Stock/EntryPage';
-import StockHistoryPage from './pages/Stock/HistoryPage';
-import StockChartsPage from './pages/Stock/ChartsPage';
-import StockDgDashboardPage from './pages/Stock/DgDashboardPage';
-import StockMovementsPage from './pages/Stock/MovementsPage';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
 import MouvementForm from './pages/Stock/MouvementForm';
@@ -60,11 +55,6 @@ export default function App() {
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
         {/* Fusionné dans le Tableau de bord (onglets Vue globale/Achats/RH/Stock) — redirige les liens/habitudes existants. */}
         <Route path="kpi" element={<Navigate to="/" replace />} />
-        <Route path="stock/saisie" element={<RequireModule subModule="stock.saisie_jour"><StockEntryPage /></RequireModule>} />
-        <Route path="stock/historique" element={<RequireModule subModule="stock.saisie_jour"><StockHistoryPage /></RequireModule>} />
-        <Route path="stock/graphiques" element={<RequireModule subModule="stock.saisie_jour"><StockChartsPage /></RequireModule>} />
-        <Route path="stock/dashboard-dg" element={<RequireModule subModule="stock.saisie_jour"><StockDgDashboardPage /></RequireModule>} />
-        <Route path="stock/mouvements" element={<RequireModule subModule="stock.mouvements"><StockMovementsPage /></RequireModule>} />
         <Route path="stock/referentiels" element={<RequireModule subModule="stock.referentiels"><StockReferentiels /></RequireModule>} />
         <Route path="stock/tableau-bord" element={<RequireModule subModule="stock.tableau_bord"><StockTableauBord /></RequireModule>} />
         <Route path="stock/saisie-mouvement" element={<RequireModule subModule="stock.saisie"><MouvementForm /></RequireModule>} />

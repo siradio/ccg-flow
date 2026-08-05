@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import { ExportButtons } from '../../utils/exportData';
+
+const EXPORT_COLS = [
+  { key: 'reference', label: 'Référence' }, { key: 'date_mouvement', label: 'Date' },
+  { key: 'type_libelle', label: 'Type' }, { key: 'bu_nom', label: 'Business Unit' },
+  { key: 'location_nom', label: 'Localisation' }, { key: 'total_quantite', label: 'Quantité' },
+  { key: 'statut', label: 'Statut' }, { key: 'cree_par', label: 'Créé par' },
+];
 
 // Refonte Stock (Lot 1) — Journal / consultation des mouvements du grand livre. Filtrable.
 // Une écriture validée ne se supprime pas : on l'annule (elle sort du solde mais reste ici).
@@ -45,8 +53,13 @@ export default function MouvementsJournal() {
   return (
     <div>
       <StockSectionNav />
-      <h1 className="page-title" style={{ margin: '0 0 4px' }}>Mouvements de stock</h1>
-      <p className="page-subtitle" style={{ margin: '0 0 12px' }}>Journal du grand livre — filtrable, traçable.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h1 className="page-title" style={{ margin: '0 0 4px' }}>Mouvements de stock</h1>
+          <p className="page-subtitle" style={{ margin: '0 0 12px' }}>Journal du grand livre — filtrable, traçable.</p>
+        </div>
+        <ExportButtons filename="mouvements_stock" columns={EXPORT_COLS} rows={rows} />
+      </div>
 
       <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field" style={{ minWidth: 150 }}>Business Unit
