@@ -4,6 +4,8 @@ import client from '../../../api/client';
 import { useConfirm } from '../../../components/ConfirmProvider.jsx';
 import { ROLE_CODES, userStatus, STATUS_META, StatusBadge } from './shared.jsx';
 
+const PAGE_SIZE = 20;
+
 export default function ListPage() {
   const confirm = useConfirm();
   const [users, setUsers] = useState([]);
@@ -18,6 +20,7 @@ export default function ListPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState({ active: true, inactive: true, pending: true, rejected: true });
   const [rejectPanel, setRejectPanel] = useState({}); // { [userId]: note } — panneau de rejet ouvert (ligne dépliée)
+  const [page, setPage] = useState(1);
 
   // key de sous-module -> libellé lisible, pour la colonne "Module" (un module sans sous-modules
   // EST lui-même l'unité accordable — voir backend/src/config/modules.js).
@@ -36,6 +39,17 @@ export default function ListPage() {
     const matchesStatus = statusFilter[userStatus(u)];
     return matchesSearch && matchesRole && matchesStatus;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Un filtre plus restrictif peut faire disparaître la page courante (ex. page 3 sur un filtre qui
+  // ne laisse qu'une page) — on revient sur la dernière page valide plutôt que d'afficher un tableau vide.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  // Changer un filtre repart de la page 1 — sinon on peut se retrouver sur une page 3 devenue
+  // incohérente avec les nouveaux résultats filtrés.
+  useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter]);
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
   function loadProfiles() { client.get('/access-profiles').then(res => setProfiles(res.data)); }
@@ -261,7 +275,7 @@ export default function ListPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map(u => (
+              {pagedUsers.map(u => (
                 <UserRow key={u.id} u={u} roleSummary={roleSummary} moduleSummary={moduleSummary}
                   sendingId={sendingId} rejectPanel={rejectPanel} setRejectPanel={setRejectPanel}
                   toggleReject={toggleReject} approveAccess={approveAccess} rejectAccess={rejectAccess}
@@ -274,6 +288,19 @@ export default function ListPage() {
           </table>
         </div>
       </div>
+
+      {filteredUsers.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, fontSize: 13, color: 'var(--color-text-muted)' }}>
+          <span>{filteredUsers.length} utilisateur{filteredUsers.length > 1 ? 's' : ''} au total</span>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Précédent</button>
+              <span>Page {page} / {totalPages}</span>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Suivant →</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
