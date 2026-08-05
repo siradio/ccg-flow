@@ -24,6 +24,31 @@ function money(n) {
   return nf(v);
 }
 const longDate = () => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const today = () => new Date().toISOString().slice(0, 10);
+const fmtBucket = (g, b) => {
+  const s = String(b).slice(0, 10);
+  if (g === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
+  return s.split('-').slice(1).reverse().join('/');
+};
+
+function PeriodControl({ value, onChange, range, onRange }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ fontSize: 12.5 }}>
+        <option value="jour">Par jour</option>
+        <option value="semaine">Par semaine</option>
+        <option value="mois">Par mois</option>
+        <option value="personnalise">Personnalisé</option>
+      </select>
+      {value === 'personnalise' && (
+        <>
+          <input type="date" value={range.from} onChange={e => onRange({ ...range, from: e.target.value })} style={{ fontSize: 12.5 }} />
+          <input type="date" value={range.to} onChange={e => onRange({ ...range, to: e.target.value })} style={{ fontSize: 12.5 }} />
+        </>
+      )}
+    </div>
+  );
+}
 
 function loadPrefs() {
   try { return { ...Object.fromEntries(RUBRIQUES.map(([k]) => [k, true])), ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; }
@@ -82,11 +107,30 @@ export default function DirectionDashboard() {
   const [prefs, setPrefs] = useState(loadPrefs);
   const [showPrefs, setShowPrefs] = useState(false);
   const [activeTab, setActiveTab] = useState('stock');
+  const [gran, setGran] = useState({ stock: 'semaine', production: 'semaine', rh: 'mois' });
+  const [customRange, setCustomRange] = useState({ stock: { from: '', to: today() }, production: { from: '', to: today() }, rh: { from: '', to: today() } });
+  const [series, setSeries] = useState({});
 
   useEffect(() => {
     if (!canView) return;
     client.get('/direction/dashboard').then(r => setD(r.data)).catch(() => setErr(true));
   }, [canView]);
+
+  function periodParams(rub) {
+    const g = gran[rub]; const t = today();
+    if (g === 'personnalise') return { granularity: 'jour', from: customRange[rub].from, to: customRange[rub].to || t };
+    if (g === 'jour') { const dt = new Date(); dt.setDate(dt.getDate() - 30); return { granularity: 'jour', from: dt.toISOString().slice(0, 10), to: t }; }
+    if (g === 'mois') { const dt = new Date(); dt.setMonth(dt.getMonth() - 11); return { granularity: 'mois', from: dt.toISOString().slice(0, 10), to: t }; }
+    const dt = new Date(); dt.setDate(dt.getDate() - 83); return { granularity: 'semaine', from: dt.toISOString().slice(0, 10), to: t };
+  }
+  useEffect(() => {
+    if (!canView || !['stock', 'production', 'rh'].includes(activeTab)) return;
+    const p = periodParams(activeTab);
+    if (!p.from) return;
+    client.get(`/direction/evolution?rubrique=${activeTab}&granularity=${p.granularity}&date_from=${p.from}&date_to=${p.to}`)
+      .then(r => setSeries(s => ({ ...s, [activeTab]: r.data }))).catch(() => {});
+    // eslint-disable-next-line
+  }, [canView, activeTab, gran, customRange]);
 
   function toggle(k) {
     setPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(PREF_KEY, JSON.stringify(next)); return next; });
@@ -97,9 +141,11 @@ export default function DirectionDashboard() {
   if (!d) return <Loading />;
 
   const prodDelta = d.production.hier - d.production.avantHier;
-  const fmtWk = b => String(b).slice(8, 10) + '/' + String(b).slice(5, 7);
-  const stockEvoData = (d.stock.evolution || []).map(e => ({ x: fmtWk(e.bucket), valeur: e.valeur }));
-  const prodEvoData = (d.production.evolution || []).map(e => ({ x: fmtWk(e.bucket), valeur: e.valeur }));
+  const stockEvoData = (series.stock ?? d.stock.evolution ?? []).map(e => ({ x: fmtBucket(gran.stock, e.bucket), valeur: e.valeur }));
+  const prodEvoData = (series.production ?? d.production.evolution ?? []).map(e => ({ x: fmtBucket(gran.production, e.bucket), valeur: e.valeur }));
+  const rhEvoData = (series.rh ?? []).map(e => ({ x: fmtBucket(gran.rh, e.bucket), valeur: e.valeur }));
+  const setG = (rub, v) => setGran(g => ({ ...g, [rub]: v }));
+  const setR = (rub, r) => setCustomRange(c => ({ ...c, [rub]: r }));
   const veh = d.logistique;
   const rh = d.rh || { total: 0, actifs: 0, parBu: [] };
 
@@ -128,7 +174,10 @@ export default function DirectionDashboard() {
           {pill(`${d.stock.alerte} sous seuil`, true, 'var(--status-amber-bg,#fef3c7)', 'var(--status-amber-fg,#b45309)')}
           {pill(`${d.stock.relevesDuJour.nb} relevés aujourd'hui`, true, 'var(--color-primary-soft)', 'var(--color-primary)')}
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', margin: '2px 0' }}>Évolution du stock (quantité, par semaine)</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '6px 0 2px' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Évolution du stock (quantité)</span>
+          <PeriodControl value={gran.stock} onChange={v => setG('stock', v)} range={customRange.stock} onRange={r => setR('stock', r)} />
+        </div>
         {stockEvoData.length > 1 ? (
           <div style={{ width: '100%', height: 130 }}>
             <ResponsiveContainer>
@@ -179,7 +228,10 @@ export default function DirectionDashboard() {
           <Delta value={prodDelta} />
           <span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>vs avant-veille ({nf(d.production.avantHier)})</span>
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', margin: '8px 0 2px' }}>Évolution de la production (par semaine)</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '8px 0 2px' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Évolution de la production</span>
+          <PeriodControl value={gran.production} onChange={v => setG('production', v)} range={customRange.production} onRange={r => setR('production', r)} />
+        </div>
         {prodEvoData.length > 1 ? (
           <div style={{ width: '100%', height: 150 }}>
             <ResponsiveContainer>
@@ -252,6 +304,22 @@ export default function DirectionDashboard() {
           ))}
           {(rh.parBu || []).length === 0 && <span className="empty-row" style={{ margin: 0 }}>Aucun employé actif.</span>}
         </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '12px 0 2px' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Embauches par période</span>
+          <PeriodControl value={gran.rh} onChange={v => setG('rh', v)} range={customRange.rh} onRange={r => setR('rh', r)} />
+        </div>
+        {rhEvoData.length > 1 ? (
+          <div style={{ width: '100%', height: 150 }}>
+            <ResponsiveContainer>
+              <AreaChart data={rhEvoData} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
+                <defs><linearGradient id="rhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0891b2" stopOpacity={0.45} /><stop offset="100%" stopColor="#0891b2" stopOpacity={0.04} /></linearGradient></defs>
+                <XAxis dataKey="x" fontSize={11} />
+                <Tooltip formatter={v => nf(v)} />
+                <Area type="monotone" dataKey="valeur" stroke="#0891b2" strokeWidth={2} fill="url(#rhg)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <p className="empty-row" style={{ margin: '4px 0' }}>Peu d'embauches sur la période choisie.</p>}
       </ModuleCard>
     ),
   };

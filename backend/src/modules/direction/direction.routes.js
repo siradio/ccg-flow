@@ -139,4 +139,49 @@ router.get('/dashboard', requireSubModule('direction'), async (req, res, next) =
   } catch (e) { next(e); }
 });
 
+// Évolution paramétrable par rubrique (jour/semaine/mois/personnalisé) pour les onglets du dashboard.
+// rubrique : stock (quantité relevée), production (quantité produite), rh (embauches).
+router.get('/evolution', requireSubModule('direction'), async (req, res, next) => {
+  try {
+    const rub = req.query.rubrique;
+    const unit = ({ jour: 'day', semaine: 'week', mois: 'month' })[req.query.granularity] || 'week';
+    const isDate = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
+    const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : null;
+    if (!from) return res.status(400).json({ error: 'date_from requis.' });
+
+    if (rub === 'rh') {
+      return res.json(await all(
+        `SELECT date_trunc('${unit}', date_embauche) AS bucket, COUNT(*)::int AS valeur
+         FROM employees WHERE date_embauche BETWEEN $1 AND $2
+         GROUP BY bucket ORDER BY bucket`, [from, to]));
+    }
+
+    const visible = visibleBusinessUnitIds(req.user);
+    const params = [from, to];
+    let buScope = '';
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); buScope = `AND p.business_unit_id = ANY($${params.length})`; }
+
+    if (rub === 'stock') {
+      return res.json(await all(
+        `WITH lpb AS (
+           SELECT DISTINCT ON (se.product_id, date_trunc('${unit}', se.date_stock))
+                  se.product_id, date_trunc('${unit}', se.date_stock) AS bucket, se.quantite
+           FROM stock_entries se JOIN products p ON p.id = se.product_id
+           WHERE se.date_stock BETWEEN $1 AND $2 AND p.type_article IS DISTINCT FROM 'matiere_premiere' ${buScope}
+           ORDER BY se.product_id, date_trunc('${unit}', se.date_stock), se.date_stock DESC
+         )
+         SELECT bucket, SUM(quantite)::float AS valeur FROM lpb GROUP BY bucket ORDER BY bucket`, params));
+    }
+    if (rub === 'production') {
+      return res.json(await all(
+        `SELECT date_trunc('${unit}', pe.date_production) AS bucket, SUM(pe.quantite)::float AS valeur
+         FROM production_entries pe JOIN products p ON p.id = pe.product_id
+         WHERE pe.date_production BETWEEN $1 AND $2 ${buScope}
+         GROUP BY bucket ORDER BY bucket`, params));
+    }
+    return res.status(400).json({ error: 'rubrique invalide (stock | production | rh).' });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
