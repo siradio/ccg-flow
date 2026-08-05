@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ReferentialPage from '../Referentials/ReferentialPage';
+import StockSectionNav from './StockSectionNav';
 
 // Refonte Stock (Lot 0) — Référentiels du module Stock : types de mouvement + localisations.
 // Réutilise le composant générique ReferentialPage. Gaté par le sous-module stock.referentiels.
@@ -54,11 +55,12 @@ export default function StockReferentiels() {
     client.get('/stock-locations').then(r => setLocations(r.data)).catch(() => {});
   }, [canView]);
 
-  if (!canView) return <p>Le référentiel Stock ne vous a pas été accordé.</p>;
+  if (!canView) return <div><StockSectionNav /><p>Le référentiel Stock ne vous a pas été accordé.</p></div>;
 
   const config = CONFIGS[tab];
   return (
     <div>
+      <StockSectionNav />
       <div style={{ marginBottom: 6 }}>
         <h1 className="page-title" style={{ margin: 0 }}>Référentiels Stock</h1>
         <p className="page-subtitle" style={{ margin: '4px 0 0' }}>Types de mouvement (avec leur impact sur le stock) et localisations physiques.</p>
