@@ -31,6 +31,7 @@ const MODULES = [
     key: 'logistique', label: 'Logistique',
     subModules: [
       { key: 'logistique.parc', label: 'Parc (véhicules)' },
+      { key: 'logistique.missions', label: 'Missions' },
     ],
   },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },

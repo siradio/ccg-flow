@@ -40,6 +40,7 @@ app.use('/api/stock-movements', require('./modules/stock-movements/stock-movemen
 app.use('/api/vehicle-types', require('./modules/logistique/vehicle-types.routes'));
 app.use('/api/vehicles', require('./modules/logistique/vehicles.routes'));
 app.use('/api/drivers', require('./modules/logistique/drivers.routes'));
+app.use('/api/missions', require('./modules/logistique/missions.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
