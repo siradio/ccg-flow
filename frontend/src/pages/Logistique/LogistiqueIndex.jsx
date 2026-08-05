@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, NavLink, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ReferentialPage from '../Referentials/ReferentialPage';
 
-// Module Logistique — socle « Parc ». Réutilise la page CRUD générique des référentiels (mêmes
-// composants, mêmes permissions par sous-module), sous une sous-navigation propre au module. Les
-// écrans suivants (Conducteurs, Missions, Checklists…) viendront s'ajouter au fil des phases.
+// Module Logistique. Réutilise la page CRUD générique des référentiels (mêmes composants, mêmes
+// permissions par sous-module), sous une sous-navigation propre au module.
 const STATUTS = ['actif', 'immobilise', 'reforme'];
+const MISSION_STATUTS = ['Planifiée', 'En cours', 'Terminée', 'Annulée'];
+const fullName = e => `${e.prenom || ''} ${e.nom || ''}`.trim();
 
 const CONFIGS = {
   vehicules: {
@@ -48,6 +49,23 @@ const CONFIGS = {
       { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
     ],
   },
+  missions: {
+    title: 'Missions', endpoint: '/missions', subModuleKey: 'logistique.missions',
+    filters: ['statut', 'vehicle_id'],
+    fields: [
+      { key: 'objet', label: 'Objet / motif', required: true },
+      { key: 'vehicle_id', label: 'Véhicule', type: 'fkSelect', listKey: 'vehicles', required: true },
+      { key: 'driver_id', label: 'Chauffeur', type: 'fkSelect', listKey: 'drivers', required: true },
+      { key: 'commercial_employee_id', label: 'Commercial (accompagnateur)', type: 'fkSelect', listKey: 'commerciaux' },
+      { key: 'depart', label: 'Départ' },
+      { key: 'arrivee', label: 'Arrivée / destination' },
+      { key: 'date_debut', label: 'Date de début', type: 'date' },
+      { key: 'date_fin', label: 'Date de fin', type: 'date' },
+      { key: 'km_depart', label: 'Km départ', type: 'number' },
+      { key: 'km_retour', label: 'Km retour', type: 'number' },
+      { key: 'statut', label: 'Statut', type: 'select', options: MISSION_STATUTS, default: 'Planifiée' },
+    ],
+  },
   types: {
     title: 'Types de véhicule', endpoint: '/vehicle-types', subModuleKey: 'logistique.parc',
     fields: [
@@ -57,7 +75,13 @@ const CONFIGS = {
   },
 };
 
-const NAV = [['vehicules', 'Véhicules'], ['conducteurs', 'Conducteurs'], ['types', 'Types de véhicule']];
+// Missions a son propre sous-module ; les autres écrans dépendent du Parc.
+const NAV = [
+  ['vehicules', 'Véhicules', 'logistique.parc'],
+  ['conducteurs', 'Conducteurs', 'logistique.parc'],
+  ['missions', 'Missions', 'logistique.missions'],
+  ['types', 'Types de véhicule', 'logistique.parc'],
+];
 
 export default function LogistiqueIndex() {
   const { type } = useParams();
@@ -65,40 +89,48 @@ export default function LogistiqueIndex() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [sites, setSites] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  const [rawEmployees, setRawEmployees] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
 
   useEffect(() => {
     client.get('/vehicle-types').then(res => setVehicleTypes(res.data)).catch(() => {});
     client.get('/entities').then(res => setEntities(res.data)).catch(() => {});
     client.get('/sites').then(res => setSites(res.data)).catch(() => {});
-    // Liste des employés dont le POSTE est « Chauffeur » — inutile de dérouler tout l'effectif pour
-    // lier un conducteur interne. En dégradé gracieux si pas d'accès RH : liste vide, saisie manuelle.
-    client.get('/employees').then(res => setEmployees(res.data
-      .filter(e => e.poste && /chauffeur/i.test(e.poste))
-      .map(e => ({
-        id: e.id,
-        nom: `${e.prenom || ''} ${e.nom || ''}`.trim(),   // libellé de l'option
-        _nom: e.nom || '', _prenom: e.prenom || '', _tel: e.telephone || '', // sources d'auto-remplissage
-      })))).catch(() => {});
+    // Employés une seule fois → on en dérive les chauffeurs et les commerciaux. Dégradé gracieux
+    // sans accès RH (listes vides). Véhicules/conducteurs pour les listes déroulantes des missions.
+    client.get('/employees').then(res => setRawEmployees(res.data)).catch(() => {});
+    client.get('/vehicles').then(res => setVehicles(res.data.map(v => ({ id: v.id, nom: `${v.immatriculation}${v.marque ? ' — ' + v.marque : ''}` })))).catch(() => {});
+    client.get('/drivers').then(res => setDrivers(res.data.map(d => ({ id: d.id, nom: fullName(d) })))).catch(() => {});
   }, []);
 
-  const canParc = hasSubModuleLevel(user, 'logistique.parc');
-  if (!canParc) return <p>Le module Logistique ne vous a pas été accordé.</p>;
+  // Chauffeurs (pour lier un conducteur interne) et commerciaux (accompagnateur de mission), filtrés
+  // sur le poste, avec les sources d'auto-remplissage pour les chauffeurs.
+  const chauffeurs = useMemo(() => rawEmployees.filter(e => /chauffeur/i.test(e.poste || ''))
+    .map(e => ({ id: e.id, nom: fullName(e), _nom: e.nom || '', _prenom: e.prenom || '', _tel: e.telephone || '' })), [rawEmployees]);
+  const commerciaux = useMemo(() => rawEmployees.filter(e => /commercial/i.test(e.poste || ''))
+    .map(e => ({ id: e.id, nom: fullName(e) })), [rawEmployees]);
 
   const config = CONFIGS[type];
   if (!config) return <Navigate to="/logistique/vehicules" replace />;
+  if (!hasSubModuleLevel(user, config.subModuleKey)) {
+    return <p>Cet écran du module Logistique ne vous a pas été accordé.</p>;
+  }
+
+  const allowedNav = NAV.filter(([, , sub]) => hasSubModuleLevel(user, sub));
 
   return (
     <div>
       <nav className="subnav">
-        {NAV.map(([key, label]) => (
+        {allowedNav.map(([key, label]) => (
           <NavLink key={key} to={`/logistique/${key}`} className={({ isActive }) => isActive ? 'active' : undefined}>{label}</NavLink>
         ))}
       </nav>
       <ReferentialPage
         key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
         filters={config.filters || []}
-        entities={entities} sites={sites} lists={{ vehicleTypes, entities, sites, employees }}
+        entities={entities} sites={sites}
+        lists={{ vehicleTypes, entities, sites, employees: chauffeurs, vehicles, drivers, commerciaux }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
       />
