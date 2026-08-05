@@ -14,6 +14,11 @@ const RUBRIQUES = [
   ['ventes', '🛒 Ventes'], ['logistique', '🚚 Logistique'], ['rh', '👥 RH'],
 ];
 const PREF_KEY = 'direction_rubriques';
+const HERO_KPIS = [
+  ['stock', 'Valeur du stock'], ['production', 'Production de la veille'],
+  ['achats', 'Achats en cours'], ['rh', 'Effectif actif'],
+];
+const HERO_KEY = 'direction_hero';
 
 function greeting() { const h = new Date().getHours(); return h >= 5 && h < 18 ? 'Bonjour' : 'Bonsoir'; }
 const nf = n => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 });
@@ -53,6 +58,10 @@ function PeriodControl({ value, onChange, range, onRange }) {
 function loadPrefs() {
   try { return { ...Object.fromEntries(RUBRIQUES.map(([k]) => [k, true])), ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; }
   catch { return Object.fromEntries(RUBRIQUES.map(([k]) => [k, true])); }
+}
+function loadHeroPrefs() {
+  try { return { ...Object.fromEntries(HERO_KPIS.map(([k]) => [k, true])), ...JSON.parse(localStorage.getItem(HERO_KEY) || '{}') }; }
+  catch { return Object.fromEntries(HERO_KPIS.map(([k]) => [k, true])); }
 }
 
 function Delta({ value }) {
@@ -105,6 +114,7 @@ export default function DirectionDashboard() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
   const [prefs, setPrefs] = useState(loadPrefs);
+  const [heroPrefs, setHeroPrefs] = useState(loadHeroPrefs);
   const [showPrefs, setShowPrefs] = useState(false);
   const [activeTab, setActiveTab] = useState('stock');
   const [gran, setGran] = useState({ stock: 'semaine', production: 'semaine', rh: 'mois' });
@@ -138,6 +148,9 @@ export default function DirectionDashboard() {
 
   function toggle(k) {
     setPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(PREF_KEY, JSON.stringify(next)); return next; });
+  }
+  function toggleHero(k) {
+    setHeroPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(HERO_KEY, JSON.stringify(next)); return next; });
   }
 
   if (!canView) return <p>Le tableau de bord Direction ne vous a pas été accordé.</p>;
@@ -351,16 +364,25 @@ export default function DirectionDashboard() {
           <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>⚙ Personnaliser</button>
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 20 }}>
-          {prefs.stock && <HeroStat label="Valeur du stock (GNF)" value={money(d.stock.valeurTotale)} sub={`${d.stock.nbProduits} produits suivis`} />}
-          {prefs.production && <HeroStat label="Production de la veille" value={nf(d.production.hier)} sub={<span>vs avant-veille <Delta value={prodDelta} /></span>} />}
-          {prefs.achats && <HeroStat label="Achats en cours" value={nf(d.achats.enCours)} sub={`${d.achats.bcGeneres} bons de commande générés`} />}
-          {prefs.rh && <HeroStat label="Effectif actif" value={nf(rh.actifs)} sub={`${rh.total} au total`} />}
+          {heroPrefs.stock && <HeroStat label="Valeur du stock (GNF)" value={money(d.stock.valeurTotale)} sub={`${d.stock.nbProduits} produits suivis`} />}
+          {heroPrefs.production && <HeroStat label="Production de la veille" value={nf(d.production.hier)} sub={<span>vs avant-veille <Delta value={prodDelta} /></span>} />}
+          {heroPrefs.achats && <HeroStat label="Achats en cours" value={nf(d.achats.enCours)} sub={`${d.achats.bcGeneres} bons de commande générés`} />}
+          {heroPrefs.rh && <HeroStat label="Effectif actif" value={nf(rh.actifs)} sub={`${rh.total} au total`} />}
+          {!Object.values(heroPrefs).some(Boolean) && <div style={{ opacity: 0.75, fontSize: 13 }}>Aucun indicateur sélectionné (voir « Personnaliser »).</div>}
         </div>
       </div>
 
       {showPrefs && (
         <section className="card">
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Rubriques à afficher</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Indicateurs du bandeau</div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+            {HERO_KPIS.map(([k, label]) => (
+              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!heroPrefs[k]} onChange={() => toggleHero(k)} /> {label}
+              </label>
+            ))}
+          </div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Rubriques (onglets)</div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {RUBRIQUES.map(([k, label]) => (
               <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
