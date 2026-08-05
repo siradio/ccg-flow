@@ -77,6 +77,7 @@ export default function WorkflowConfig() {
       commentaire_obligatoire_si_refus: true,
       comportement_si_refus: 'retour_etape_precedente',
       retour_step_code: 'validation_achat',
+      sla_jours: null,
     };
     sorted.splice(insertAt, 0, newStep);
     setSteps(sorted.map((s, i) => ({ ...s, ordre: i + 1 })));
@@ -154,7 +155,7 @@ export default function WorkflowConfig() {
               <tr>
                 <th></th><th>Ordre</th><th>Code</th><th>Nom</th>
                 <th>Rôle requis</th><th>Commentaire si refus</th>
-                <th>Comportement si refus</th><th>Retour vers</th><th></th>
+                <th>Comportement si refus</th><th>Retour vers</th><th title="Délai cible de l'étape, en jours">SLA (jours)</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -210,6 +211,11 @@ export default function WorkflowConfig() {
                         <option value="">—</option>
                         {steps.filter(o => o.id !== s.id).map(o => <option key={o.id} value={o.code}>{o.code}</option>)}
                       </select>
+                    </td>
+                    <td>
+                      <input type="number" min="0" value={s.sla_jours ?? ''} placeholder="—" style={{ width: 70 }}
+                        title="Délai cible en jours pour cette étape (vide = pas de SLA)"
+                        onChange={e => updateStep(s.id, 'sla_jours', e.target.value === '' ? null : Number(e.target.value))} />
                     </td>
                     <td>
                       {!protectedCode && !systemStep && (

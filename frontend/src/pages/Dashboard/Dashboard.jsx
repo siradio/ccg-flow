@@ -310,6 +310,39 @@ function AchatsKpiTab({ data }) {
           </div>
         )}
       </section>
+
+      <section className="card">
+        <h2>Performance par étape (SLA)</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '-4px 0 10px' }}>
+          Temps réellement passé à chaque étape de validation, comparé au délai cible (SLA) configuré dans le workflow.
+          Le suivi ne compte que les validations décidées après la mise en service du SLA.
+        </p>
+        {(!data.slaParEtape || data.slaParEtape.length === 0) ? (
+          <p className="empty-row">Aucune validation mesurée pour l'instant.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Étape</th><th>SLA (jours)</th><th>Délai moyen (j)</th><th>Respect du SLA</th><th>Validations</th></tr></thead>
+              <tbody>
+                {data.slaParEtape.map(s => {
+                  const pct = s.tauxRespectSla != null ? Math.round(s.tauxRespectSla * 100) : null;
+                  const color = pct == null ? 'var(--color-text-faint)'
+                    : pct >= 80 ? 'var(--status-green-fg)' : pct >= 50 ? 'var(--status-amber-fg)' : 'var(--status-red-fg)';
+                  return (
+                    <tr key={s.code}>
+                      <td>{s.nom}</td>
+                      <td>{s.sla_jours != null ? s.sla_jours : '—'}</td>
+                      <td>{s.delaiMoyenJours != null ? s.delaiMoyenJours.toFixed(1) : '—'}</td>
+                      <td style={{ fontWeight: 700, color }}>{pct != null ? `${pct}%` : '—'}</td>
+                      <td>{s.n}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </>
   );
 }

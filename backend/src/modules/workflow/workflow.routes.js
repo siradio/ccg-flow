@@ -7,6 +7,14 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireSubModule('achats'));
 
+// SLA (délai cible de l'étape) en jours : entier positif, ou NULL si non défini (« pas de SLA »).
+function slaJours(s) {
+  const v = s.sla_jours;
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+}
+
 // Un template par module_code peut être "archivé" (actif = false) lors d'un versionnement (voir
 // PUT ci-dessous) — au-delà de ce cas, il n'y en a jamais qu'un seul actif à la fois (contrainte
 // partielle en base, migration 016), donc ce lookup reste sans ambiguïté.
@@ -117,11 +125,11 @@ router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next
         const retourStepCode = resolveRetourCode(s.retour_step_code || null);
         await client.query(
           `INSERT INTO workflow_steps
-             (workflow_template_id, ordre, code, nom, role_code_requis, commentaire_obligatoire_si_refus, comportement_si_refus, retour_step_code)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+             (workflow_template_id, ordre, code, nom, role_code_requis, commentaire_obligatoire_si_refus, comportement_si_refus, retour_step_code, sla_jours)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             newTemplate.id, s.ordre, s.code, s.nom, s.role_code_requis || null,
-            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode,
+            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode, slaJours(s),
           ]
         );
       }
@@ -146,11 +154,11 @@ router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next
         await client.query(
           `UPDATE workflow_steps SET
              ordre = $1, code = $2, nom = $3, role_code_requis = $4,
-             commentaire_obligatoire_si_refus = $5, comportement_si_refus = $6, retour_step_code = $7
-           WHERE id = $8`,
+             commentaire_obligatoire_si_refus = $5, comportement_si_refus = $6, retour_step_code = $7, sla_jours = $8
+           WHERE id = $9`,
           [
             s.ordre, s.code, s.nom, s.role_code_requis || null,
-            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode, s.id,
+            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode, slaJours(s), s.id,
           ]
         );
       }
@@ -158,11 +166,11 @@ router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next
         const retourStepCode = resolveRetourCode(s.retour_step_code || null);
         await client.query(
           `INSERT INTO workflow_steps
-             (workflow_template_id, ordre, code, nom, role_code_requis, commentaire_obligatoire_si_refus, comportement_si_refus, retour_step_code)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+             (workflow_template_id, ordre, code, nom, role_code_requis, commentaire_obligatoire_si_refus, comportement_si_refus, retour_step_code, sla_jours)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             template.id, s.ordre, s.code, s.nom, s.role_code_requis || null,
-            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode,
+            !!s.commentaire_obligatoire_si_refus, s.comportement_si_refus || null, retourStepCode, slaJours(s),
           ]
         );
       }
