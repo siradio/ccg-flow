@@ -7,9 +7,9 @@ import { ExportButtons } from '../../utils/exportData';
 const EXPORT_COLS = [
   { key: 'product_code', label: 'Code' }, { key: 'designation', label: 'Désignation' },
   { key: 'numero_lot', label: 'Lot' }, { key: 'bu_nom', label: 'Business Unit' },
-  { key: 'location_nom', label: 'Localisation' }, { key: 'quantite_restante', label: 'Reste' },
-  { key: 'date_fabrication', label: 'Fabrication' }, { key: 'date_peremption', label: 'Péremption' },
-  { key: 'jours_avant_peremption', label: 'Jours restants' },
+  { key: 'location_nom', label: 'Localisation' }, { key: 'quantite_restante', label: 'Reste', type: 'number' },
+  { key: 'date_fabrication', label: 'Fabrication', type: 'date' }, { key: 'date_peremption', label: 'Péremption', type: 'date' },
+  { key: 'jours_avant_peremption', label: 'Jours restants', type: 'number' },
 ];
 
 // Refonte Stock (Lot 2) — Lots & péremption. Quantité restante dérivée du grand livre. Statut de

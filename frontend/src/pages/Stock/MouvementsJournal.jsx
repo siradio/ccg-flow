@@ -5,9 +5,9 @@ import StockSectionNav from './StockSectionNav';
 import { ExportButtons } from '../../utils/exportData';
 
 const EXPORT_COLS = [
-  { key: 'reference', label: 'Référence' }, { key: 'date_mouvement', label: 'Date' },
+  { key: 'reference', label: 'Référence' }, { key: 'date_mouvement', label: 'Date', type: 'date' },
   { key: 'type_libelle', label: 'Type' }, { key: 'bu_nom', label: 'Business Unit' },
-  { key: 'location_nom', label: 'Localisation' }, { key: 'total_quantite', label: 'Quantité' },
+  { key: 'location_nom', label: 'Localisation' }, { key: 'total_quantite', label: 'Quantité', type: 'number' },
   { key: 'statut', label: 'Statut' }, { key: 'cree_par', label: 'Créé par' },
 ];
 

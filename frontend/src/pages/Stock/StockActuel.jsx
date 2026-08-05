@@ -7,9 +7,9 @@ import { ExportButtons } from '../../utils/exportData';
 const EXPORT_COLS = [
   { key: 'product_code', label: 'Code' }, { key: 'designation', label: 'Désignation' },
   { key: 'bu_nom', label: 'Business Unit' }, { key: 'location_nom', label: 'Localisation' },
-  { key: 'total_entrees', label: 'Entrées' }, { key: 'total_sorties', label: 'Sorties' },
-  { key: 'stock_actuel', label: 'Stock actuel' }, { key: 'seuil_alerte_stock', label: 'Seuil' },
-  { key: 'valeur_stock', label: 'Valeur' }, { key: 'statut', label: 'Statut' },
+  { key: 'total_entrees', label: 'Entrées', type: 'number' }, { key: 'total_sorties', label: 'Sorties', type: 'number' },
+  { key: 'stock_actuel', label: 'Stock actuel', type: 'number' }, { key: 'seuil_alerte_stock', label: 'Seuil', type: 'number' },
+  { key: 'valeur_stock', label: 'Valeur', type: 'number' }, { key: 'statut', label: 'Statut' },
 ];
 
 // Refonte Stock (Lot 1) — Stock actuel : solde dérivé du grand livre, par produit × localisation,
