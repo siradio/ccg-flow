@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
@@ -41,7 +42,8 @@ export default function StockReleveJour() {
   const canView = hasSubModuleLevel(user, 'stock.releve_jour');
   const canSaisir = hasSubModuleLevel(user, 'stock.releve_jour', 'ajout');
 
-  const [tab, setTab] = useState('saisie');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get('vue') === 'suivi' ? 'suivi' : 'saisie');
   const [bus, setBus] = useState([]);
   const [buId, setBuId] = useState('');
   const [date, setDate] = useState(today());

@@ -54,6 +54,22 @@ router.get('/dashboard', requireSubModule('direction'), async (req, res, next) =
        WHERE pe.date_production >= CURRENT_DATE - 7 ${buScope}
        GROUP BY pe.date_production ORDER BY pe.date_production`, P);
 
+    // ---- ÉVOLUTIONS (12 semaines) pour affichage direct sur le dashboard (le DG ne navigue pas) ----
+    const stockEvo = await all(
+      `WITH lpb AS (
+         SELECT DISTINCT ON (se.product_id, date_trunc('week', se.date_stock))
+                se.product_id, date_trunc('week', se.date_stock) AS bucket, se.quantite
+         FROM stock_entries se JOIN products p ON p.id = se.product_id
+         WHERE se.date_stock >= CURRENT_DATE - 84 AND p.type_article IS DISTINCT FROM 'matiere_premiere' ${buScope}
+         ORDER BY se.product_id, date_trunc('week', se.date_stock), se.date_stock DESC
+       )
+       SELECT bucket, SUM(quantite)::float AS valeur FROM lpb GROUP BY bucket ORDER BY bucket`, P);
+    const prodEvo = await all(
+      `SELECT date_trunc('week', pe.date_production) AS bucket, SUM(pe.quantite)::float AS valeur
+       FROM production_entries pe JOIN products p ON p.id = pe.product_id
+       WHERE pe.date_production >= CURRENT_DATE - 84 ${buScope}
+       GROUP BY bucket ORDER BY bucket`, P);
+
     // ---- LOGISTIQUE (global) ----
     const logi = await one(
       `SELECT
@@ -74,14 +90,27 @@ router.get('/dashboard', requireSubModule('direction'), async (req, res, next) =
     const bcGeneres = parStatut['bon_commande_genere'] || 0;
     const montantEngage = achatsRows.filter(r => r.status === 'bon_commande_genere').reduce((s, r) => s + Number(r.mf), 0);
 
+    // ---- RH (global) ----
+    const rhTotals = await one(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE statut = 'actif')::int AS actifs,
+              COUNT(*) FILTER (WHERE statut = 'inactif')::int AS inactifs,
+              COUNT(*) FILTER (WHERE statut = 'sorti')::int AS sortis
+       FROM employees`);
+    const rhParBu = await all(
+      `SELECT COALESCE(bu.nom, 'Sans BU') AS bu_nom, COUNT(*)::int AS c
+       FROM employees e LEFT JOIN business_units bu ON bu.id = e.business_unit_id
+       WHERE e.statut = 'actif' GROUP BY bu.nom ORDER BY c DESC`);
+
     res.json({
+      rh: { ...rhTotals, parBu: rhParBu },
       stock: {
         valeurTotale, parBu: stockParBu,
         rupture: stockStatuts.rupture, alerte: stockStatuts.alerte, nbProduits: stockStatuts.nb,
-        relevesDuJour: { nb: releves.nb, total: releves.total },
+        relevesDuJour: { nb: releves.nb, total: releves.total }, evolution: stockEvo,
       },
       production: {
-        hier: prodHier, avantHier: prodAvantHier, parBu: prodHierParBu, serie7j: prodSerie,
+        hier: prodHier, avantHier: prodAvantHier, parBu: prodHierParBu, serie7j: prodSerie, evolution: prodEvo,
       },
       ventes: null, // module Ventes à venir
       logistique: logi,

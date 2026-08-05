@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
@@ -37,7 +38,8 @@ export default function ProductionReleve() {
   const canSaisir = hasSubModuleLevel(user, 'production.releve', 'ajout');
   const canSuivi = hasSubModuleLevel(user, 'production.suivi');
 
-  const [tab, setTab] = useState(hasSubModuleLevel(user, 'production.releve') ? 'saisie' : 'suivi');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get('vue') === 'suivi' || !hasSubModuleLevel(user, 'production.releve') ? 'suivi' : 'saisie');
   const [bus, setBus] = useState([]);
   const [buId, setBuId] = useState('');
   const [date, setDate] = useState(today());
