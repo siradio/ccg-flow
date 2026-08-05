@@ -33,6 +33,7 @@ import StockMovementsPage from './pages/Stock/MovementsPage';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
 import MouvementForm from './pages/Stock/MouvementForm';
+import MouvementMP from './pages/Stock/MouvementMP';
 import MouvementsJournal from './pages/Stock/MouvementsJournal';
 import StockActuel from './pages/Stock/StockActuel';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="stock/referentiels" element={<RequireModule subModule="stock.referentiels"><StockReferentiels /></RequireModule>} />
         <Route path="stock/tableau-bord" element={<RequireModule subModule="stock.tableau_bord"><StockTableauBord /></RequireModule>} />
         <Route path="stock/saisie-mouvement" element={<RequireModule subModule="stock.saisie"><MouvementForm /></RequireModule>} />
+        <Route path="stock/saisie-mp" element={<RequireModule subModule="stock.saisie"><MouvementMP /></RequireModule>} />
         <Route path="stock/journal" element={<RequireModule subModule="stock.consultation"><MouvementsJournal /></RequireModule>} />
         <Route path="stock/etat" element={<RequireModule subModule="stock.consultation"><StockActuel /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />

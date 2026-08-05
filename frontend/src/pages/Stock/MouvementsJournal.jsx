@@ -105,6 +105,16 @@ export default function MouvementsJournal() {
             {d10(detail.date_mouvement)} · {detail.bu_nom || '—'} · {detail.location_nom || 'sans localisation'} · {detail.statut}
             {detail.reference_document ? ` · doc ${detail.reference_document}` : ''}{detail.cree_par ? ` · par ${detail.cree_par}` : ''}
           </p>
+          {(detail.ordre_fabrication || detail.produit_fini_designation || detail.lot_fournisseur || detail.statut_qualite) && (
+            <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+              <strong>Production :</strong>
+              {detail.ordre_fabrication ? ` OF ${detail.ordre_fabrication}` : ''}
+              {detail.ligne_production ? ` · ligne ${detail.ligne_production}` : ''}
+              {detail.produit_fini_designation ? ` · → ${detail.produit_fini_designation}` : ''}
+              {detail.lot_fournisseur ? ` · lot fourn. ${detail.lot_fournisseur}` : ''}
+              {detail.statut_qualite ? ` · qualité : ${detail.statut_qualite}` : ''}
+            </p>
+          )}
           {detail.commentaire && <p style={{ margin: '0 0 10px' }}>{detail.commentaire}</p>}
           <div className="table-wrap">
             <table>

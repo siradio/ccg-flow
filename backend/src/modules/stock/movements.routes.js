@@ -43,10 +43,12 @@ router.get('/:id', requireSubModule('stock.consultation'), async (req, res, next
   try {
     const m = await one(
       `SELECT m.*, t.libelle AS type_libelle, t.sens, bu.nom AS bu_nom, loc.nom AS location_nom,
+              pf.designation AS produit_fini_designation,
               u.prenom || ' ' || u.nom AS cree_par, v.prenom || ' ' || v.nom AS valide_par
        FROM stock_ledger m JOIN stock_movement_types t ON t.id = m.type_id
        LEFT JOIN business_units bu ON bu.id = m.business_unit_id
        LEFT JOIN stock_locations loc ON loc.id = m.location_id
+       LEFT JOIN products pf ON pf.id = m.produit_fini_id
        LEFT JOIN users u ON u.id = m.created_by LEFT JOIN users v ON v.id = m.validated_by
        WHERE m.id = $1`, [Number(req.params.id)]);
     if (!m) return res.status(404).json({ error: 'Mouvement introuvable.' });
@@ -75,10 +77,14 @@ router.post('/', requireCreate, async (req, res, next) => {
     const result = await withTransaction(async (tx) => {
       const m = await tx.one(
         `INSERT INTO stock_ledger (date_mouvement, type_id, business_unit_id, location_id, statut,
-            reference_document, numero_bon, fournisseur_id, commentaire, created_by, validated_by)
-         VALUES (COALESCE($1, CURRENT_DATE),$2,$3,$4,'valide',$5,$6,$7,$8,$9,$9) RETURNING *`,
+            reference_document, numero_bon, fournisseur_id, commentaire,
+            ordre_fabrication, ligne_production, produit_fini_id, lot_fournisseur, statut_qualite,
+            created_by, validated_by)
+         VALUES (COALESCE($1, CURRENT_DATE),$2,$3,$4,'valide',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14) RETURNING *`,
         [b.date_mouvement || null, Number(b.type_id), buId, num(b.location_id),
-         b.reference_document || null, b.numero_bon || null, num(b.fournisseur_id), b.commentaire || null, req.user.id]);
+         b.reference_document || null, b.numero_bon || null, num(b.fournisseur_id), b.commentaire || null,
+         b.ordre_fabrication || null, b.ligne_production || null, num(b.produit_fini_id),
+         b.lot_fournisseur || null, b.statut_qualite || null, req.user.id]);
       await tx.run(`UPDATE stock_ledger SET reference = $1 WHERE id = $2`, [`MV-${String(m.id).padStart(5, '0')}`, m.id]);
       for (const l of lines) {
         const pu = num(l.prix_unitaire);
