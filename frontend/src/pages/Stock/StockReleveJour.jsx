@@ -23,7 +23,7 @@ const SUIVI_COLS = [
 ];
 
 function Segmented({ tab, setTab }) {
-  const tabs = [['saisie', 'Saisie du jour'], ['suivi', 'Suivi Direction']];
+  const tabs = [['saisie', 'Saisie du jour'], ['suivi', 'Suivi']];
   return (
     <div style={{ display: 'inline-flex', gap: 4, background: 'rgba(128,128,128,0.12)', borderRadius: 12, padding: 4, margin: '4px 0 16px' }}>
       {tabs.map(([k, label]) => (
