@@ -5,7 +5,7 @@ import client from '../../api/client';
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
-export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false }) {
+export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields));
   const [editingId, setEditingId] = useState(null);
@@ -27,8 +27,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   }
   useEffect(load, [endpoint]);
 
-  function startEdit(item) {
-    setEditingId(item.id);
+  // Construit les valeurs du formulaire à partir d'un enregistrement existant (édition ou duplication).
+  function formFromItem(item) {
     const next = {};
     for (const f of fields) {
       if (f.type === 'multiEntity') next[f.key] = item[f.key] ?? [];
@@ -37,11 +37,25 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       else if (f.type === 'date') next[f.key] = item[f.key] ? String(item[f.key]).slice(0, 10) : '';
       else next[f.key] = item[f.key] ?? '';
     }
-    setForm(next);
-    // Le formulaire est en bas de page, après le tableau — sans ça, cliquer "Éditer" sur une
-    // ligne du haut d'une longue liste (ex. Fournisseurs) ne montre visuellement aucun effet tant
-    // qu'on n'a pas fait défiler manuellement jusqu'en bas (même pattern que Prices/HistoryPage.jsx).
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    return next;
+  }
+
+  // Le formulaire est en bas de page, après le tableau — sans ce défilement, cliquer "Éditer"/
+  // "Dupliquer" sur une ligne du haut ne montre visuellement aucun effet (même pattern que Prices).
+  function scrollToForm() { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+
+  function startEdit(item) {
+    setEditingId(item.id);
+    setForm(formFromItem(item));
+    scrollToForm();
+  }
+
+  // Duplication : pré-remplit le formulaire avec une fiche existante SANS editingId → le submit crée
+  // un nouvel enregistrement. Utile pour les missions récurrentes (on reprend tout, on change la date).
+  function startDuplicate(item) {
+    setEditingId(null);
+    setForm(formFromItem(item));
+    scrollToForm();
   }
 
   async function onSubmit(e) {
@@ -118,17 +132,18 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             <thead>
               <tr>
                 {fields.map(f => <th key={f.key}>{f.label}</th>)}
-                {canEdit && <th className="sticky-col" />}
+                {(canEdit || (canAdd && duplicable)) && <th className="sticky-col" />}
               </tr>
             </thead>
             <tbody>
               {visibleItems.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint)}</td>)}
-                  {canEdit && (
+                  {(canEdit || (canAdd && duplicable)) && (
                     <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
-                      <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
-                      <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">Supprimer</button>
+                      {canAdd && duplicable && <button onClick={() => startDuplicate(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Dupliquer</button>}
+                      {canEdit && <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>}
+                      {canEdit && <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">Supprimer</button>}
                     </td>
                   )}
                 </tr>
@@ -146,14 +161,25 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       {showForm && (
         <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
           <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? 'Modifier' : 'Ajouter'}</strong>
-          {fields.filter(f => fieldVisible(f, form)).map(f => (
-            f.type === 'photo'
-              ? <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
-                  hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />
-              : <FieldInput key={f.key} field={f} value={form[f.key]}
-                  onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
-                  entities={entities} sites={sites} lists={lists} />
-          ))}
+          {fields.filter(f => fieldVisible(f, form)).map(f => {
+            if (f.type === 'photo') {
+              return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
+                hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
+            }
+            const input = <FieldInput field={f} value={form[f.key]}
+              onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
+              entities={entities} sites={sites} lists={lists} />;
+            // La case à cocher porte déjà son propre libellé à côté d'elle.
+            if (f.type === 'checkbox') return <span key={f.key} style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>{input}</span>;
+            // Un libellé au-dessus de chaque champ : sans ça, les placeholders (tronqués sur les
+            // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
+            return (
+              <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
+                {f.label}{f.required ? ' *' : ''}
+                {input}
+              </label>
+            );
+          })}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
           <button type="submit" className="btn btn-primary">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
           {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields)); }} className="btn btn-secondary">Annuler</button>}
@@ -381,18 +407,6 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
     return (
       <textarea placeholder={field.label} required={field.required} rows={2} style={{ minWidth: 220 }}
         value={value || ''} onChange={e => onChange(e.target.value)} />
-    );
-  }
-  // Un <input type="date"> ignore le placeholder (il affiche toujours « jj/mm/aaaa »), donc sans
-  // libellé on ne distingue pas deux dates côte à côte (ex. fabrication vs acquisition). On ajoute
-  // une petite étiquette au-dessus du champ.
-  if (field.type === 'date') {
-    return (
-      <label style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, fontSize: 11, color: 'var(--color-text-muted)' }}>
-        {field.label}
-        <input type="date" required={field.required} value={value || ''}
-          onChange={e => onChange(e.target.value)} style={{ fontSize: 13, color: 'var(--color-text)' }} />
-      </label>
     );
   }
   return (
