@@ -31,10 +31,13 @@ const CONFIGS = {
   conducteurs: {
     title: 'Conducteurs', endpoint: '/drivers', subModuleKey: 'logistique.parc',
     filters: ['actif'],
+    // Chauffeur interne : on choisit l'employé → nom/prénom/téléphone se remplissent tout seuls
+    // (modifiables). Chauffeur externe/intérimaire : on laisse « Employé » vide et on saisit le nom.
     fields: [
+      { key: 'employee_id', label: 'Employé (chauffeur interne)', type: 'fkSelect', listKey: 'employees',
+        autofill: { nom: '_nom', prenom: '_prenom', telephone: '_tel' } },
       { key: 'nom', label: 'Nom', required: true },
       { key: 'prenom', label: 'Prénom' },
-      { key: 'employee_id', label: 'Employé (si interne)', type: 'fkSelect', listKey: 'employees' },
       { key: 'telephone', label: 'Téléphone' },
       { key: 'permis_numero', label: 'N° de permis' },
       { key: 'permis_categories', label: 'Catégories de permis' },
@@ -65,9 +68,15 @@ export default function LogistiqueIndex() {
     client.get('/vehicle-types').then(res => setVehicleTypes(res.data)).catch(() => {});
     client.get('/entities').then(res => setEntities(res.data)).catch(() => {});
     client.get('/sites').then(res => setSites(res.data)).catch(() => {});
-    // Liste des employés pour lier un conducteur interne à sa fiche RH. En dégradé gracieux si
-    // l'utilisateur n'a pas l'accès RH : le lien reste vide, on saisit alors nom/prénom à la main.
-    client.get('/employees').then(res => setEmployees(res.data.map(e => ({ id: e.id, nom: `${e.prenom || ''} ${e.nom || ''}`.trim() })))).catch(() => {});
+    // Liste des employés dont le POSTE est « Chauffeur » — inutile de dérouler tout l'effectif pour
+    // lier un conducteur interne. En dégradé gracieux si pas d'accès RH : liste vide, saisie manuelle.
+    client.get('/employees').then(res => setEmployees(res.data
+      .filter(e => e.poste && /chauffeur/i.test(e.poste))
+      .map(e => ({
+        id: e.id,
+        nom: `${e.prenom || ''} ${e.nom || ''}`.trim(),   // libellé de l'option
+        _nom: e.nom || '', _prenom: e.prenom || '', _tel: e.telephone || '', // sources d'auto-remplissage
+      })))).catch(() => {});
   }, []);
 
   const canParc = hasSubModuleLevel(user, 'logistique.parc');
