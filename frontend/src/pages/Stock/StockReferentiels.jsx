@@ -62,16 +62,25 @@ export default function StockReferentiels() {
     <div>
       <StockSectionNav />
       <div style={{ marginBottom: 6 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Référentiels Stock</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>Paramétrage du stock</h1>
         <p className="page-subtitle" style={{ margin: '4px 0 0' }}>Types de mouvement (avec leur impact sur le stock) et localisations physiques.</p>
       </div>
-      <div style={{ display: 'flex', gap: 8, margin: '10px 0 14px', flexWrap: 'wrap' }}>
-        {TABS.map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setTab(key)}
-            className={`btn btn-sm ${tab === key ? 'btn-primary' : 'btn-secondary'}`}>
-            {label}
-          </button>
-        ))}
+      <div style={{ display: 'inline-flex', gap: 4, background: 'rgba(128,128,128,0.12)', borderRadius: 12, padding: 4, margin: '12px 0 16px' }}>
+        {TABS.map(([key, label]) => {
+          const active = tab === key;
+          return (
+            <button key={key} type="button" onClick={() => setTab(key)}
+              style={{
+                border: 'none', cursor: 'pointer', font: 'inherit', fontWeight: 600, fontSize: 13.5,
+                padding: '7px 18px', borderRadius: 9, transition: 'background .15s, color .15s, box-shadow .15s',
+                background: active ? 'var(--color-primary, #4f46e5)' : 'transparent',
+                color: active ? '#fff' : 'var(--color-text-muted, #6b7280)',
+                boxShadow: active ? '0 1px 3px rgba(0,0,0,0.18)' : 'none',
+              }}>
+              {label}
+            </button>
+          );
+        })}
       </div>
       <ReferentialPage
         key={tab} title={config.title} endpoint={config.endpoint} fields={config.fields}

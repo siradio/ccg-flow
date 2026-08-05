@@ -14,7 +14,7 @@ const NAV = [
   ['/stock/inventaires', 'Inventaires', 'stock.inventaires'],
   ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
   ['/stock/import', 'Import', 'stock.import'],
-  ['/stock/referentiels', 'Référentiels', 'stock.referentiels'],
+  ['/stock/referentiels', 'Paramétrage', 'stock.referentiels'],
 ];
 
 export default function StockSectionNav() {
