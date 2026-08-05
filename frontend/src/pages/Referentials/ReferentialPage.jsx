@@ -146,7 +146,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       {showForm && (
         <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
           <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? 'Modifier' : 'Ajouter'}</strong>
-          {fields.map(f => (
+          {fields.filter(f => fieldVisible(f, form)).map(f => (
             f.type === 'photo'
               ? <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
                   hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />
@@ -161,6 +161,17 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       )}
     </div>
   );
+}
+
+// Affichage conditionnel d'un champ du formulaire : `showIf { field, equals }` ou `{ field, in:[…] }`
+// n'affiche le champ que si la valeur d'un autre champ correspond (ex. « Société » seulement pour un
+// conducteur de type Prestataire). Sans showIf, toujours visible.
+function fieldVisible(field, form) {
+  const c = field.showIf;
+  if (!c) return true;
+  const v = form[c.field];
+  if (Array.isArray(c.in)) return c.in.includes(v);
+  return v === c.equals;
 }
 
 // Applique un changement de champ, avec auto-remplissage optionnel : un champ `fkSelect` porteur
