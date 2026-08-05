@@ -34,6 +34,7 @@ const MODULES = [
       { key: 'logistique.missions', label: 'Missions' },
       { key: 'logistique.checklists', label: 'Checklists chauffeurs' },
       { key: 'logistique.maintenance', label: 'Pannes, garages & réparations' },
+      { key: 'logistique.accidents', label: 'Accidents' },
     ],
   },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },

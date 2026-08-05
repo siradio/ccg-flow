@@ -14,6 +14,7 @@ import ChecklistsPage from './pages/Logistique/ChecklistsPage';
 import LogistiqueDocuments from './pages/Logistique/LogistiqueDocuments';
 import PannesPage from './pages/Logistique/PannesPage';
 import LogistiqueGarages from './pages/Logistique/LogistiqueGarages';
+import AccidentsPage from './pages/Logistique/AccidentsPage';
 import LiensPage from './pages/Liens/LiensPage';
 import Users from './pages/Admin/Users';
 import Statistiques from './pages/Admin/Statistiques';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
         <Route path="logistique/pannes" element={<PannesPage />} />
         <Route path="logistique/garages" element={<LogistiqueGarages />} />
+        <Route path="logistique/accidents" element={<AccidentsPage />} />
         <Route path="logistique/:type" element={<LogistiqueIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><Users /></RequireAdmin>} />
         <Route path="admin/stats" element={<RequireAdmin level="user"><Statistiques /></RequireAdmin>} />
