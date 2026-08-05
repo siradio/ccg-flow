@@ -71,6 +71,8 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`✅ CCG Flow API démarrée sur http://localhost:${PORT}`);
     console.log('   Pense à lancer "npm run seed" la première fois pour peupler la base.');
+    // Planificateur des alertes d'échéance des documents véhicule (vérif quotidienne).
+    require('./modules/logistique/echeance-alerts').startEcheanceAlerts();
   });
 }
 
