@@ -32,6 +32,7 @@ const MODULES = [
     subModules: [
       { key: 'logistique.parc', label: 'Parc (véhicules)' },
       { key: 'logistique.missions', label: 'Missions' },
+      { key: 'logistique.checklists', label: 'Checklists chauffeurs' },
     ],
   },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },
