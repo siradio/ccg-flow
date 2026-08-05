@@ -51,7 +51,7 @@ const CONFIGS = {
   },
   missions: {
     title: 'Missions', endpoint: '/missions', subModuleKey: 'logistique.missions',
-    filters: ['statut', 'vehicle_id'],
+    filters: ['statut', 'vehicle_id'], duplicable: true,  // missions récurrentes : « Dupliquer »
     fields: [
       { key: 'objet', label: 'Objet / motif', required: true },
       { key: 'vehicle_id', label: 'Véhicule', type: 'fkSelect', listKey: 'vehicles', required: true },
@@ -133,6 +133,7 @@ export default function LogistiqueIndex() {
         lists={{ vehicleTypes, entities, sites, employees: chauffeurs, vehicles, drivers, commerciaux }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
+        duplicable={config.duplicable}
       />
     </div>
   );
