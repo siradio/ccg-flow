@@ -8,6 +8,7 @@ const NAV = [
   ['/logistique/conducteurs', 'Conducteurs', 'logistique.parc'],
   ['/logistique/missions', 'Missions', 'logistique.missions'],
   ['/logistique/checklists', 'Checklists', 'logistique.checklists'],
+  ['/logistique/documents', 'Documents & échéances', 'logistique.parc'],
   ['/logistique/types', 'Types de véhicule', 'logistique.parc'],
 ];
 
