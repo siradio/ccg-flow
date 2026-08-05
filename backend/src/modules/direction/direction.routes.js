@@ -54,6 +54,26 @@ router.get('/dashboard', requireSubModule('direction'), async (req, res, next) =
        WHERE pe.date_production >= CURRENT_DATE - 7 ${buScope}
        GROUP BY pe.date_production ORDER BY pe.date_production`, P);
 
+    // ---- DÉTAIL PAR PRODUIT (le DG veut tout sur un écran) ----
+    // Stock : dernier relevé par produit + théorique (grand livre) + écart.
+    const stockProduits = (await all(
+      `SELECT DISTINCT ON (se.product_id) se.product_id, se.quantite AS releve, se.date_stock,
+              p.code, p.designation, bu.nom AS bu_nom, COALESCE(bal.qty, 0) AS theorique
+       FROM stock_entries se JOIN products p ON p.id = se.product_id
+       LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       LEFT JOIN (SELECT product_id, SUM(stock_actuel) AS qty FROM v_stock_balances GROUP BY product_id) bal ON bal.product_id = se.product_id
+       WHERE se.date_stock <= CURRENT_DATE AND p.type_article IS DISTINCT FROM 'matiere_premiere' ${buScope}
+       ORDER BY se.product_id, se.date_stock DESC`, P))
+      .map(r => ({ ...r, ecart: Number(r.releve) - Number(r.theorique) }))
+      .sort((a, b) => (a.bu_nom || '').localeCompare(b.bu_nom || '') || (a.designation || '').localeCompare(b.designation || ''));
+    // Production : production de la veille par produit.
+    const prodProduits = await all(
+      `SELECT p.code, p.designation, bu.nom AS bu_nom, COALESCE(SUM(pe.quantite),0)::float AS total
+       FROM production_entries pe JOIN products p ON p.id = pe.product_id
+       LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       WHERE pe.date_production = CURRENT_DATE - 1 ${buScope}
+       GROUP BY p.code, p.designation, bu.nom ORDER BY total DESC`, P);
+
     // ---- ÉVOLUTIONS (12 semaines) pour affichage direct sur le dashboard (le DG ne navigue pas) ----
     const stockEvo = await all(
       `WITH lpb AS (
@@ -107,10 +127,10 @@ router.get('/dashboard', requireSubModule('direction'), async (req, res, next) =
       stock: {
         valeurTotale, parBu: stockParBu,
         rupture: stockStatuts.rupture, alerte: stockStatuts.alerte, nbProduits: stockStatuts.nb,
-        relevesDuJour: { nb: releves.nb, total: releves.total }, evolution: stockEvo,
+        relevesDuJour: { nb: releves.nb, total: releves.total }, evolution: stockEvo, produits: stockProduits,
       },
       production: {
-        hier: prodHier, avantHier: prodAvantHier, parBu: prodHierParBu, serie7j: prodSerie, evolution: prodEvo,
+        hier: prodHier, avantHier: prodAvantHier, parBu: prodHierParBu, serie7j: prodSerie, evolution: prodEvo, produits: prodProduits,
       },
       ventes: null, // module Ventes à venir
       logistique: logi,

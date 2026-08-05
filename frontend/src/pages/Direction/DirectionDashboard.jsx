@@ -81,6 +81,7 @@ export default function DirectionDashboard() {
   const [err, setErr] = useState(false);
   const [prefs, setPrefs] = useState(loadPrefs);
   const [showPrefs, setShowPrefs] = useState(false);
+  const [activeTab, setActiveTab] = useState('stock');
 
   useEffect(() => {
     if (!canView) return;
@@ -148,6 +149,27 @@ export default function DirectionDashboard() {
             </div>
           ))}
         </div>
+        {(d.stock.produits || []).length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — relevé du jour · théorique · écart</div>
+            <div style={{ maxHeight: 190, overflowY: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+                <thead><tr style={{ color: 'var(--color-text-muted)' }}>
+                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '2px 0' }}>Produit</th>
+                  <th style={{ textAlign: 'right' }}>Relevé</th><th style={{ textAlign: 'right' }}>Théo.</th><th style={{ textAlign: 'right' }}>Écart</th>
+                </tr></thead>
+                <tbody>{d.stock.produits.map(r => (
+                  <tr key={r.product_id}>
+                    <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.releve)}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-muted)' }}>{nf(r.theorique)}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: r.ecart === 0 ? '#15803d' : r.ecart > 0 ? '#1d4ed8' : '#b91c1c' }}>{r.ecart > 0 ? '+' : ''}{nf(r.ecart)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </ModuleCard>
     ),
     production: (
@@ -173,6 +195,21 @@ export default function DirectionDashboard() {
         <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
           {d.production.parBu.length ? d.production.parBu.map(b => `${b.bu_nom} : ${nf(b.total)}`).join(' · ') : 'Aucune production saisie hier.'}
         </div>
+        {(d.production.produits || []).length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — production de la veille</div>
+            <div style={{ maxHeight: 170, overflowY: 'auto' }}>
+              <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+                <tbody>{d.production.produits.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.total)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </ModuleCard>
     ),
     ventes: (
@@ -253,10 +290,28 @@ export default function DirectionDashboard() {
         </section>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
-        {ORDER.filter(k => prefs[k]).map(k => CARDS[k])}
-      </div>
-      {ORDER.every(k => !prefs[k]) && <p className="empty-row">Aucune rubrique sélectionnée — cliquez sur « Personnaliser » pour en afficher.</p>}
+      {(() => {
+        const LABELS = Object.fromEntries(RUBRIQUES);
+        const visibleTabs = ORDER.filter(k => prefs[k]);
+        if (!visibleTabs.length) return <p className="empty-row">Aucune rubrique sélectionnée — cliquez sur « Personnaliser » pour en afficher.</p>;
+        const active = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0];
+        return (
+          <>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background: 'rgba(128,128,128,0.10)', borderRadius: 12, padding: 5 }}>
+              {visibleTabs.map(k => {
+                const on = k === active;
+                return (
+                  <button key={k} type="button" onClick={() => setActiveTab(k)}
+                    style={{ border: 'none', cursor: 'pointer', font: 'inherit', fontWeight: 600, fontSize: 13.5, padding: '8px 16px', borderRadius: 9,
+                      background: on ? 'var(--color-primary, #2454e0)' : 'transparent', color: on ? '#fff' : 'var(--color-text-muted, #6b7280)',
+                      boxShadow: on ? '0 1px 3px rgba(0,0,0,0.18)' : 'none' }}>{LABELS[k]}</button>
+                );
+              })}
+            </div>
+            <div>{CARDS[active]}</div>
+          </>
+        );
+      })()}
     </div>
   );
 }
