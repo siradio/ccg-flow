@@ -406,16 +406,16 @@ function StockKpiTab({ data }) {
   return (
     <>
       <p style={{ marginBottom: 16 }}>
-        <Link to="/stock/dashboard-dg">Voir l'analyse détaillée (par Business Unit, évolution, top mouvements) →</Link>
+        <Link to="/stock/tableau-bord">Voir le tableau de bord Stock détaillé (valeur par BU, alertes, péremption, mouvements) →</Link>
       </p>
       <div className="kpi-grid">
         <div className="card kpi-card">
           <div className="kpi-value">{Math.round(data.stockGlobal).toLocaleString('fr-FR')}</div>
-          <div className="kpi-label">Stock global (dernière saisie par produit, toutes BU)</div>
+          <div className="kpi-label">Stock global, toutes BU (solde des mouvements)</div>
         </div>
         <div className="card kpi-card">
           <div className="kpi-value">{data.produitsSuivis}</div>
-          <div className="kpi-label">Produits suivis (au moins une saisie)</div>
+          <div className="kpi-label">Produits suivis (avec mouvements)</div>
         </div>
         <div className="card kpi-card" style={{ background: data.rupture.length > 0 ? 'var(--color-danger-soft)' : undefined }}>
           <div className="kpi-value">{data.rupture.length}</div>
