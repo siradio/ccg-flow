@@ -5,6 +5,7 @@ import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 // les anciens écrans (Stock du Jour / Mouvement Stock) conservés le temps de la migration.
 const NAV = [
   ['/stock/tableau-bord', 'Tableau de bord', 'stock.tableau_bord'],
+  ['/stock/releve-jour', 'Relevé du jour', 'stock.releve_jour'],
   ['/stock/saisie-mouvement', 'Saisie produit fini', 'stock.saisie'],
   ['/stock/saisie-mp', 'Saisie matière première', 'stock.saisie'],
   ['/stock/journal', 'Mouvements', 'stock.consultation'],
