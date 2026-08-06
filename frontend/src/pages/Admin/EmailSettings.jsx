@@ -39,32 +39,46 @@ export default function EmailSettings() {
   if (error) return <div className="alert alert-danger">{error}</div>;
   if (!cfg) return <p>Chargement…</p>;
 
-  const configured = !!cfg.host;
-  const rows = [
-    ['Serveur (hôte)', cfg.host || '—'],
-    ['Port', cfg.port || '—'],
-    ['TLS implicite (465)', cfg.secure ? 'Oui' : 'Non'],
-    ['Utilisateur (login SMTP)', cfg.user || '—'],
-    ['Mot de passe', cfg.passwordSet ? 'Défini' : 'Non défini'],
-    ['Expéditeur (From)', cfg.from || '—'],
-  ];
+  const provider = cfg.provider || (cfg.host ? 'smtp' : 'none');
+  const configured = provider !== 'none';
+  const providerLabel = { graph: 'Microsoft Graph (OAuth2)', smtp: 'SMTP', none: 'Aucun' }[provider];
+  const rows = provider === 'graph'
+    ? [
+      ['Canal', 'Microsoft Graph (OAuth2, Mail.Send)'],
+      ['Boîte d’envoi', cfg.graph?.sender || '—'],
+    ]
+    : [
+      ['Canal', 'SMTP'],
+      ['Serveur (hôte)', cfg.host || '—'],
+      ['Port', cfg.port || '—'],
+      ['TLS implicite (465)', cfg.secure ? 'Oui' : 'Non'],
+      ['Utilisateur (login SMTP)', cfg.user || '—'],
+      ['Mot de passe', cfg.passwordSet ? 'Défini' : 'Non défini'],
+      ['Expéditeur (From)', cfg.from || '—'],
+    ];
 
   return (
     <div>
-      <h1 className="page-title">Configuration email (SMTP)</h1>
+      <h1 className="page-title">Configuration email</h1>
 
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 640, marginTop: 0 }}>
-        Serveur d’envoi utilisé pour les emails de l’application (demandes de devis, notifications, accès
-        utilisateurs). La configuration est gérée via les <strong>variables d’environnement du serveur</strong>{' '}
-        (App Settings Azure : <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>,{' '}
-        <code>SMTP_PASS</code>, <code>SMTP_FROM</code>). Cet écran est en lecture seule ; utilisez le test
-        ci-dessous pour vérifier l’envoi.
+      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 660, marginTop: 0 }}>
+        Canal d’envoi des emails de l’application (demandes de devis, notifications, accès utilisateurs).
+        Deux modes possibles, pilotés par les <strong>variables d’environnement du serveur</strong> (App
+        Settings Azure) : <strong>Microsoft Graph</strong> (OAuth2, recommandé — <code>GRAPH_TENANT_ID</code>,{' '}
+        <code>GRAPH_CLIENT_ID</code>, <code>GRAPH_CLIENT_SECRET</code>, <code>GRAPH_SENDER</code>), sinon{' '}
+        <strong>SMTP</strong> (<code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>,{' '}
+        <code>SMTP_PASS</code>, <code>SMTP_FROM</code>). Graph est prioritaire dès qu’il est configuré. Cet
+        écran est en lecture seule ; utilisez le test ci-dessous pour vérifier l’envoi réel.
       </p>
 
+      <div style={{ fontSize: 13, marginBottom: 12 }}>
+        Canal actif : <strong>{providerLabel}</strong>
+      </div>
+
       {!configured && (
-        <div className="alert alert-warning" style={{ maxWidth: 640 }}>
-          Aucun serveur SMTP n’est configuré : les emails ne partiront pas tant que les variables
-          d’environnement ne sont pas renseignées côté serveur.
+        <div className="alert alert-warning" style={{ maxWidth: 660 }}>
+          Aucun canal d’envoi n’est configuré (ni Microsoft Graph, ni SMTP) : les emails ne partiront pas
+          tant que les variables d’environnement ne sont pas renseignées côté serveur.
         </div>
       )}
 

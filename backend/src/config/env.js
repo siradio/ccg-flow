@@ -24,4 +24,15 @@ module.exports = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || '"Achats CCG" <achats@ccg-guinee.com>',
   },
+  // Envoi via Microsoft Graph (OAuth2 app-only, permission Mail.Send) — voie moderne recommandée par
+  // Microsoft depuis la fin du Basic Auth SMTP. Prioritaire sur SMTP dès que ces 4 valeurs sont
+  // renseignées. `sender` = boîte aux lettres d'envoi (UPN, ex. direction@ccggroupe.com) ; le nom
+  // d'affichage optionnel de l'expéditeur peut être posé via GRAPH_FROM_NAME.
+  graph: {
+    tenantId: process.env.GRAPH_TENANT_ID || '',
+    clientId: process.env.GRAPH_CLIENT_ID || '',
+    clientSecret: process.env.GRAPH_CLIENT_SECRET || '',
+    sender: process.env.GRAPH_SENDER || process.env.SMTP_USER || '',
+    fromName: process.env.GRAPH_FROM_NAME || 'CCG Flow',
+  },
 };

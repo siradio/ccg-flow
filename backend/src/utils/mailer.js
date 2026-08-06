@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 const settings = require('../modules/settings/settings.service');
+const graphMailer = require('./graphMailer');
 
 const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo-ccg.png');
 const LOGO_CID = 'logo-ccg';
@@ -79,13 +80,30 @@ const RETRY_COOLDOWN_MS = 60_000;
 let brokenUntil = 0;
 let lastError = null;
 
-// En dev/test sans SMTP configuré : log en console au lieu d'échouer, pour ne pas bloquer le workflow.
+// Ordre des canaux d'envoi : Microsoft Graph (OAuth2) si configuré, sinon SMTP, sinon (dev/test sans
+// rien de configuré) log en console au lieu d'échouer, pour ne pas bloquer le workflow.
 async function sendMail({ to, subject, text, html, attachments }) {
-  const { transporter, cfg } = await getTransporter();
   // Le logo n'est joint (en inline, via cid) que si un corps HTML utilise le gabarit ci-dessus.
   const allAttachments = html
-    ? [...(attachments || []), { filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID }]
+    ? [...(attachments || []), { filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID, contentType: 'image/png' }]
     : attachments;
+
+  // 1) Microsoft Graph (recommandé depuis la fin du Basic Auth SMTP), prioritaire dès qu'il est configuré.
+  if (graphMailer.isGraphConfigured()) {
+    if (Date.now() < brokenUntil) throw lastError || new Error('Envoi email indisponible (dernier échec récent).');
+    try {
+      const r = await graphMailer.sendViaGraph({ to, subject, text, html, attachments: allAttachments });
+      brokenUntil = 0;
+      return r;
+    } catch (e) {
+      brokenUntil = Date.now() + RETRY_COOLDOWN_MS;
+      lastError = e;
+      throw e;
+    }
+  }
+
+  // 2) SMTP classique (repli).
+  const { transporter, cfg } = await getTransporter();
   if (!transporter) {
     console.log(`[mailer:dev] À: ${to} | Sujet: ${subject}${allAttachments ? ` | ${allAttachments.length} pièce(s) jointe(s)` : ''}`);
     return { dev: true, to, subject };
@@ -109,10 +127,27 @@ async function sendMail({ to, subject, text, html, attachments }) {
 // tentative réelle immédiate et l'erreur brute remontée à l'admin (pour diagnostiquer identifiants
 // / hôte / port), et pouvoir retester aussitôt après correction sans attendre le cooldown.
 async function sendTestMail({ to }) {
+  const testHtml = renderMailTemplate({
+    title: 'Test de configuration email',
+    bodyHtml: '<p>Cet email confirme que la configuration email de <strong>CCG Flow</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
+  });
+  const testAtt = [{ filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID, contentType: 'image/png' }];
+
+  // Graph prioritaire : on veut tester le canal réellement utilisé pour les envois.
+  if (graphMailer.isGraphConfigured()) {
+    const r = await graphMailer.sendViaGraph({
+      to, subject: 'CCG Flow — email de test',
+      text: 'Cet email confirme que la configuration email de CCG Flow est fonctionnelle.',
+      html: testHtml, attachments: testAtt,
+    });
+    brokenUntil = 0;
+    return r;
+  }
+
   const cfg = await settings.getSmtpConfig();
   const transporter = buildTransporter(cfg);
   if (!transporter) {
-    const err = new Error("Aucun serveur SMTP n'est configuré (renseignez au moins l'hôte).");
+    const err = new Error("Aucun canal d'envoi n'est configuré (ni Microsoft Graph, ni SMTP).");
     err.code = 'NO_SMTP';
     throw err;
   }

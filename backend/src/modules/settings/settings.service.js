@@ -74,6 +74,8 @@ async function getSmtpConfigForAdmin() {
   const db = Object.fromEntries(rows.map(r => [r.key, r.value]));
   const has = k => db[k] !== undefined && db[k] !== '';
   const passInDb = has('smtp_pass') && !!decrypt(db.smtp_pass);
+  const g = env.graph || {};
+  const graphConfigured = !!(g.tenantId && g.clientId && g.clientSecret && g.sender);
   return {
     host: has('smtp_host') ? db.smtp_host : (env.smtp.host || ''),
     port: has('smtp_port') ? db.smtp_port : String(env.smtp.port || 587),
@@ -83,6 +85,9 @@ async function getSmtpConfigForAdmin() {
     passwordSet: passInDb || (!has('smtp_pass') && !!env.smtp.pass),
     // true si au moins un champ est piloté par la base (sinon tout vient encore du .env)
     fromDb: SMTP_KEYS.some(has),
+    // Canal d'envoi réellement utilisé : Graph prioritaire s'il est configuré, sinon SMTP.
+    graph: { configured: graphConfigured, sender: g.sender || '' },
+    provider: graphConfigured ? 'graph' : (has('smtp_host') || env.smtp.host ? 'smtp' : 'none'),
   };
 }
 
