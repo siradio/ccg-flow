@@ -7,7 +7,15 @@
 // Un module absent d'ici, ou présent avec un tableau vide, est lui-même l'unité accordable (sa
 // clé sert directement de sub_module_key) — même règle que côté backend.
 export const MODULE_SUB_KEYS = {
-  stock: ['stock.saisie_jour', 'stock.mouvements'],
+  stock: [
+    'stock.tableau_bord', 'stock.releve_jour', 'stock.saisie', 'stock.consultation',
+    'stock.inventaires', 'stock.transferts', 'stock.valorisation', 'stock.referentiels', 'stock.import',
+  ],
+  logistique: [
+    'logistique.parc', 'logistique.missions', 'logistique.checklists',
+    'logistique.maintenance', 'logistique.accidents', 'logistique.suivi',
+  ],
+  production: ['production.releve', 'production.suivi'],
   kpi: ['kpi.global', 'kpi.achats', 'kpi.rh', 'kpi.stock'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
