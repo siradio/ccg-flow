@@ -61,8 +61,11 @@ router.post('/', requireAuth, requireUserAdmin, async (req, res, next) => {
     const notification = { requested: !!notify, sent: false };
     if (notify) {
       try {
-        await sendCredentialsEmail({ to: email, prenom, email, password: effectivePassword, loginUrl: buildLoginUrl(req) });
-        notification.sent = true;
+        const info = await sendCredentialsEmail({ to: email, prenom, email, password: effectivePassword, loginUrl: buildLoginUrl(req) });
+        // `info.dev` = aucun SMTP configuré (le mail a été journalisé, PAS envoyé) : on ne prétend
+        // pas l'avoir envoyé, pour que l'UI affiche le mot de passe à communiquer manuellement.
+        notification.sent = !info?.dev;
+        if (info?.dev) notification.error = "Aucun serveur SMTP configuré (Admin → Email).";
       } catch (e) {
         // Envoi isolé, jamais bloquant : le compte est créé même si l'email échoue (même principe
         // que les demandes de devis, §3.1). L'UI affichera le repli manuel.
@@ -107,8 +110,9 @@ router.post('/:id/set-password', requireAuth, requireUserAdmin, async (req, res,
     const notification = { requested: !!notify, sent: false };
     if (notify) {
       try {
-        await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password: newPassword, loginUrl: buildLoginUrl(req) });
-        notification.sent = true;
+        const info = await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password: newPassword, loginUrl: buildLoginUrl(req) });
+        notification.sent = !info?.dev; // pas de SMTP configuré -> journalisé, pas envoyé
+        if (info?.dev) notification.error = "Aucun serveur SMTP configuré (Admin → Email).";
       } catch (e) {
         // Envoi isolé, jamais bloquant : le mot de passe est déjà changé, l'UI proposera le repli
         // manuel avec le mot de passe généré ci-dessous (le cas échéant).
@@ -136,8 +140,9 @@ router.post('/:id/approve-access', requireAuth, requireUserAdmin, async (req, re
 
     const notification = { sent: false };
     try {
-      await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password, loginUrl: buildLoginUrl(req) });
-      notification.sent = true;
+      const info = await sendCredentialsEmail({ to: user.email, prenom: user.prenom, email: user.email, password, loginUrl: buildLoginUrl(req) });
+      notification.sent = !info?.dev; // pas de SMTP configuré -> journalisé, pas envoyé
+      if (info?.dev) notification.error = "Aucun serveur SMTP configuré (Admin → Email).";
     } catch (e) {
       notification.error = e.message;
     }
