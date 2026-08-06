@@ -4,20 +4,17 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Tableau de bord Direction (vue exécutive DG). Agrège stock produits finis, production de la veille,
 // ventes (à venir), logistique, achats et RH via /api/direction/dashboard. Les rubriques affichées
 // sont personnalisables (mémorisé dans le navigateur) — ex. masquer Logistique si non déployée.
 const BU_COLORS = ['#2454e0', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#0891b2'];
-const RUBRIQUES = [
-  ['achats', '🧾 Achats'], ['stock', '📦 Stock'], ['production', '🏭 Production'],
-  ['ventes', '🛒 Ventes'], ['logistique', '🚚 Logistique'], ['rh', '👥 RH'],
-];
+// Clés des rubriques/indicateurs (les libellés sont traduits au rendu via t('cockpit.rub.*') /
+// t('cockpit.kpi.*')). L'ordre définit l'ordre d'affichage des onglets.
+const RUBRIQUES = ['achats', 'stock', 'production', 'ventes', 'logistique', 'rh'];
 const PREF_KEY = 'direction_rubriques';
-const HERO_KPIS = [
-  ['stock', 'Valeur du stock'], ['production', 'Production de la veille'],
-  ['achats', 'Achats en cours'], ['rh', 'Effectif actif'],
-];
+const HERO_KPIS = ['stock', 'production', 'achats', 'rh'];
 const HERO_KEY = 'direction_hero';
 
 const nf = n => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 });
@@ -27,7 +24,7 @@ function money(n) {
   if (Math.abs(v) >= 1e6) return (v / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' M';
   return nf(v);
 }
-const longDate = () => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const longDate = (lang) => new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const today = () => new Date().toISOString().slice(0, 10);
 const fmtBucket = (g, b) => {
   const s = String(b).slice(0, 10);
@@ -36,13 +33,14 @@ const fmtBucket = (g, b) => {
 };
 
 function PeriodControl({ value, onChange, range, onRange }) {
+  const { t } = useI18n();
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <select value={value} onChange={e => onChange(e.target.value)} style={{ fontSize: 12.5 }}>
-        <option value="jour">Par jour</option>
-        <option value="semaine">Par semaine</option>
-        <option value="mois">Par mois</option>
-        <option value="personnalise">Personnalisé</option>
+        <option value="jour">{t('cockpit.period.day')}</option>
+        <option value="semaine">{t('cockpit.period.week')}</option>
+        <option value="mois">{t('cockpit.period.month')}</option>
+        <option value="personnalise">{t('cockpit.period.custom')}</option>
       </select>
       {value === 'personnalise' && (
         <>
@@ -55,12 +53,12 @@ function PeriodControl({ value, onChange, range, onRange }) {
 }
 
 function loadPrefs() {
-  try { return { ...Object.fromEntries(RUBRIQUES.map(([k]) => [k, true])), ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; }
-  catch { return Object.fromEntries(RUBRIQUES.map(([k]) => [k, true])); }
+  try { return { ...Object.fromEntries(RUBRIQUES.map(k => [k, true])), ...JSON.parse(localStorage.getItem(PREF_KEY) || '{}') }; }
+  catch { return Object.fromEntries(RUBRIQUES.map(k => [k, true])); }
 }
 function loadHeroPrefs() {
-  try { return { ...Object.fromEntries(HERO_KPIS.map(([k]) => [k, true])), ...JSON.parse(localStorage.getItem(HERO_KEY) || '{}') }; }
-  catch { return Object.fromEntries(HERO_KPIS.map(([k]) => [k, true])); }
+  try { return { ...Object.fromEntries(HERO_KPIS.map(k => [k, true])), ...JSON.parse(localStorage.getItem(HERO_KEY) || '{}') }; }
+  catch { return Object.fromEntries(HERO_KPIS.map(k => [k, true])); }
 }
 
 function Delta({ value }) {
@@ -80,11 +78,12 @@ function HeroStat({ label, value, sub }) {
 }
 
 function ModuleCard({ title, to, accent, children }) {
+  const { t } = useI18n();
   return (
     <section className="card" style={{ borderTop: `3px solid ${accent}`, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <h2 style={{ margin: 0, fontSize: 15, letterSpacing: '.01em' }}>{title}</h2>
-        {to && <Link to={to} style={{ fontSize: 12.5, color: accent, fontWeight: 600, textDecoration: 'none' }}>Ouvrir →</Link>}
+        {to && <Link to={to} style={{ fontSize: 12.5, color: accent, fontWeight: 600, textDecoration: 'none' }}>{t('cockpit.open')}</Link>}
       </div>
       {children}
     </section>
@@ -109,6 +108,7 @@ const pill = (txt, on, colorBg, colorFg) => (
 
 export default function DirectionDashboard() {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const canView = hasSubModuleLevel(user, 'direction');
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
@@ -152,8 +152,8 @@ export default function DirectionDashboard() {
     setHeroPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(HERO_KEY, JSON.stringify(next)); return next; });
   }
 
-  if (!canView) return <p>Le cockpit ne vous a pas été accordé.</p>;
-  if (err) return <p className="empty-row">Impossible de charger le tableau de bord.</p>;
+  if (!canView) return <p>{t('cockpit.notAllowed')}</p>;
+  if (err) return <p className="empty-row">{t('cockpit.loadError')}</p>;
   if (!d) return <Loading />;
 
   const prodDelta = d.production.hier - d.production.avantHier;
@@ -172,17 +172,17 @@ export default function DirectionDashboard() {
   const prodParBuView = buFilter.production ? d.production.parBu.filter(b => b.bu_nom === selProdBu) : d.production.parBu;
   const prodHierView = buFilter.production ? prodParBuView.reduce((s, b) => s + Number(b.total), 0) : d.production.hier;
   const prodProduitsView = buFilter.production ? (d.production.produits || []).filter(r => r.bu_nom === selProdBu) : (d.production.produits || []);
-  const buOptions = <><option value="">Toutes les BU</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</>;
+  const buOptions = <><option value="">{t('cockpit.allBu')}</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</>;
   const veh = d.logistique;
   const rh = d.rh || { total: 0, actifs: 0, parBu: [] };
 
   const CARDS = {
     achats: (
-      <ModuleCard key="achats" title="🧾 Achats" accent="#7c3aed">
+      <ModuleCard key="achats" title={t('cockpit.rub.achats')} accent="#7c3aed">
         <StatRow items={[
-          { label: 'En cours', value: nf(d.achats.enCours), color: '#7c3aed' },
-          { label: 'BC générés', value: nf(d.achats.bcGeneres), color: '#15803d' },
-          { label: 'Engagé (GNF)', value: money(d.achats.montantEngage) },
+          { label: t('cockpit.achats.enCours'), value: nf(d.achats.enCours), color: '#7c3aed' },
+          { label: t('cockpit.achats.bc'), value: nf(d.achats.bcGeneres), color: '#15803d' },
+          { label: t('cockpit.achats.engage'), value: money(d.achats.montantEngage) },
         ]} />
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {Object.entries(d.achats.parStatut).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([s, c]) => (
@@ -194,18 +194,18 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     stock: (
-      <ModuleCard key="stock" title="📦 Stock produits finis" accent="#2454e0">
+      <ModuleCard key="stock" title={t('cockpit.card.stock')} accent="#2454e0">
         <div style={{ marginBottom: 8 }}>
           <select value={buFilter.stock} onChange={e => setBuFilter(f => ({ ...f, stock: e.target.value }))}>{buOptions}</select>
         </div>
         <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{money(stockValeurView)} <span style={{ fontSize: 14, color: 'var(--color-text-muted)', fontWeight: 600 }}>GNF</span></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}>
-          {pill(`${d.stock.rupture} rupture`, true, 'var(--status-red-bg,#fee2e2)', 'var(--status-red-fg,#b91c1c)')}
-          {pill(`${d.stock.alerte} sous seuil`, true, 'var(--status-amber-bg,#fef3c7)', 'var(--status-amber-fg,#b45309)')}
-          {pill(`${d.stock.relevesDuJour.nb} relevés aujourd'hui`, true, 'var(--color-primary-soft)', 'var(--color-primary)')}
+          {pill(t('cockpit.stock.rupture', { n: d.stock.rupture }), true, 'var(--status-red-bg,#fee2e2)', 'var(--status-red-fg,#b91c1c)')}
+          {pill(t('cockpit.stock.sousSeuil', { n: d.stock.alerte }), true, 'var(--status-amber-bg,#fef3c7)', 'var(--status-amber-fg,#b45309)')}
+          {pill(t('cockpit.stock.relevesToday', { n: d.stock.relevesDuJour.nb }), true, 'var(--color-primary-soft)', 'var(--color-primary)')}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '6px 0 2px' }}>
-          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Évolution du stock (quantité)</span>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{t('cockpit.stock.evo')}</span>
           <PeriodControl value={gran.stock} onChange={v => setG('stock', v)} range={customRange.stock} onRange={r => setR('stock', r)} />
         </div>
         {stockEvoData.length > 1 ? (
@@ -219,7 +219,7 @@ export default function DirectionDashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        ) : <p className="empty-row" style={{ margin: '4px 0' }}>Peu de relevés sur les dernières semaines.</p>}
+        ) : <p className="empty-row" style={{ margin: '4px 0' }}>{t('cockpit.stock.few')}</p>}
         <div style={{ marginTop: 6 }}>
           {stockParBuView.map((b, i) => (
             <div key={b.bu_nom} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
@@ -230,12 +230,12 @@ export default function DirectionDashboard() {
         </div>
         {stockProduitsView.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — relevé du jour · théorique · écart</div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>{t('cockpit.stock.detail')}</div>
             <div style={{ maxHeight: 190, overflowY: 'auto' }}>
               <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
                 <thead><tr style={{ color: 'var(--color-text-muted)' }}>
-                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '2px 0' }}>Produit</th>
-                  <th style={{ textAlign: 'right' }}>Relevé</th><th style={{ textAlign: 'right' }}>Théo.</th><th style={{ textAlign: 'right' }}>Écart</th>
+                  <th style={{ textAlign: 'left', fontWeight: 600, padding: '2px 0' }}>{t('cockpit.th.product')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('cockpit.th.releve')}</th><th style={{ textAlign: 'right' }}>{t('cockpit.th.theo')}</th><th style={{ textAlign: 'right' }}>{t('cockpit.th.ecart')}</th>
                 </tr></thead>
                 <tbody>{stockProduitsView.map(r => (
                   <tr key={r.product_id}>
@@ -252,16 +252,16 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     production: (
-      <ModuleCard key="production" title="🏭 Production (veille)" accent="#0f766e">
+      <ModuleCard key="production" title={t('cockpit.card.production')} accent="#0f766e">
         <div style={{ marginBottom: 8 }}>
           <select value={buFilter.production} onChange={e => setBuFilter(f => ({ ...f, production: e.target.value }))}>{buOptions}</select>
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{nf(prodHierView)}</div>
-          {!buFilter.production && <><Delta value={prodDelta} /><span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>vs avant-veille ({nf(d.production.avantHier)})</span></>}
+          {!buFilter.production && <><Delta value={prodDelta} /><span style={{ fontSize: 12.5, color: 'var(--color-text-muted)' }}>{t('cockpit.prod.vsDayBefore', { n: nf(d.production.avantHier) })}</span></>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '8px 0 2px' }}>
-          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Évolution de la production</span>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{t('cockpit.prod.evo')}</span>
           <PeriodControl value={gran.production} onChange={v => setG('production', v)} range={customRange.production} onRange={r => setR('production', r)} />
         </div>
         {prodEvoData.length > 1 ? (
@@ -275,13 +275,13 @@ export default function DirectionDashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        ) : <p className="empty-row" style={{ margin: '10px 0 0' }}>Peu de données de production sur les dernières semaines.</p>}
+        ) : <p className="empty-row" style={{ margin: '10px 0 0' }}>{t('cockpit.prod.few')}</p>}
         <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 6 }}>
-          {prodParBuView.length ? prodParBuView.map(b => `${b.bu_nom} : ${nf(b.total)}`).join(' · ') : 'Aucune production saisie hier.'}
+          {prodParBuView.length ? prodParBuView.map(b => `${b.bu_nom} : ${nf(b.total)}`).join(' · ') : t('cockpit.prod.none')}
         </div>
         {prodProduitsView.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>Détail par produit — production de la veille</div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginBottom: 4 }}>{t('cockpit.prod.detail')}</div>
             <div style={{ maxHeight: 170, overflowY: 'auto' }}>
               <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
                 <tbody>{prodProduitsView.map((r, i) => (
@@ -297,30 +297,30 @@ export default function DirectionDashboard() {
       </ModuleCard>
     ),
     ventes: (
-      <ModuleCard key="ventes" title="🛒 Ventes (veille)" accent="#94a3b8">
+      <ModuleCard key="ventes" title={t('cockpit.card.ventes')} accent="#94a3b8">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '18px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
           <div style={{ fontSize: 34 }}>🚧</div>
-          <div style={{ fontWeight: 700, marginTop: 6 }}>Module Ventes à venir</div>
-          <div style={{ fontSize: 12.5, marginTop: 2 }}>Le suivi des ventes de la veille s'affichera ici une fois le module Ventes livré.</div>
+          <div style={{ fontWeight: 700, marginTop: 6 }}>{t('cockpit.ventes.soon')}</div>
+          <div style={{ fontSize: 12.5, marginTop: 2 }}>{t('cockpit.ventes.desc')}</div>
         </div>
       </ModuleCard>
     ),
     logistique: (
-      <ModuleCard key="logistique" title="🚚 Logistique" accent="#94a3b8">
+      <ModuleCard key="logistique" title={t('cockpit.rub.logistique')} accent="#94a3b8">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '26px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
           <div style={{ fontSize: 34 }}>🚧</div>
-          <div style={{ fontWeight: 700, marginTop: 6 }}>Module Logistique à venir</div>
-          <div style={{ fontSize: 12.5, marginTop: 2 }}>Les indicateurs logistique s'afficheront ici une fois le module déployé.</div>
+          <div style={{ fontWeight: 700, marginTop: 6 }}>{t('cockpit.logi.soon')}</div>
+          <div style={{ fontSize: 12.5, marginTop: 2 }}>{t('cockpit.logi.desc')}</div>
         </div>
       </ModuleCard>
     ),
     rh: (
-      <ModuleCard key="rh" title="👥 RH — Effectif" accent="#0891b2">
+      <ModuleCard key="rh" title={t('cockpit.card.rh')} accent="#0891b2">
         <StatRow items={[
-          { label: 'Actifs', value: nf(rh.actifs), color: '#0891b2' },
-          { label: 'Total', value: nf(rh.total) },
-          { label: 'Inactifs', value: nf(rh.inactifs) },
-          { label: 'Sortis', value: nf(rh.sortis) },
+          { label: t('cockpit.rh.active'), value: nf(rh.actifs), color: '#0891b2' },
+          { label: t('cockpit.rh.total'), value: nf(rh.total) },
+          { label: t('cockpit.rh.inactive'), value: nf(rh.inactifs) },
+          { label: t('cockpit.rh.left'), value: nf(rh.sortis) },
         ]} />
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(rh.parBu || []).slice(0, 5).map(b => (
@@ -328,10 +328,10 @@ export default function DirectionDashboard() {
               <span style={{ color: 'var(--color-text-muted)' }}>{b.bu_nom}</span><strong>{b.c}</strong>
             </div>
           ))}
-          {(rh.parBu || []).length === 0 && <span className="empty-row" style={{ margin: 0 }}>Aucun employé actif.</span>}
+          {(rh.parBu || []).length === 0 && <span className="empty-row" style={{ margin: 0 }}>{t('cockpit.rh.noneActive')}</span>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '12px 0 2px' }}>
-          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Embauches par période</span>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>{t('cockpit.rh.hires')}</span>
           <PeriodControl value={gran.rh} onChange={v => setG('rh', v)} range={customRange.rh} onRange={r => setR('rh', r)} />
         </div>
         {rhEvoData.length > 1 ? (
@@ -345,7 +345,7 @@ export default function DirectionDashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        ) : <p className="empty-row" style={{ margin: '4px 0' }}>Peu d'embauches sur la période choisie.</p>}
+        ) : <p className="empty-row" style={{ margin: '4px 0' }}>{t('cockpit.rh.fewHires')}</p>}
       </ModuleCard>
     ),
   };
@@ -356,47 +356,46 @@ export default function DirectionDashboard() {
       <div style={{ background: 'linear-gradient(130deg, #2454e0 0%, #16308f 55%, #0c1f5e 100%)', color: '#fff', borderRadius: 20, padding: '26px 28px', boxShadow: '0 12px 30px -12px rgba(20,40,120,0.55)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, opacity: 0.85, textTransform: 'capitalize' }}>{longDate()}</div>
-            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.25)' }}>Bienvenue au cockpit du groupe CCG 👋</h1>
-            <div style={{ opacity: 0.85, fontSize: 14, marginTop: 4 }}>Pilotage du groupe en un coup d'œil.</div>
+            <div style={{ fontSize: 13, opacity: 0.85, textTransform: 'capitalize' }}>{longDate(lang)}</div>
+            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.25)' }}>{t('cockpit.heroTitle')}</h1>
+            <div style={{ opacity: 0.85, fontSize: 14, marginTop: 4 }}>{t('cockpit.heroSubtitle')}</div>
           </div>
-          <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>⚙ Personnaliser</button>
+          <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>{t('cockpit.customize')}</button>
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 20 }}>
-          {heroPrefs.stock && <HeroStat label="Valeur du stock (GNF)" value={money(d.stock.valeurTotale)} sub={`${d.stock.nbProduits} produits suivis`} />}
-          {heroPrefs.production && <HeroStat label="Production de la veille" value={nf(d.production.hier)} sub={<span>vs avant-veille <Delta value={prodDelta} /></span>} />}
-          {heroPrefs.achats && <HeroStat label="Achats en cours" value={nf(d.achats.enCours)} sub={`${d.achats.bcGeneres} bons de commande générés`} />}
-          {heroPrefs.rh && <HeroStat label="Effectif actif" value={nf(rh.actifs)} sub={`${rh.total} au total`} />}
-          {!Object.values(heroPrefs).some(Boolean) && <div style={{ opacity: 0.75, fontSize: 13 }}>Aucun indicateur sélectionné (voir « Personnaliser »).</div>}
+          {heroPrefs.stock && <HeroStat label={t('cockpit.hero.stockValue')} value={money(d.stock.valeurTotale)} sub={t('cockpit.hero.productsTracked', { n: d.stock.nbProduits })} />}
+          {heroPrefs.production && <HeroStat label={t('cockpit.hero.prodYesterday')} value={nf(d.production.hier)} sub={<span>{t('cockpit.vsDayBefore')} <Delta value={prodDelta} /></span>} />}
+          {heroPrefs.achats && <HeroStat label={t('cockpit.hero.purchasesOngoing')} value={nf(d.achats.enCours)} sub={t('cockpit.hero.poGenerated', { n: d.achats.bcGeneres })} />}
+          {heroPrefs.rh && <HeroStat label={t('cockpit.hero.headcount')} value={nf(rh.actifs)} sub={t('cockpit.hero.ofTotal', { n: rh.total })} />}
+          {!Object.values(heroPrefs).some(Boolean) && <div style={{ opacity: 0.75, fontSize: 13 }}>{t('cockpit.noKpi')}</div>}
         </div>
       </div>
 
       {showPrefs && (
         <section className="card">
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Indicateurs du bandeau</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>{t('cockpit.bandLabel')}</div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-            {HERO_KPIS.map(([k, label]) => (
+            {HERO_KPIS.map(k => (
               <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!heroPrefs[k]} onChange={() => toggleHero(k)} /> {label}
+                <input type="checkbox" checked={!!heroPrefs[k]} onChange={() => toggleHero(k)} /> {t(`cockpit.kpi.${k}`)}
               </label>
             ))}
           </div>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Rubriques (onglets)</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>{t('cockpit.rubLabel')}</div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {RUBRIQUES.map(([k, label]) => (
+            {RUBRIQUES.map(k => (
               <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!prefs[k]} onChange={() => toggle(k)} /> {label}
+                <input type="checkbox" checked={!!prefs[k]} onChange={() => toggle(k)} /> {t(`cockpit.rub.${k}`)}
               </label>
             ))}
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 8 }}>Votre choix est mémorisé sur cet appareil.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--color-text-muted)', marginTop: 8 }}>{t('cockpit.prefSaved')}</div>
         </section>
       )}
 
       {(() => {
-        const LABELS = Object.fromEntries(RUBRIQUES);
         const visibleTabs = ORDER.filter(k => prefs[k]);
-        if (!visibleTabs.length) return <p className="empty-row">Aucune rubrique sélectionnée — cliquez sur « Personnaliser » pour en afficher.</p>;
+        if (!visibleTabs.length) return <p className="empty-row">{t('cockpit.noRub')}</p>;
         const active = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0];
         return (
           <>
@@ -407,7 +406,7 @@ export default function DirectionDashboard() {
                   <button key={k} type="button" onClick={() => setActiveTab(k)}
                     style={{ border: 'none', cursor: 'pointer', font: 'inherit', fontWeight: 600, fontSize: 13.5, padding: '8px 16px', borderRadius: 9,
                       background: on ? 'var(--color-primary, #2454e0)' : 'transparent', color: on ? '#fff' : 'var(--color-text-muted, #6b7280)',
-                      boxShadow: on ? '0 1px 3px rgba(0,0,0,0.18)' : 'none' }}>{LABELS[k]}</button>
+                      boxShadow: on ? '0 1px 3px rgba(0,0,0,0.18)' : 'none' }}>{t(`cockpit.rub.${k}`)}</button>
                 );
               })}
             </div>
