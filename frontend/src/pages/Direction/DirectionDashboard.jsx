@@ -357,7 +357,7 @@ export default function DirectionDashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontSize: 13, opacity: 0.85, textTransform: 'capitalize' }}>{longDate()}</div>
-            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Bienvenue au cockpit du groupe CCG 👋</h1>
+            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.25)' }}>Bienvenue au cockpit du groupe CCG 👋</h1>
             <div style={{ opacity: 0.85, fontSize: 14, marginTop: 4 }}>Pilotage du groupe en un coup d'œil.</div>
           </div>
           <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>⚙ Personnaliser</button>
