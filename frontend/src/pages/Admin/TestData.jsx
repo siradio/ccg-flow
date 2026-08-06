@@ -30,9 +30,10 @@ export default function TestData() {
   async function clearTestData() {
     const ok = await confirm(
       "Vider les données de test ? Ceci supprime DÉFINITIVEMENT toutes les demandes d'achat (devis, " +
-      'bons de commande, pièces jointes, historique), les saisies de stock, l\'historique des prix et ' +
-      'les notifications. Les référentiels (entités, sites, produits, fournisseurs) et les comptes ' +
-      'utilisateurs ne sont PAS touchés. Cette action est irréversible.',
+      "bons de commande, pièces jointes, historique), les relevés de stock et de production, " +
+      "l'historique des prix, les notifications, ainsi que les stocks initiaux et employés de démo. " +
+      'Les référentiels (entités, sites, produits, fournisseurs) et les comptes utilisateurs ne sont ' +
+      'PAS touchés. Cette action est irréversible.',
       { danger: true, confirmLabel: 'Vider' }
     );
     if (!ok) return;
@@ -65,6 +66,13 @@ export default function TestData() {
           en validation, bon de commande généré) — via le circuit réel, pas des lignes insérées
           directement en base.
         </p>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+          Alimente aussi le <strong>tableau de bord Direction</strong> : ~90 jours de relevés de
+          stock et de production journalière pour chaque produit fini rattaché à une BU (courbes
+          d'évolution, détail par produit, écart théorique), un stock initial au grand livre (valeur
+          de stock par BU) et quelques employés si la table RH est vide. Ré-exécutable sans
+          doublon.
+        </p>
         <button className="btn btn-primary" onClick={loadSampleData} disabled={loading}>
           {loading ? 'Génération…' : 'Charger des données de test'}
         </button>
@@ -73,9 +81,9 @@ export default function TestData() {
       <section className="card" style={{ maxWidth: 560 }}>
         <h2>Vider les données de test</h2>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          Supprime toutes les demandes d'achat, saisies de stock, historique des prix et
-          notifications — pour repartir d'un environnement propre. Les référentiels et les comptes
-          utilisateurs restent intacts.
+          Supprime toutes les demandes d'achat, relevés de stock et de production, historique des
+          prix, notifications, ainsi que les stocks initiaux et employés de démo — pour repartir
+          d'un environnement propre. Les référentiels et les comptes utilisateurs restent intacts.
         </p>
         <div className="alert alert-danger" style={{ marginBottom: 12 }}>
           ⚠️ Action irréversible — à utiliser uniquement en environnement de test.
@@ -90,6 +98,19 @@ export default function TestData() {
       {result?.type === 'load' && (
         <div className="alert alert-success" style={{ maxWidth: 560 }}>
           {result.created} demande(s) d'achat créée(s).
+          {result.demo && (
+            result.demo.produits > 0 ? (
+              <>
+                <br />Tableau de bord Direction : {result.demo.produits} produit(s) fini(s) sur{' '}
+                {result.demo.jours} jours — {result.demo.releves} relevé(s) de stock,{' '}
+                {result.demo.production} saisie(s) de production
+                {result.demo.stockInitial > 0 && <>, {result.demo.stockInitial} stock(s) initial(aux)</>}
+                {result.demo.employes > 0 && <>, {result.demo.employes} employé(s)</>}.
+              </>
+            ) : (
+              <><br />Dashboard Direction : {result.demo.note}</>
+            )
+          )}
           {result.skipped?.length > 0 && (
             <>
               <br />Ignoré (données insuffisantes) :

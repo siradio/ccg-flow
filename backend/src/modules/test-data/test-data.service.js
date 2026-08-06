@@ -1,4 +1,4 @@
-const { all, run } = require('../../db');
+const { all, one, run, withTransaction } = require('../../db');
 const prService = require('../purchase-requests/purchase-requests.service');
 const repo = require('../purchase-requests/purchase-requests.repository');
 const settings = require('../settings/settings.service');
@@ -113,7 +113,170 @@ async function loadSampleData(user) {
     created.push(pr.id);
   }
 
-  return { created: created.length, skipped };
+  const demo = await loadDashboardDemo(user);
+  return { created: created.length, skipped, demo };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Données de démo pour le TABLEAU DE BORD DIRECTION (relevé stock du jour, production journalière,
+// valeur de stock, RH). Génère ~90 jours d'historique par produit fini rattaché à une BU, pour que
+// les cartes, les détails par produit ET les courbes d'évolution (12 semaines) soient remplis dès
+// l'ouverture. Idempotent : relevés/production en upsert (1 ligne par produit et par jour), entrée
+// initiale au grand livre dédupliquée par référence `DEMO-INIT-<produit>`, employés seulement si la
+// table est vide. À vider avec clearTestData().
+const DEMO_DAYS = 90;
+
+function isoDaysAgo(n) {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d;
+}
+function noise(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+// Upsert groupé (par lots) d'une grille flux : rows = [dateISO, productId, quantite].
+async function upsertGrid(tx, table, dateCol, rows, userId) {
+  const CHUNK = 400;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const slice = rows.slice(i, i + CHUNK);
+    const values = [];
+    const params = [];
+    slice.forEach((r, j) => {
+      const b = j * 4;
+      values.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 4})`);
+      params.push(r[0], r[1], r[2], userId);
+    });
+    await tx.run(
+      `INSERT INTO ${table} (${dateCol}, product_id, quantite, created_by, updated_by)
+       VALUES ${values.join(',')}
+       ON CONFLICT (${dateCol}, product_id)
+       DO UPDATE SET quantite = EXCLUDED.quantite, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      params);
+  }
+  return rows.length;
+}
+
+async function loadDashboardDemo(user) {
+  const products = await all(
+    `SELECT p.id, p.business_unit_id AS bu, p.seuil_alerte_stock AS seuil,
+            COALESCE(p.cout_moyen_pondere, p.cout_standard, p.prix_suggere_gnf) AS cost
+     FROM products p
+     WHERE p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
+       AND p.business_unit_id IS NOT NULL`);
+  if (!products.length) {
+    return { produits: 0, releves: 0, production: 0, note: "Aucun produit fini rattaché à une BU — rien à générer pour le dashboard. Rattachez vos produits finis à une Business Unit dans le référentiel." };
+  }
+  const initType = await one("SELECT id FROM stock_movement_types WHERE code = 'stock_initial'");
+
+  // Solde actuel du grand livre par produit (état avant seeding) : on ancre dessus pour que
+  // l'écart relevé/théorique du jour reste petit et réaliste, quel que soit l'existant.
+  const balMap = new Map((await all(
+    'SELECT product_id, SUM(stock_actuel)::float AS qty FROM v_stock_balances GROUP BY product_id'
+  )).map(r => [r.product_id, Number(r.qty)]));
+
+  let releves = 0, production = 0, stockInitial = 0;
+
+  await withTransaction(async (tx) => {
+    for (const p of products) {
+      // Valorisation : garantir un coût, sinon la valeur de stock du DG serait nulle.
+      let cost = Number(p.cost);
+      if (!cost || Number.isNaN(cost)) {
+        cost = Math.round(noise(1500, 25000) / 100) * 100;
+        await tx.run(
+          `UPDATE products SET cout_standard = $1
+           WHERE id = $2 AND cout_standard IS NULL AND cout_moyen_pondere IS NULL AND prix_suggere_gnf IS NULL`,
+          [cost, p.id]);
+      }
+
+      // Niveau de stock CIBLE (= solde théorique visé). Entrée initiale au grand livre (dédupliquée)
+      // pour porter le solde jusqu'à cette cible : jamais en dessous de l'existant (une entrée ne peut
+      // qu'ajouter), d'où max(existant, ...). Le relevé du jour est ensuite calé sur cette cible.
+      const existing = balMap.get(p.id) || 0;
+      const ref = `DEMO-INIT-${p.id}`;
+      const alreadyInit = await tx.one('SELECT 1 FROM stock_ledger WHERE reference = $1', [ref]);
+      let target;
+      if (alreadyInit || !initType) {
+        target = existing > 0 ? existing : Math.round(noise(300, 2500));
+      } else {
+        target = Math.max(existing + Math.round(noise(80, 500)), Math.round(noise(300, 2500)));
+        const openQ = Math.max(1, Math.round(target - existing));
+        const hdr = await tx.one(
+          `INSERT INTO stock_ledger (reference, date_mouvement, type_id, business_unit_id, statut, commentaire, created_by)
+           VALUES ($1, $2, $3, $4, 'valide', 'Données de démo (stock initial)', $5) RETURNING id`,
+          [ref, isoDaysAgo(DEMO_DAYS).toISOString().slice(0, 10), initType.id, p.bu, user.id]);
+        await tx.run(
+          `INSERT INTO stock_ledger_lines (movement_id, product_id, quantite, prix_unitaire, valeur)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [hdr.id, p.id, openQ, cost, Math.round(openQ * cost)]);
+        target = existing + openQ;
+        stockInitial++;
+      }
+
+      const baseProd = Math.round(noise(40, 600)); // production journalière de référence
+      const step = Math.max(5, Math.round(target * 0.03));
+
+      const releveRows = [];
+      const prodRows = [];
+      let level = Math.max(1, Math.round(target * noise(0.9, 1.05)));
+      for (let d = DEMO_DAYS; d >= 0; d--) {
+        const day = isoDaysAgo(d);
+        const dateStr = day.toISOString().slice(0, 10);
+        // Production (flux) : tendance haussière douce + bruit, repos le dimanche.
+        const trend = 1 + 0.20 * ((DEMO_DAYS - d) / DEMO_DAYS);
+        const prodQ = day.getUTCDay() === 0 ? 0 : Math.max(0, Math.round(baseProd * trend * noise(0.7, 1.3)));
+        prodRows.push([dateStr, p.id, prodQ]);
+        // Relevé (niveau) : dérive lente ; le jour même est calé sur la cible -> écart réaliste (± ~5 %).
+        level = d === 0
+          ? Math.max(1, Math.round(target * noise(0.95, 1.03)))
+          : Math.max(1, Math.round(level + noise(-step, step)));
+        releveRows.push([dateStr, p.id, level]);
+      }
+      releves += await upsertGrid(tx, 'stock_entries', 'date_stock', releveRows, user.id);
+      production += await upsertGrid(tx, 'production_entries', 'date_production', prodRows, user.id);
+    }
+  });
+
+  const employes = await seedEmployeesIfEmpty();
+  return { produits: products.length, jours: DEMO_DAYS + 1, releves, production, stockInitial, employes };
+}
+
+// RH : quelques employés répartis par BU, avec date d'embauche étalée sur 24 mois (pour la courbe
+// d'évolution RH) — seulement si la table est quasi vide, pour ne jamais écraser un RH réel.
+const DEMO_PRENOMS = ['Mamadou', 'Fatoumata', 'Ibrahima', 'Aïssatou', 'Ousmane', 'Mariama', 'Alpha', 'Kadiatou', 'Sékou', 'Hadja', 'Thierno', 'Bineta', 'Amadou', 'Ramatoulaye', 'Boubacar', 'Djénabou'];
+const DEMO_NOMS = ['Diallo', 'Barry', 'Bah', 'Sow', 'Camara', 'Touré', 'Keïta', 'Condé', 'Baldé', 'Sylla', 'Cissé', 'Kaba'];
+const DEMO_POSTES = [['Production', 'Opérateur de production'], ['Production', 'Chef d\'équipe'], ['Logistique', 'Cariste'], ['Qualité', 'Contrôleur qualité'], ['Maintenance', 'Technicien de maintenance'], ['Commercial', 'Commercial'], ['Administration', 'Assistant administratif'], ['Finance', 'Comptable']];
+const DEMO_CONTRATS = ['CDI', 'CDI', 'CDI', 'CDD', 'Journalier', 'Consultant'];
+
+async function seedEmployeesIfEmpty() {
+  const { c } = await one('SELECT COUNT(*)::int AS c FROM employees');
+  if (c >= 5) return 0;
+  const entity = await one('SELECT id FROM entities ORDER BY id LIMIT 1');
+  if (!entity) return 0;
+  const bus = await all('SELECT id FROM business_units ORDER BY id');
+  const N = 30;
+  const values = [];
+  const params = [];
+  for (let i = 0; i < N; i++) {
+    const bu = bus.length ? bus[i % bus.length].id : null;
+    const [dep, poste] = DEMO_POSTES[i % DEMO_POSTES.length];
+    const emb = isoDaysAgo(Math.floor(noise(15, 730))).toISOString().slice(0, 10);
+    const statut = i % 12 === 0 ? 'sorti' : (i % 15 === 0 ? 'inactif' : 'actif');
+    const contrat = DEMO_CONTRATS[i % DEMO_CONTRATS.length];
+    const salaire = Math.round(noise(1_500_000, 8_000_000) / 50_000) * 50_000;
+    const b = i * 11;
+    values.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},$${b + 11})`);
+    params.push(
+      `DEMO-${String(1000 + i)}`,
+      DEMO_NOMS[i % DEMO_NOMS.length],
+      DEMO_PRENOMS[i % DEMO_PRENOMS.length],
+      poste, dep, entity.id, bu, emb, contrat, statut, salaire);
+  }
+  await run(
+    `INSERT INTO employees (matricule, nom, prenom, poste, departement, entity_id, business_unit_id, date_embauche, type_contrat, statut, salaire_mensuel)
+     VALUES ${values.join(',')}`, params);
+  return N;
 }
 
 // Vide toutes les données transactionnelles du circuit achat + stock + prix + notifications —
@@ -126,8 +289,12 @@ async function clearTestData() {
   await run(`TRUNCATE TABLE
     purchase_requests, purchase_request_lines, quote_requests, quote_request_suppliers,
     quotes, approvals, purchase_orders, attachments, audit_log, notifications,
-    stock_entries, stock_movements, product_prices
+    stock_entries, stock_movements, production_entries, product_prices
     RESTART IDENTITY CASCADE`);
+  // Données de démo dashboard ciblées (jamais les référentiels ni le grand livre réel) :
+  // entrées initiales de stock et employés générés, repérés par leur préfixe.
+  await run("DELETE FROM stock_ledger WHERE reference LIKE 'DEMO-%'"); // lignes en cascade
+  await run("DELETE FROM employees WHERE matricule LIKE 'DEMO-%'");
 }
 
-module.exports = { loadSampleData, clearTestData };
+module.exports = { loadSampleData, clearTestData, loadDashboardDemo };
