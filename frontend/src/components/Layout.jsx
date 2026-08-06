@@ -4,6 +4,7 @@ import { useAuth, isSuperAdmin, isUserAdmin, hasModuleAccess, hasSubModuleLevel 
 import client from '../api/client';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
+import InstallPWA from './InstallPWA';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
@@ -128,6 +129,7 @@ export default function Layout() {
             <IconMenu />
           </button>
           <div className="topbar-right">
+            <InstallPWA />
             <ThemeSwitcher />
             <NotificationBell />
             <span className="user-chip">
