@@ -158,7 +158,44 @@ async function upsertGrid(tx, table, dateCol, rows, userId) {
   return rows.length;
 }
 
+// Pour une démo « toutes BU », chaque Business Unit doit avoir des produits finis : on complète
+// celles qui en manquent avec des produits finis de démo (code `DEMO-PF-<bu>-<n>`, effaçables).
+// Sans ça, une BU sans produit fini rattaché reste vide sur le dashboard.
+const TARGET_PF_PER_BU = 4;
+const DEMO_PF_SUFFIXES = ['500 g', '1 kg', 'Pack 6', 'Format familial', 'Sachet 250 g', 'Bouteille 1 L'];
+
+async function ensureFinishedProductsPerBu() {
+  const pfCat = (await one("SELECT id FROM product_categories WHERE code = 'produit_fini' ORDER BY id LIMIT 1"))
+    || (await one('SELECT id FROM product_categories ORDER BY id LIMIT 1'));
+  if (!pfCat) return 0; // pas de catégorie -> on ne peut pas créer de produit
+  const bus = await all(
+    `SELECT bu.id, bu.nom,
+            (SELECT COUNT(*) FROM products p
+             WHERE p.business_unit_id = bu.id AND p.actif = true
+               AND p.type_article IS DISTINCT FROM 'matiere_premiere')::int AS nb
+     FROM business_units bu ORDER BY bu.id`);
+  let created = 0;
+  for (const bu of bus) {
+    for (let n = bu.nb + 1; n <= TARGET_PF_PER_BU; n++) {
+      const code = `DEMO-PF-${bu.id}-${n}`;
+      const suffix = DEMO_PF_SUFFIXES[(n - 1) % DEMO_PF_SUFFIXES.length];
+      const cost = Math.round(noise(1500, 25000) / 100) * 100;
+      const nomLisible = String(bu.nom || '').replace(/^BU\s+/i, '').trim() || 'Produit';
+      const r = await run(
+        `INSERT INTO products (code, designation, category_id, type_article, business_unit_id, unite, cout_standard, actif)
+         VALUES ($1, $2, $3, 'produit_fini', $4, 'carton', $5, true)
+         ON CONFLICT (code) DO NOTHING`,
+        [code, `${nomLisible} ${suffix}`, pfCat.id, bu.id, cost]);
+      if (r.rowCount > 0) created++;
+    }
+  }
+  return created;
+}
+
 async function loadDashboardDemo(user) {
+  // Complète chaque BU en produits finis pour que TOUTES les BU soient représentées.
+  const produitsCrees = await ensureFinishedProductsPerBu();
+
   const products = await all(
     `SELECT p.id, p.business_unit_id AS bu, p.seuil_alerte_stock AS seuil,
             COALESCE(p.cout_moyen_pondere, p.cout_standard, p.prix_suggere_gnf) AS cost
@@ -166,7 +203,7 @@ async function loadDashboardDemo(user) {
      WHERE p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
        AND p.business_unit_id IS NOT NULL`);
   if (!products.length) {
-    return { produits: 0, releves: 0, production: 0, note: "Aucun produit fini rattaché à une BU — rien à générer pour le dashboard. Rattachez vos produits finis à une Business Unit dans le référentiel." };
+    return { produits: 0, produitsCrees, releves: 0, production: 0, note: "Aucune Business Unit dans le référentiel — créez au moins une BU pour alimenter le dashboard." };
   }
   const initType = await one("SELECT id FROM stock_movement_types WHERE code = 'stock_initial'");
 
@@ -239,7 +276,7 @@ async function loadDashboardDemo(user) {
   });
 
   const employes = await seedEmployeesIfEmpty();
-  return { produits: products.length, jours: DEMO_DAYS + 1, releves, production, stockInitial, employes };
+  return { produits: products.length, produitsCrees, jours: DEMO_DAYS + 1, releves, production, stockInitial, employes };
 }
 
 // RH : quelques employés répartis par BU, avec date d'embauche étalée sur 24 mois (pour la courbe
@@ -295,6 +332,7 @@ async function clearTestData() {
   // entrées initiales de stock et employés générés, repérés par leur préfixe.
   await run("DELETE FROM stock_ledger WHERE reference LIKE 'DEMO-%'"); // lignes en cascade
   await run("DELETE FROM employees WHERE matricule LIKE 'DEMO-%'");
+  await run("DELETE FROM products WHERE code LIKE 'DEMO-PF-%'"); // produits finis de démo créés par BU
 }
 
 module.exports = { loadSampleData, clearTestData, loadDashboardDemo };

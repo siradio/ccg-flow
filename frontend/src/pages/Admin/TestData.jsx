@@ -67,7 +67,7 @@ export default function TestData() {
           directement en base.
         </p>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          Alimente aussi le <strong>tableau de bord Direction</strong> : ~90 jours de relevés de
+          Alimente aussi le <strong>Cockpit</strong> (vue Direction) : ~90 jours de relevés de
           stock et de production journalière pour chaque produit fini rattaché à une BU (courbes
           d'évolution, détail par produit, écart théorique), un stock initial au grand livre (valeur
           de stock par BU) et quelques employés si la table RH est vide. Ré-exécutable sans
@@ -101,14 +101,17 @@ export default function TestData() {
           {result.demo && (
             result.demo.produits > 0 ? (
               <>
-                <br />Tableau de bord Direction : {result.demo.produits} produit(s) fini(s) sur{' '}
+                <br />Cockpit : {result.demo.produits} produit(s) fini(s) sur{' '}
                 {result.demo.jours} jours — {result.demo.releves} relevé(s) de stock,{' '}
                 {result.demo.production} saisie(s) de production
                 {result.demo.stockInitial > 0 && <>, {result.demo.stockInitial} stock(s) initial(aux)</>}
                 {result.demo.employes > 0 && <>, {result.demo.employes} employé(s)</>}.
+                {result.demo.produitsCrees > 0 && (
+                  <><br />{result.demo.produitsCrees} produit(s) fini(s) de démo créé(s) pour compléter les BU sans produit.</>
+                )}
               </>
             ) : (
-              <><br />Dashboard Direction : {result.demo.note}</>
+              <><br />Cockpit : {result.demo.note}</>
             )
           )}
           {result.skipped?.length > 0 && (

@@ -20,7 +20,6 @@ const HERO_KPIS = [
 ];
 const HERO_KEY = 'direction_hero';
 
-function greeting() { const h = new Date().getHours(); return h >= 5 && h < 18 ? 'Bonjour' : 'Bonsoir'; }
 const nf = n => Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 });
 function money(n) {
   const v = Number(n || 0);
@@ -153,7 +152,7 @@ export default function DirectionDashboard() {
     setHeroPrefs(p => { const next = { ...p, [k]: !p[k] }; localStorage.setItem(HERO_KEY, JSON.stringify(next)); return next; });
   }
 
-  if (!canView) return <p>Le tableau de bord Direction ne vous a pas été accordé.</p>;
+  if (!canView) return <p>Le cockpit ne vous a pas été accordé.</p>;
   if (err) return <p className="empty-row">Impossible de charger le tableau de bord.</p>;
   if (!d) return <Loading />;
 
@@ -240,7 +239,7 @@ export default function DirectionDashboard() {
                 </tr></thead>
                 <tbody>{stockProduitsView.map(r => (
                   <tr key={r.product_id}>
-                    <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
+                    <td style={{ padding: '2px 0' }}>{r.designation || r.code}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.releve)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-muted)' }}>{nf(r.theorique)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: r.ecart === 0 ? '#15803d' : r.ecart > 0 ? '#1d4ed8' : '#b91c1c' }}>{r.ecart > 0 ? '+' : ''}{nf(r.ecart)}</td>
@@ -287,7 +286,7 @@ export default function DirectionDashboard() {
               <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
                 <tbody>{prodProduitsView.map((r, i) => (
                   <tr key={i}>
-                    <td style={{ padding: '2px 0' }}>{r.code || r.designation}</td>
+                    <td style={{ padding: '2px 0' }}>{r.designation || r.code}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{nf(r.total)}</td>
                   </tr>
                 ))}</tbody>
@@ -358,7 +357,7 @@ export default function DirectionDashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontSize: 13, opacity: 0.85, textTransform: 'capitalize' }}>{longDate()}</div>
-            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>{greeting()}, Direction 👋</h1>
+            <h1 style={{ margin: '4px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Bienvenue au cockpit du groupe CCG 👋</h1>
             <div style={{ opacity: 0.85, fontSize: 14, marginTop: 4 }}>Pilotage du groupe en un coup d'œil.</div>
           </div>
           <button onClick={() => setShowPrefs(s => !s)} style={{ background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>⚙ Personnaliser</button>

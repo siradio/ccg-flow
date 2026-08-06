@@ -1,0 +1,21 @@
+{
+  "name": "CCG Flow — Cockpit",
+  "short_name": "CCG Flow",
+  "description": "Cockpit du groupe CCG : pilotage du stock, de la production, des achats et de la logistique.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1330",
+  "theme_color": "#2454e0",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
