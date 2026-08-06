@@ -14,8 +14,7 @@ const ecartColor = e => (e == null ? 'inherit' : e === 0 ? '#15803d' : e > 0 ? '
 
 const SAISIE_COLS = [
   { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' },
-  { key: 'releve', label: 'Stock du jour', type: 'number' }, { key: 'theorique', label: 'Théorique', type: 'number' },
-  { key: 'ecart', label: 'Écart', type: 'number' },
+  { key: 'releve', label: 'Stock du jour', type: 'number' },
 ];
 const SUIVI_COLS = [
   { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
@@ -142,11 +141,11 @@ export default function StockReleveJour() {
             <div className="card" style={{ padding: 0 }}>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Produit</th><th className="num">Stock du jour</th><th className="num">Théorique</th><th className="num">Écart</th><th>Commentaire</th></tr></thead>
+                  {/* Théorique/Écart masqués pour l'instant (écran calé sur la saisie Production). */}
+                  <thead><tr><th>Produit</th><th className="num">Stock du jour</th><th>Commentaire</th></tr></thead>
                   <tbody>
                     {grid.map(r => {
                       const q = edits[r.product_id]?.quantite;
-                      const ecart = q === '' || q == null ? null : Number(q) - Number(r.theorique);
                       return (
                         <tr key={r.product_id}>
                           <td><strong>{r.code || ''}</strong>{r.code ? ' — ' : ''}{r.designation}<div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{r.unite || ''}</div></td>
@@ -154,8 +153,6 @@ export default function StockReleveJour() {
                             <input type="number" step="0.001" disabled={!canSaisir} value={q ?? ''} style={{ width: 100, textAlign: 'right' }}
                               onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], quantite: e.target.value } }))} />
                           </td>
-                          <td className="num" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-muted)' }}>{fmt(r.theorique)}</td>
-                          <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: ecartColor(ecart) }}>{ecart == null ? '—' : (ecart > 0 ? '+' : '') + fmt(ecart)}</td>
                           <td><input disabled={!canSaisir} value={edits[r.product_id]?.commentaire ?? ''} placeholder="optionnel" style={{ width: 160 }}
                             onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], commentaire: e.target.value } }))} /></td>
                         </tr>

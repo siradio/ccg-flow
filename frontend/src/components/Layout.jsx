@@ -23,6 +23,9 @@ function initials(user) {
 // Le lien "Stock" pointe vers le premier écran réellement accordé du module (refonte grand livre).
 function stockLinkTarget(user) {
   if (isSuperAdmin(user) || hasSubModuleLevel(user, 'stock.tableau_bord')) return '/stock/tableau-bord';
+  // Le relevé du jour est l'écran opérationnel quotidien : on l'ouvre en priorité (avant le
+  // Paramétrage), pour ne pas atterrir sur la config quand c'est la saisie du matin qui est visée.
+  if (hasSubModuleLevel(user, 'stock.releve_jour')) return '/stock/releve-jour';
   if (hasSubModuleLevel(user, 'stock.consultation')) return '/stock/etat';
   if (hasSubModuleLevel(user, 'stock.saisie')) return '/stock/saisie-mouvement';
   if (hasSubModuleLevel(user, 'stock.referentiels')) return '/stock/referentiels';
