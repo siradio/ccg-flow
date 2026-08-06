@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 
 // Bouton d'installation de la PWA dans la topbar. Rend l'installation DÉCOUVRABLE :
 // - si le navigateur propose l'invite native (Chrome/Edge/Android), un clic la déclenche ;
@@ -20,6 +21,7 @@ export default function InstallPWA() {
   const [showHelp, setShowHelp] = useState(false);
   const wrapRef = useRef(null);
   const platform = detectPlatform();
+  const { t } = useI18n();
 
   useEffect(() => {
     const onPrompt = (e) => { e.preventDefault(); setDeferred(e); };
@@ -64,9 +66,9 @@ export default function InstallPWA() {
         type="button"
         onClick={onClick}
         className="btn btn-secondary btn-sm"
-        title="Installer l'application sur cet appareil"
+        title={t('install.title')}
       >
-        <span aria-hidden="true">📲</span> <span className="btn-label">Installer l'app</span>
+        <span aria-hidden="true">📲</span> <span className="btn-label">{t('install.button')}</span>
       </button>
       {showHelp && (
         <div

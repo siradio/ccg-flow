@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../theme/ThemeContext';
+import { useI18n } from '../i18n/I18nContext';
 
 const OPTIONS = [
-  { value: 'light', label: 'Clair' },
-  { value: 'dark', label: 'Sombre' },
-  { value: 'system', label: 'Système' },
+  { value: 'light', key: 'theme.light' },
+  { value: 'dark', key: 'theme.dark' },
+  { value: 'system', key: 'theme.system' },
 ];
 
 function SunIcon() {
@@ -37,6 +38,7 @@ const ICONS = { light: SunIcon, dark: MoonIcon, system: SystemIcon };
 
 export default function ThemeSwitcher() {
   const { mode, setMode } = useTheme();
+  const { t } = useI18n();
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
   const CurrentIcon = ICONS[mode];
@@ -54,15 +56,15 @@ export default function ThemeSwitcher() {
       <button
         className="notif-bell-btn"
         onClick={() => setOpen(o => !o)}
-        aria-label="Apparence"
-        title="Apparence"
+        aria-label={t('theme.label')}
+        title={t('theme.label')}
         type="button"
       >
         <CurrentIcon />
       </button>
       {open && (
         <div className="notif-dropdown theme-dropdown">
-          <div className="notif-dropdown-header">Apparence</div>
+          <div className="notif-dropdown-header">{t('theme.label')}</div>
           {OPTIONS.map(opt => {
             const Icon = ICONS[opt.value];
             return (
@@ -73,7 +75,7 @@ export default function ThemeSwitcher() {
                 onClick={() => { setMode(opt.value); setOpen(false); }}
               >
                 <Icon />
-                <span>{opt.label}</span>
+                <span>{t(opt.key)}</span>
               </button>
             );
           })}

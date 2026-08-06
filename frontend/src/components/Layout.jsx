@@ -5,6 +5,8 @@ import client from '../api/client';
 import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import InstallPWA from './InstallPWA';
+import LanguageSwitcher from './LanguageSwitcher';
+import { useI18n } from '../i18n/I18nContext';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
@@ -43,16 +45,17 @@ function productionLinkTarget(user) {
 // niveau de visibilité par défaut. "Utilisateurs" est aussi accessible à support_it (superOnly
 // absent) ; Workflow/Données de test restent réservés aux vrais super_admin.
 const PARAMS_ITEMS = [
-  { to: '/admin/users', label: 'Utilisateurs', Icon: IconUsers },
-  { to: '/admin/stats', label: 'Statistiques', Icon: IconDashboard },
-  { to: '/admin/workflow', label: 'Workflow', Icon: IconWorkflow, superOnly: true },
-  { to: '/admin/email', label: 'Email (SMTP)', Icon: IconMail, superOnly: true },
-  { to: '/admin/documents', label: 'Branding', Icon: IconImage, superOnly: true },
-  { to: '/admin/test-data', label: 'Données de test', Icon: IconDatabase, superOnly: true },
+  { to: '/admin/users', labelKey: 'nav.users', Icon: IconUsers },
+  { to: '/admin/stats', labelKey: 'nav.stats', Icon: IconDashboard },
+  { to: '/admin/workflow', labelKey: 'nav.workflow', Icon: IconWorkflow, superOnly: true },
+  { to: '/admin/email', labelKey: 'nav.email', Icon: IconMail, superOnly: true },
+  { to: '/admin/documents', labelKey: 'nav.branding', Icon: IconImage, superOnly: true },
+  { to: '/admin/test-data', labelKey: 'nav.testData', Icon: IconDatabase, superOnly: true },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
@@ -80,22 +83,22 @@ export default function Layout() {
         <div className="sidebar-brand">
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           CCG Flow
-          <button type="button" className="sidebar-close" onClick={closeNav} aria-label="Fermer le menu">
+          <button type="button" className="sidebar-close" onClick={closeNav} aria-label={t('common.closeMenu')}>
             <IconClose />
           </button>
         </div>
         <nav className="sidebar-nav">
-          <NavLink to="/" end className={navClass} onClick={closeNav}><IconDashboard /> Tableau de bord</NavLink>
-          {hasModuleAccess(user, 'direction') && <NavLink to="/direction" className={navClass} onClick={closeNav}><IconChart /> Cockpit</NavLink>}
-          {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> Demandes d'achat</NavLink>}
-          {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> Stock</NavLink>}
-          {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> Logistique</NavLink>}
-          {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> Production</NavLink>}
-          {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> Référentiels</NavLink>}
+          <NavLink to="/" end className={navClass} onClick={closeNav}><IconDashboard /> {t('nav.dashboard')}</NavLink>
+          {hasModuleAccess(user, 'direction') && <NavLink to="/direction" className={navClass} onClick={closeNav}><IconChart /> {t('nav.cockpit')}</NavLink>}
+          {hasModuleAccess(user, 'achats') && <NavLink to="/purchase-requests" className={navClass} onClick={closeNav}><IconCart /> {t('nav.purchases')}</NavLink>}
+          {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> {t('nav.stock')}</NavLink>}
+          {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> {t('nav.logistics')}</NavLink>}
+          {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> {t('nav.production')}</NavLink>}
+          {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
           {hasLiens && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>
-                <IconLink /> Liens utiles
+                <IconLink /> {t('nav.usefulLinks')}
                 <span className={`sidebar-chevron${liensOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
               </button>
               {liensOpen && (
@@ -111,13 +114,13 @@ export default function Layout() {
           {userAdmin && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setParamsOpen(o => !o)}>
-                <IconSettings /> Paramètres
+                <IconSettings /> {t('nav.settings')}
                 <span className={`sidebar-chevron${paramsOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
               </button>
               {paramsOpen && (
                 <div className="sidebar-subnav">
-                  {visibleParamsItems.map(({ to, label, Icon }) => (
-                    <NavLink key={to} to={to} className={navClass} onClick={closeNav}><Icon /> {label}</NavLink>
+                  {visibleParamsItems.map(({ to, labelKey, Icon }) => (
+                    <NavLink key={to} to={to} className={navClass} onClick={closeNav}><Icon /> {t(labelKey)}</NavLink>
                   ))}
                 </div>
               )}
@@ -128,11 +131,12 @@ export default function Layout() {
 
       <div className="app-main">
         <header className="topbar">
-          <button type="button" className="nav-toggle" onClick={() => setNavOpen(true)} aria-label="Ouvrir le menu">
+          <button type="button" className="nav-toggle" onClick={() => setNavOpen(true)} aria-label={t('common.openMenu')}>
             <IconMenu />
           </button>
           <div className="topbar-right">
             <InstallPWA />
+            <LanguageSwitcher />
             <ThemeSwitcher />
             <NotificationBell />
             <span className="user-chip">
@@ -140,7 +144,7 @@ export default function Layout() {
               <span className="user-name">{user?.prenom} {user?.nom}</span>
             </span>
             <button onClick={() => { logout(); navigate('/login'); }} className="btn btn-secondary btn-sm">
-              <IconLogout /> <span className="btn-label">Déconnexion</span>
+              <IconLogout /> <span className="btn-label">{t('common.logout')}</span>
             </button>
           </div>
         </header>
