@@ -34,10 +34,11 @@ router.post('/', requireAuth, requireUserAdmin, async (req, res, next) => {
     if (existing) return res.status(409).json({ error: 'Email déjà utilisé.' });
 
     const typedPassword = (password || '').trim();
-    // Quand on notifie sans mot de passe saisi, on en génère un fort plutôt que de retomber sur le
-    // défaut "changeme" (qui n'aurait aucun sens à envoyer par email). Comportement inchangé sinon.
-    const generated = notify && !typedPassword;
-    const effectivePassword = typedPassword || (generated ? generatePassword() : undefined);
+    // Sans mot de passe saisi, on en génère TOUJOURS un fort (jamais le défaut "changeme", qui
+    // laissait un compte inconnectable) — qu'on notifie par email ou non. Il est renvoyé à l'admin
+    // ci-dessous pour qu'il puisse le communiquer manuellement.
+    const generated = !typedPassword;
+    const effectivePassword = typedPassword || generatePassword();
 
     const id = await usersService.createUser({ nom, prenom, email, password: effectivePassword, employeeId });
 

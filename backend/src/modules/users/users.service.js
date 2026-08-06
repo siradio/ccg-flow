@@ -6,6 +6,11 @@ const { SUB_MODULE_KEYS } = require('../../config/modules');
 // pour valider un bundle appliqué sans dépendre du middleware depuis la couche service.
 const BUNDLE_NIVEAUX = ['consultation', 'ajout', 'edition'];
 
+// Normalisation de l'email : minuscules + sans espaces. L'email sert d'identifiant de connexion ;
+// le stocker et le comparer normalisé évite l'échec « connexion impossible » quand l'admin saisit
+// une casse différente de celle tapée par l'utilisateur.
+const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
+
 async function loadUserWithRoles(userId) {
   const user = await one(
     'SELECT id, nom, prenom, email, actif, access_status, telephone, fonction, employee_id, created_at FROM users WHERE id = $1',
@@ -118,7 +123,9 @@ async function recordLogin(userId) {
 }
 
 async function findByEmail(email) {
-  return one('SELECT * FROM users WHERE email = $1', [email]);
+  // Comparaison insensible à la casse et aux espaces : le login réussit quelle que soit la casse
+  // saisie, y compris pour les comptes déjà stockés avec une casse hétérogène.
+  return one('SELECT * FROM users WHERE lower(email) = lower(btrim($1))', [email]);
 }
 
 async function findById(id) {
@@ -129,7 +136,7 @@ async function createUser({ nom, prenom, email, password, employeeId, telephone,
   const hash = bcrypt.hashSync(password || 'changeme', 10);
   const row = await one(
     'INSERT INTO users (nom, prenom, email, password_hash, employee_id, telephone, fonction) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-    [nom, prenom, email, hash, employeeId || null, telephone || null, fonction || null]
+    [nom, prenom, normalizeEmail(email), hash, employeeId || null, telephone || null, fonction || null]
   );
   // Rôle demandeur sur toutes les entités par défaut : un compte fraîchement créé peut soumettre
   // une demande d'achat immédiatement, sans qu'un admin ajoute le rôle à la main pour chaque
@@ -153,7 +160,7 @@ async function createPendingUser({ nom, prenom, email, telephone, fonction, enti
   const row = await one(
     `INSERT INTO users (nom, prenom, email, password_hash, telephone, fonction, access_status)
      VALUES ($1,$2,$3,$4,$5,$6,'pending') RETURNING id`,
-    [nom, prenom, email, hash, telephone || null, fonction || null]
+    [nom, prenom, normalizeEmail(email), hash, telephone || null, fonction || null]
   );
   await run(
     `INSERT INTO user_entity_roles (user_id, entity_id, role_code) VALUES ($1,$2,'demandeur')
@@ -177,7 +184,7 @@ async function updateUser(id, { nom, prenom, email, actif, password, telephone, 
     [
       nom ?? existing.nom,
       prenom ?? existing.prenom,
-      email ?? existing.email,
+      email != null ? normalizeEmail(email) : existing.email,
       actif === undefined ? existing.actif : actif,
       hash,
       telephone === undefined ? existing.telephone : telephone,

@@ -143,6 +143,28 @@ export default function DetailPage() {
     finally { setSendingId(null); }
   }
 
+  // « Renvoyer les identifiants » en un clic : régénère un mot de passe fort et l'envoie par email
+  // (les mots de passe étant hachés, on ne peut pas renvoyer l'ancien — on en émet un nouveau). Si
+  // l'email échoue, le mot de passe généré est affiché pour communication manuelle.
+  async function resendCredentials() {
+    const ok = await confirm(
+      `Renvoyer les identifiants à ${u.prenom} ${u.nom} (${u.email}) ? Un nouveau mot de passe sera généré et envoyé par email — l'ancien ne fonctionnera plus.`,
+      { confirmLabel: 'Renvoyer' }
+    );
+    if (!ok) return;
+    setError(''); setNotice(null); setSendingId(u.id);
+    try {
+      const { data } = await client.post(`/users/${u.id}/set-password`, { notify: true });
+      const gen = data.generatedPassword;
+      if (data.notification?.sent) {
+        setNotice({ type: 'success', text: `Identifiants renvoyés par email à ${u.email}.` });
+      } else {
+        setNotice({ type: 'warning', text: `Nouveau mot de passe généré, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${gen ? ` Mot de passe : ${gen} — à lui communiquer manuellement.` : ''}` });
+      }
+    } catch (err) { setError(err.response?.data?.error || 'Erreur lors de l’envoi des identifiants.'); }
+    finally { setSendingId(null); }
+  }
+
   async function copyAccessFrom() {
     if (!quick.copyFrom) return;
     setError(''); setNotice(null);
@@ -221,6 +243,9 @@ export default function DetailPage() {
               <>
                 <button onClick={() => setPwOpen(o => !o)} className="btn btn-secondary btn-sm" title="Définir / réinitialiser le mot de passe et l’envoyer par email">
                   {pwOpen ? 'Fermer' : 'Mot de passe'}
+                </button>
+                <button onClick={resendCredentials} disabled={sendingId === u.id} className="btn btn-secondary btn-sm" title="Générer un nouveau mot de passe et l’envoyer par email à l’utilisateur">
+                  {sendingId === u.id ? '…' : 'Renvoyer les identifiants'}
                 </button>
                 <button onClick={toggleActive} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
                   {u.actif ? 'Supprimer (désactiver)' : 'Réactiver'}

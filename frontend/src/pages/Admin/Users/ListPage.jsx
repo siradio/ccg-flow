@@ -76,6 +76,8 @@ export default function ListPage() {
       } else if (form.notify && !data.notification?.sent) {
         const pw = data.generatedPassword ? ` Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` : ' Communiquez-lui manuellement le mot de passe saisi.';
         setNotice({ type: 'warning', text: `Utilisateur créé, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${pw}` });
+      } else if (data.generatedPassword) {
+        setNotice({ type: 'success', text: `Utilisateur ${who} créé. Mot de passe : ${data.generatedPassword} — à lui communiquer (il pourra le changer ensuite).` });
       } else {
         setNotice({ type: 'success', text: `Utilisateur ${who} créé.` });
       }
