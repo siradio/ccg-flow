@@ -9,7 +9,7 @@ import { useConfirm } from '../../components/ConfirmProvider.jsx';
 export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false }) {
   const confirm = useConfirm();
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState(() => emptyForm(fields));
+  const [form, setForm] = useState(() => emptyForm(fields, entities));
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -66,7 +66,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
     try {
       if (editingId) await client.put(`${endpoint}/${editingId}`, form);
       else await client.post(endpoint, form);
-      setForm(emptyForm(fields));
+      setForm(emptyForm(fields, entities));
       setEditingId(null);
       load();
     } catch (err) {
@@ -184,7 +184,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
           })}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
           <button type="submit" className="btn btn-primary">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields)); }} className="btn btn-secondary">Annuler</button>}
+          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); }} className="btn btn-secondary">Annuler</button>}
         </form>
       )}
     </div>
@@ -215,10 +215,12 @@ function applyFieldChange(prev, field, value, lists = {}) {
   return next;
 }
 
-export function emptyForm(fields) {
+export function emptyForm(fields, entities = []) {
   const f = {};
   for (const field of fields) {
-    f[field.key] = field.type === 'multiEntity' ? []
+    // multiEntity : vide par défaut, SAUF si `defaultAll` (ex. fournisseur) -> toutes les entités
+    // pré-cochées à la création, pour qu'un nouveau fournisseur soit d'emblée disponible partout.
+    f[field.key] = field.type === 'multiEntity' ? (field.defaultAll ? entities.map(e => e.id) : [])
       : field.type === 'checkbox' ? !!field.default
       : (field.default ?? ''); // honore une valeur par défaut (ex. statut = 'actif' sur un select)
   }

@@ -49,39 +49,44 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
     const existing = await one('SELECT * FROM suppliers WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Introuvable.' });
-    const {
-      nom, contact_nom, contact_email, contact_tel, adresse, actif,
-      code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
-      entity_ids,
-    } = req.body || {};
-    const supplier = await one(
-      `UPDATE suppliers SET
-         nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6,
-         code=$7, origine=$8, pays=$9, categorie=$10, produits_offres=$11, mode_paiement=$12,
-         conditions_paiement=$13, a_contrat=$14, commentaires=$15
-       WHERE id=$16 RETURNING *`,
-      [
-        nom ?? existing.nom,
-        contact_nom ?? existing.contact_nom,
-        contact_email ?? existing.contact_email,
-        contact_tel ?? existing.contact_tel,
-        adresse ?? existing.adresse,
-        actif === undefined ? existing.actif : actif,
-        code ?? existing.code,
-        origine ?? existing.origine,
-        pays ?? existing.pays,
-        categorie ?? existing.categorie,
-        produits_offres ?? existing.produits_offres,
-        mode_paiement ?? existing.mode_paiement,
-        conditions_paiement ?? existing.conditions_paiement,
-        a_contrat === undefined ? existing.a_contrat : a_contrat,
-        commentaires ?? existing.commentaires,
-        req.params.id,
-      ]
-    );
+    const b = req.body || {};
+    const { entity_ids } = b;
+    // Champ non fourni -> on garde l'existant ; champ fourni vide ('') -> NULL. Crucial pour `code`
+    // (UNIQUE) : un '' au lieu de NULL entre en collision dès qu'un autre fournisseur a un code vide,
+    // et pour `origine` (CHECK 'import'/'local') : un '' violerait la contrainte. D'où « erreur
+    // serveur » intermittente à l'édition, corrigée ici.
+    const field = (k) => (b[k] === undefined ? existing[k] : (b[k] === '' ? null : b[k]));
+
+    let supplier;
+    try {
+      supplier = await one(
+        `UPDATE suppliers SET
+           nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6,
+           code=$7, origine=$8, pays=$9, categorie=$10, produits_offres=$11, mode_paiement=$12,
+           conditions_paiement=$13, a_contrat=$14, commentaires=$15
+         WHERE id=$16 RETURNING *`,
+        [
+          b.nom === undefined ? existing.nom : b.nom, // nom obligatoire : jamais mis à NULL
+          field('contact_nom'), field('contact_email'), field('contact_tel'), field('adresse'),
+          b.actif === undefined ? existing.actif : b.actif,
+          field('code'), field('origine'), field('pays'), field('categorie'), field('produits_offres'),
+          field('mode_paiement'), field('conditions_paiement'),
+          b.a_contrat === undefined ? existing.a_contrat : b.a_contrat,
+          field('commentaires'),
+          req.params.id,
+        ]
+      );
+    } catch (e) {
+      // Mêmes messages clairs qu'à la création (suppliers.service) plutôt qu'un 500 générique.
+      if (e.code === '23505') return res.status(409).json({ error: 'Ce code fournisseur est déjà utilisé — choisissez-en un autre (ou laissez-le vide).' });
+      if (e.code === '23514') return res.status(400).json({ error: 'Origine invalide : choisissez « Import » ou « Local ».' });
+      throw e;
+    }
+
     if (entity_ids) {
       await run('DELETE FROM supplier_entities WHERE supplier_id = $1', [req.params.id]);
-      for (const entityId of entity_ids) {
+      // Set (dédoublonnage) : un entity_id en double ferait échouer l'INSERT sur la PK composite.
+      for (const entityId of [...new Set(entity_ids)]) {
         await run('INSERT INTO supplier_entities (supplier_id, entity_id) VALUES ($1,$2)', [req.params.id, entityId]);
       }
     }

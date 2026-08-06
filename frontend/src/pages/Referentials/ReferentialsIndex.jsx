@@ -24,7 +24,7 @@ export const SUPPLIER_FIELDS = [
   { key: 'a_contrat', label: 'Contrat en place', type: 'checkbox' },
   { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
   { key: 'commentaires', label: 'Commentaires', type: 'textarea' },
-  { key: 'entity_ids', label: 'Entités', type: 'multiEntity' },
+  { key: 'entity_ids', label: 'Entités', type: 'multiEntity', defaultAll: true },
 ];
 
 const CONFIGS = {
