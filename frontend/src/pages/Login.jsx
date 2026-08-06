@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import client from '../api/client';
 import logo from '../assets/logo-web-darklogo.png';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useI18n } from '../i18n/I18nContext';
 
 const EMPTY_REQUEST = { nom: '', prenom: '', email: '', telephone: '', fonction: '', entityId: '' };
 
@@ -19,6 +21,7 @@ const REUSSIR = [
 
 export default function Login() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [mode, setMode] = useState('login'); // 'login' | 'request'
 
@@ -48,7 +51,7 @@ export default function Login() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur de connexion.');
+      setError(err.response?.data?.error || t('login.error'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +65,7 @@ export default function Login() {
       await client.post('/access-requests', { ...req, entityId: Number(req.entityId) });
       setReqDone(true);
     } catch (err) {
-      setReqError(err.response?.data?.error || 'Une erreur est survenue.');
+      setReqError(err.response?.data?.error || t('login.genericError'));
     } finally {
       setReqLoading(false);
     }
@@ -80,6 +83,7 @@ export default function Login() {
         <circle cx="120" cy="120" r="140" />
         <text x="850" y="740" textAnchor="middle" className="login-watermark" transform="rotate(-8 850 740)">CCG</text>
       </svg>
+      <div style={{ position: 'absolute', top: 14, right: 16, zIndex: 5 }}><LanguageSwitcher /></div>
       <div className="login-shell">
         <div className="login-brand">
           <div className="login-brand-eyebrow">NOS VALEURS</div>
@@ -100,9 +104,9 @@ export default function Login() {
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Flow</div>
-            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', lineHeight: 1.3 }}>ERP centralisé du groupe CCG</div>
+            <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', lineHeight: 1.3 }}>{t('login.subtitle')}</div>
             <div style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 1 }}>
-              {mode === 'login' ? 'Connexion' : 'Demande d’accès'}
+              {mode === 'login' ? t('login.mode.login') : t('login.mode.request')}
             </div>
           </div>
         </div>
@@ -111,22 +115,22 @@ export default function Login() {
           <>
             <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
               <label className="field">
-                Email
+                {t('login.email')}
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
               </label>
               <label className="field">
-                Mot de passe
+                {t('login.password')}
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
               </label>
               {error && <div className="alert alert-danger">{error}</div>}
               <button type="submit" disabled={loading} className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                {loading ? 'Connexion…' : 'Se connecter'}
+                {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
             <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--color-text-muted)' }}>
-              Pas encore de compte ?{' '}
+              {t('login.noAccount')}{' '}
               <button type="button" className="link-button" onClick={() => { setMode('request'); setError(''); }}>
-                Demander un accès
+                {t('login.requestAccess')}
               </button>
             </div>
           </>
@@ -136,41 +140,40 @@ export default function Login() {
           reqDone ? (
             <div>
               <div className="alert alert-success" style={{ marginTop: 0 }}>
-                Votre demande a bien été envoyée. Un administrateur la traitera, et vous recevrez vos identifiants
-                par email une fois votre accès validé.
+                {t('login.requestSent')}
               </div>
               <button type="button" className="btn btn-secondary" style={{ justifyContent: 'center', width: '100%' }}
                 onClick={() => { setMode('login'); setReq(EMPTY_REQUEST); setReqDone(false); }}>
-                Retour à la connexion
+                {t('login.backToLogin')}
               </button>
             </div>
           ) : (
             <>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>
-                Renseignez vos informations : un administrateur validera votre accès et vous recevrez vos identifiants par email.
+                {t('login.requestIntro')}
               </p>
               <form onSubmit={submitRequest} className="form-grid" style={{ maxWidth: 'none' }}>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <label className="field" style={{ flex: 1, minWidth: 0 }}>
-                    Prénom
+                    {t('login.firstName')}
                     <input value={req.prenom} onChange={e => updateReq('prenom', e.target.value)} required />
                   </label>
                   <label className="field" style={{ flex: 1, minWidth: 0 }}>
-                    Nom
+                    {t('login.lastName')}
                     <input value={req.nom} onChange={e => updateReq('nom', e.target.value)} required />
                   </label>
                 </div>
                 <label className="field">
-                  Email professionnel
+                  {t('login.workEmail')}
                   <input type="email" value={req.email} onChange={e => updateReq('email', e.target.value)} required />
                 </label>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <label className="field" style={{ flex: 1, minWidth: 0 }}>
-                    Téléphone
+                    {t('login.phone')}
                     <input value={req.telephone} onChange={e => updateReq('telephone', e.target.value)} />
                   </label>
                   <label className="field" style={{ flex: 1, minWidth: 0 }}>
-                    Entité
+                    {t('login.entity')}
                     <select value={req.entityId} onChange={e => updateReq('entityId', e.target.value)} required>
                       <option value="" disabled>—</option>
                       {entities.map(en => <option key={en.id} value={en.id}>{en.code}</option>)}
@@ -178,17 +181,17 @@ export default function Login() {
                   </label>
                 </div>
                 <label className="field">
-                  Fonction
-                  <input value={req.fonction} onChange={e => updateReq('fonction', e.target.value)} placeholder="ex. Comptable, Responsable achats…" />
+                  {t('login.role')}
+                  <input value={req.fonction} onChange={e => updateReq('fonction', e.target.value)} placeholder={t('login.rolePlaceholder')} />
                 </label>
                 {reqError && <div className="alert alert-danger">{reqError}</div>}
                 <button type="submit" disabled={reqLoading} className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                  {reqLoading ? 'Envoi…' : 'Envoyer la demande'}
+                  {reqLoading ? t('login.sending') : t('login.sendRequest')}
                 </button>
               </form>
               <div style={{ textAlign: 'center', marginTop: 14, fontSize: 13 }}>
                 <button type="button" className="link-button" onClick={() => { setMode('login'); setReqError(''); }}>
-                  ← Retour à la connexion
+                  {t('login.backToLoginArrow')}
                 </button>
               </div>
             </>
