@@ -1,30 +1,33 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Navigation du module Stock. Refonte (grand livre) : les écrans du nouveau module d'abord, puis
 // les anciens écrans (Stock du Jour / Mouvement Stock) conservés le temps de la migration.
+// Libellés traduits au rendu via t('stocknav.*').
 const NAV = [
-  ['/stock/tableau-bord', 'Tableau de bord', 'stock.tableau_bord'],
-  ['/stock/releve-jour', 'Relevé du jour', 'stock.releve_jour'],
-  ['/stock/saisie-mouvement', 'Saisie produit fini', 'stock.saisie'],
-  ['/stock/saisie-mp', 'Saisie matière première', 'stock.saisie'],
-  ['/stock/journal', 'Mouvements', 'stock.consultation'],
-  ['/stock/etat', 'Stock actuel', 'stock.consultation'],
-  ['/stock/lots', 'Lots', 'stock.consultation'],
-  ['/stock/transferts', 'Transferts', 'stock.transferts'],
-  ['/stock/inventaires', 'Inventaires', 'stock.inventaires'],
-  ['/stock/valorisation', 'Valorisation', 'stock.valorisation'],
-  ['/stock/import', 'Import', 'stock.import'],
-  ['/stock/referentiels', 'Paramétrage', 'stock.referentiels'],
+  ['/stock/tableau-bord', 'stocknav.dashboard', 'stock.tableau_bord'],
+  ['/stock/releve-jour', 'stocknav.releve', 'stock.releve_jour'],
+  ['/stock/saisie-mouvement', 'stocknav.saisiePF', 'stock.saisie'],
+  ['/stock/saisie-mp', 'stocknav.saisieMP', 'stock.saisie'],
+  ['/stock/journal', 'stocknav.movements', 'stock.consultation'],
+  ['/stock/etat', 'stocknav.current', 'stock.consultation'],
+  ['/stock/lots', 'stocknav.lots', 'stock.consultation'],
+  ['/stock/transferts', 'stocknav.transfers', 'stock.transferts'],
+  ['/stock/inventaires', 'stocknav.inventories', 'stock.inventaires'],
+  ['/stock/valorisation', 'stocknav.valuation', 'stock.valorisation'],
+  ['/stock/import', 'stocknav.import', 'stock.import'],
+  ['/stock/referentiels', 'stocknav.settings', 'stock.referentiels'],
 ];
 
 export default function StockSectionNav() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const allowed = NAV.filter(([, , sub]) => hasSubModuleLevel(user, sub));
   return (
     <nav className="subnav">
-      {allowed.map(([to, label]) => (
-        <NavLink key={to} to={to} end className={({ isActive }) => (isActive ? 'active' : undefined)}>{label}</NavLink>
+      {allowed.map(([to, labelKey]) => (
+        <NavLink key={to} to={to} end className={({ isActive }) => (isActive ? 'active' : undefined)}>{t(labelKey)}</NavLink>
       ))}
     </nav>
   );

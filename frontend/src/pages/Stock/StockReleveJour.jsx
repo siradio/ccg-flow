@@ -5,6 +5,7 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
 import { ExportButtons } from '../../utils/exportData';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Refonte Stock — « Relevé du jour » (produits finis). Grille rapide du matin (une ligne par produit,
 // une colonne quantité) + suivi Direction comparant le relevé au stock théorique du grand livre.
@@ -23,7 +24,8 @@ const SUIVI_COLS = [
 ];
 
 function Segmented({ tab, setTab }) {
-  const tabs = [['saisie', 'Saisie du jour'], ['suivi', 'Suivi']];
+  const { t } = useI18n();
+  const tabs = [['saisie', t('stockreleve.tab.saisie')], ['suivi', t('stockreleve.tab.suivi')]];
   return (
     <div style={{ display: 'inline-flex', gap: 4, background: 'rgba(128,128,128,0.12)', borderRadius: 12, padding: 4, margin: '4px 0 16px' }}>
       {tabs.map(([k, label]) => (
@@ -38,6 +40,7 @@ function Segmented({ tab, setTab }) {
 
 export default function StockReleveJour() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const canView = hasSubModuleLevel(user, 'stock.releve_jour');
   const canSaisir = hasSubModuleLevel(user, 'stock.releve_jour', 'ajout');
 
@@ -104,7 +107,7 @@ export default function StockReleveJour() {
   };
   const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur }));
 
-  if (!canView) return <div><StockSectionNav /><p>Le relevé du jour ne vous a pas été accordé.</p></div>;
+  if (!canView) return <div><StockSectionNav /><p>{t('stockreleve.notAllowed')}</p></div>;
 
   async function save() {
     if (saving) return; // garde-fou anti double-clic
@@ -113,10 +116,10 @@ export default function StockReleveJour() {
     setSaving(true); setMsg(null);
     try {
       const { data } = await client.put('/stock-releve/grid', { business_unit_id: Number(buId), date, lines });
-      setMsg({ type: 'success', text: `✓ ${data.saved} relevé(s) enregistré(s).` });
+      setMsg({ type: 'success', text: t('stockreleve.saved', { n: data.saved }) });
       loadGrid();
     } catch (e) {
-      setMsg({ type: 'error', text: `Échec de l'enregistrement : ${e.response?.data?.error || 'erreur serveur'}.` });
+      setMsg({ type: 'error', text: t('stockreleve.saveError', { err: e.response?.data?.error || t('stockreleve.serverError') }) });
     } finally {
       setSaving(false);
     }
@@ -129,8 +132,8 @@ export default function StockReleveJour() {
       <StockSectionNav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h1 className="page-title" style={{ margin: '0 0 4px' }}>Relevé du jour</h1>
-          <p className="page-subtitle" style={{ margin: '0 0 8px' }}>Stock des produits finis saisi chaque matin, en grille, et comparé au stock théorique.</p>
+          <h1 className="page-title" style={{ margin: '0 0 4px' }}>{t('stockreleve.title')}</h1>
+          <p className="page-subtitle" style={{ margin: '0 0 8px' }}>{t('stockreleve.subtitle')}</p>
         </div>
         <ExportButtons filename={tab === 'saisie' ? `releve_${date}` : `suivi_releve_${suiviDate}`}
           columns={tab === 'saisie' ? SAISIE_COLS : SUIVI_COLS} rows={tab === 'saisie' ? saisieExport : dash} />
@@ -140,20 +143,20 @@ export default function StockReleveJour() {
       {tab === 'saisie' && (
         <>
           <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label className="field" style={{ minWidth: 180 }}>Business Unit
+            <label className="field" style={{ minWidth: 180 }}>{t('stockreleve.bu')}
               <select value={buId} onChange={e => { setMsg(null); setBuId(e.target.value); }}>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</select>
             </label>
-            <label className="field">Date<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{nbSaisis} / {grid.length} produits saisis</div>
+            <label className="field">{t('stockreleve.date')}<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
+            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('stockreleve.entered', { n: nbSaisis, total: grid.length })}</div>
           </div>
           {msg && <div className={`alert ${msg.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
-          {grid.length === 0 && <p className="empty-row">Aucun produit fini pour cette BU.</p>}
+          {grid.length === 0 && <p className="empty-row">{t('stockreleve.noProduct')}</p>}
           {grid.length > 0 && (
             <div className="card" style={{ padding: 0 }}>
               <div className="table-wrap">
                 <table>
                   {/* Théorique/Écart masqués pour l'instant (écran calé sur la saisie Production). */}
-                  <thead><tr><th>Produit</th><th className="num">Stock du jour</th><th>Commentaire</th></tr></thead>
+                  <thead><tr><th>{t('stockreleve.th.product')}</th><th className="num">{t('stockreleve.th.stock')}</th><th>{t('stockreleve.th.comment')}</th></tr></thead>
                   <tbody>
                     {grid.map(r => {
                       const q = edits[r.product_id]?.quantite;
@@ -164,7 +167,7 @@ export default function StockReleveJour() {
                             <input type="number" step="0.001" disabled={!canSaisir} value={q ?? ''} style={{ width: 100, textAlign: 'right' }}
                               onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], quantite: e.target.value } }))} />
                           </td>
-                          <td><input disabled={!canSaisir} value={edits[r.product_id]?.commentaire ?? ''} placeholder="optionnel" style={{ width: 160 }}
+                          <td><input disabled={!canSaisir} value={edits[r.product_id]?.commentaire ?? ''} placeholder={t('stockreleve.optional')} style={{ width: 160 }}
                             onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], commentaire: e.target.value } }))} /></td>
                         </tr>
                       );
@@ -177,7 +180,7 @@ export default function StockReleveJour() {
           {canSaisir && grid.length > 0 && (
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={save} disabled={saving}>
-                {saving ? 'Enregistrement…' : `Enregistrer les relevés du ${date.split('-').reverse().join('/')}`}
+                {saving ? t('common.saving') : t('stockreleve.save', { date: date.split('-').reverse().join('/') })}
               </button>
               {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.type === 'error' ? 'var(--color-danger, #b91c1c)' : 'var(--color-success, #15803d)' }}>{msg.text}</span>}
             </div>
@@ -188,26 +191,26 @@ export default function StockReleveJour() {
       {tab === 'suivi' && (
         <>
           <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label className="field">Situation au<input type="date" value={suiviDate} onChange={e => setSuiviDate(e.target.value)} /></label>
-            <label className="field" style={{ minWidth: 170 }}>Business Unit
+            <label className="field">{t('stockreleve.situationAt')}<input type="date" value={suiviDate} onChange={e => setSuiviDate(e.target.value)} /></label>
+            <label className="field" style={{ minWidth: 170 }}>{t('stockreleve.bu')}
               <select value={suiviBu} onChange={e => setSuiviBu(e.target.value)}>
-                <option value="">Toutes</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+                <option value="">{t('stockreleve.all')}</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </label>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>Dernier relevé connu de chaque produit à cette date</div>
+            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('stockreleve.lastKnownHint')}</div>
           </div>
           <section className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 16 }}>Évolution du stock</h2>
+              <h2 style={{ margin: 0, fontSize: 16 }}>{t('stockreleve.evoTitle')}</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <select value={evoProduct} onChange={e => setEvoProduct(e.target.value)} style={{ minWidth: 160 }}>
-                  <option value="">Total de la BU</option>
+                  <option value="">{t('stockreleve.totalBu')}</option>
                   {dash.map(r => <option key={r.product_id} value={r.product_id}>{r.code ? r.code + ' — ' : ''}{r.designation}</option>)}
                 </select>
                 <select value={evoGran} onChange={e => setEvoGran(e.target.value)}>
-                  <option value="semaine">Par semaine (12 sem.)</option>
-                  <option value="mois">Par mois (12 mois)</option>
-                  <option value="personnalise">Personnalisé</option>
+                  <option value="semaine">{t('stockreleve.evoWeek')}</option>
+                  <option value="mois">{t('stockreleve.evoMonth')}</option>
+                  <option value="personnalise">{t('stockreleve.evoCustom')}</option>
                 </select>
                 {evoGran === 'personnalise' && (
                   <>
@@ -217,7 +220,7 @@ export default function StockReleveJour() {
                 )}
               </div>
             </div>
-            {evoData.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>Pas de relevé sur la période choisie.</p> : (
+            {evoData.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>{t('stockreleve.evoNone')}</p> : (
               <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer>
                   <LineChart data={evoData} margin={{ top: 6, right: 12, bottom: 6, left: 10 }}>
@@ -232,12 +235,12 @@ export default function StockReleveJour() {
             )}
           </section>
 
-          {dash.length === 0 && <p className="empty-row">Aucun relevé enregistré.</p>}
+          {dash.length === 0 && <p className="empty-row">{t('stockreleve.noReading')}</p>}
           {dash.length > 0 && (
             <div className="card" style={{ padding: 0 }}>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Produit</th><th>BU</th><th className="num">Dernier relevé</th><th>Date</th><th className="num">Théorique</th><th className="num">Écart</th></tr></thead>
+                  <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('stockreleve.th.lastReleve')}</th><th>{t('stockreleve.th.date')}</th><th className="num">{t('stockreleve.th.theo')}</th><th className="num">{t('stockreleve.th.ecart')}</th></tr></thead>
                   <tbody>
                     {dash.map(r => (
                       <tr key={r.product_id}>
