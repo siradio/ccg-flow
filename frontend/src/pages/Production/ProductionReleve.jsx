@@ -45,7 +45,8 @@ export default function ProductionReleve() {
   const [date, setDate] = useState(today());
   const [grid, setGrid] = useState([]);
   const [edits, setEdits] = useState({});
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState(null); // { type: 'success' | 'error', text }
+  const [saving, setSaving] = useState(false);
   const [period, setPeriod] = useState({ from: monthStart(), to: today(), bu: '' });
   const [suivi, setSuivi] = useState([]);
   const [evoGran, setEvoGran] = useState('semaine');
@@ -59,7 +60,8 @@ export default function ProductionReleve() {
     client.get(`/production/grid?business_unit_id=${buId}&date=${date}`).then(r => {
       setGrid(r.data);
       setEdits(Object.fromEntries(r.data.map(x => [x.product_id, { quantite: x.produit ?? '', commentaire: x.commentaire ?? '' }])));
-      setMsg('');
+      // Ne pas vider `msg` ici : loadGrid est rappelé après un enregistrement réussi, on garde la
+      // confirmation. Le message est réinitialisé au changement de BU/date.
     }).catch(() => {});
   }
   useEffect(() => { if (canView && tab === 'saisie') loadGrid(); /* eslint-disable-next-line */ }, [canView, tab, buId, date]);
@@ -77,10 +79,19 @@ export default function ProductionReleve() {
   if (!canView) return <p>Le module Production ne vous a pas été accordé.</p>;
 
   async function save() {
+    if (saving) return; // garde-fou anti double-clic
     const lines = Object.entries(edits).filter(([, v]) => v.quantite !== '' && v.quantite != null)
       .map(([product_id, v]) => ({ product_id: Number(product_id), quantite: Number(v.quantite), commentaire: v.commentaire }));
-    const { data } = await client.put('/production/grid', { business_unit_id: Number(buId), date, lines });
-    setMsg(`${data.saved} production(s) enregistrée(s).`); loadGrid();
+    setSaving(true); setMsg(null);
+    try {
+      const { data } = await client.put('/production/grid', { business_unit_id: Number(buId), date, lines });
+      setMsg({ type: 'success', text: `✓ ${data.saved} production(s) enregistrée(s).` });
+      loadGrid();
+    } catch (e) {
+      setMsg({ type: 'error', text: `Échec de l'enregistrement : ${e.response?.data?.error || 'erreur serveur'}.` });
+    } finally {
+      setSaving(false);
+    }
   }
 
   const nbSaisis = Object.values(edits).filter(v => v.quantite !== '' && v.quantite != null).length;
@@ -110,14 +121,14 @@ export default function ProductionReleve() {
         <>
           <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className="field" style={{ minWidth: 180 }}>Business Unit
-              <select value={buId} onChange={e => setBuId(e.target.value)}>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</select>
+              <select value={buId} onChange={e => { setMsg(null); setBuId(e.target.value); }}>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</select>
             </label>
-            <label className="field">Date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+            <label className="field">Date<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'right' }}>
               {nbSaisis} / {grid.length} produits saisis<br /><strong>Total du jour : {fmt(totalJour)}</strong>
             </div>
           </div>
-          {msg && <div className="alert alert-success" style={{ marginBottom: 12 }}>{msg}</div>}
+          {msg && <div className={`alert ${msg.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
           {grid.length === 0 && <p className="empty-row">Aucun produit fini pour cette BU.</p>}
           {grid.length > 0 && (
             <div className="card" style={{ padding: 0 }}>
@@ -141,7 +152,14 @@ export default function ProductionReleve() {
               </div>
             </div>
           )}
-          {canSaisir && grid.length > 0 && <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={save}>Enregistrer la production du {d10(date)}</button>}
+          {canSaisir && grid.length > 0 && (
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? 'Enregistrement…' : `Enregistrer la production du ${d10(date)}`}
+              </button>
+              {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.type === 'error' ? 'var(--color-danger, #b91c1c)' : 'var(--color-success, #15803d)' }}>{msg.text}</span>}
+            </div>
+          )}
         </>
       )}
 

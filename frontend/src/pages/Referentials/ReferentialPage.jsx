@@ -12,6 +12,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const [form, setForm] = useState(() => emptyForm(fields, entities));
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
 
@@ -62,15 +64,21 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
   async function onSubmit(e) {
     e.preventDefault();
-    setError('');
+    if (saving) return; // garde-fou anti double-clic
+    setError(''); setNotice('');
+    setSaving(true);
     try {
+      const wasEdit = !!editingId;
       if (editingId) await client.put(`${endpoint}/${editingId}`, form);
       else await client.post(endpoint, form);
       setForm(emptyForm(fields, entities));
       setEditingId(null);
       load();
+      setNotice(wasEdit ? '✓ Modifications enregistrées.' : '✓ Élément ajouté.');
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -183,8 +191,9 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             );
           })}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
-          <button type="submit" className="btn btn-primary">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); }} className="btn btn-secondary">Annuler</button>}
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : (editingId ? 'Enregistrer' : 'Ajouter')}</button>
+          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); setNotice(''); }} className="btn btn-secondary">Annuler</button>}
+          {notice && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success, #15803d)', alignSelf: 'center' }}>{notice}</span>}
         </form>
       )}
     </div>
