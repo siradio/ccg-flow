@@ -129,15 +129,15 @@ async function sendMail({ to, subject, text, html, attachments }) {
 async function sendTestMail({ to }) {
   const testHtml = renderMailTemplate({
     title: 'Test de configuration email',
-    bodyHtml: '<p>Cet email confirme que la configuration email de <strong>CCG Flow</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
+    bodyHtml: '<p>Cet email confirme que la configuration email de <strong>CCG Link</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
   });
   const testAtt = [{ filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID, contentType: 'image/png' }];
 
   // Graph prioritaire : on veut tester le canal réellement utilisé pour les envois.
   if (graphMailer.isGraphConfigured()) {
     const r = await graphMailer.sendViaGraph({
-      to, subject: 'CCG Flow — email de test',
-      text: 'Cet email confirme que la configuration email de CCG Flow est fonctionnelle.',
+      to, subject: 'CCG Link — email de test',
+      text: 'Cet email confirme que la configuration email de CCG Link est fonctionnelle.',
       html: testHtml, attachments: testAtt,
     });
     brokenUntil = 0;
@@ -153,13 +153,13 @@ async function sendTestMail({ to }) {
   }
   const html = renderMailTemplate({
     title: 'Test de configuration email',
-    bodyHtml: '<p>Cet email confirme que la configuration SMTP de <strong>CCG Flow</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
+    bodyHtml: '<p>Cet email confirme que la configuration SMTP de <strong>CCG Link</strong> est fonctionnelle. ✅</p><p>Vous pouvez fermer ce message.</p>',
   });
   const result = await transporter.sendMail({
     from: cfg.from,
     to,
-    subject: 'CCG Flow — email de test',
-    text: 'Cet email confirme que la configuration SMTP de CCG Flow est fonctionnelle.',
+    subject: 'CCG Link — email de test',
+    text: 'Cet email confirme que la configuration SMTP de CCG Link est fonctionnelle.',
     html,
     attachments: [{ filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID }],
   });

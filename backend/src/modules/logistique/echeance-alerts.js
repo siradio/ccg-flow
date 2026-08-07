@@ -53,7 +53,7 @@ function buildEmail(rows) {
       </tr>
       ${lignes}
     </table>
-    <p style="margin:18px 0 0;color:#6b7280;font-size:13px">Pensez à renouveler ces documents dans CCG Flow → Logistique → Documents & échéances.</p>`;
+    <p style="margin:18px 0 0;color:#6b7280;font-size:13px">Pensez à renouveler ces documents dans CCG Link → Logistique → Documents & échéances.</p>`;
   const text = 'Documents véhicule à renouveler :\n' + rows.map(r => `- ${r.immatriculation} · ${r.type}${r.numero ? ` (${r.numero})` : ''} · échéance ${fmt(r.date_fin)} (${r.jours_restants} j)`).join('\n');
   return { html: renderMailTemplate({ title: 'Échéances véhicule à renouveler', bodyHtml }), text };
 }
@@ -63,7 +63,7 @@ async function sendDigestTo(emails, jours) {
   const rows = await dueDocuments(jours);
   if (rows.length === 0) return { count: 0, sent: false };
   const { html, text } = buildEmail(rows);
-  await sendMail({ to: emails.join(','), subject: `CCG Flow — ${rows.length} document(s) véhicule à renouveler`, html, text });
+  await sendMail({ to: emails.join(','), subject: `CCG Link — ${rows.length} document(s) véhicule à renouveler`, html, text });
   return { count: rows.length, sent: true };
 }
 

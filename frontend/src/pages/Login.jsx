@@ -103,7 +103,7 @@ export default function Login() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Flow</div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Link</div>
             <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', lineHeight: 1.3 }}>{t('login.subtitle')}</div>
             <div style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 1 }}>
               {mode === 'login' ? t('login.mode.login') : t('login.mode.request')}

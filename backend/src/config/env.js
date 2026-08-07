@@ -33,6 +33,6 @@ module.exports = {
     clientId: process.env.GRAPH_CLIENT_ID || '',
     clientSecret: process.env.GRAPH_CLIENT_SECRET || '',
     sender: process.env.GRAPH_SENDER || process.env.SMTP_USER || '',
-    fromName: process.env.GRAPH_FROM_NAME || 'CCG Flow',
+    fromName: process.env.GRAPH_FROM_NAME || 'CCG Link',
   },
 };

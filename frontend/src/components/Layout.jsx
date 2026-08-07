@@ -82,7 +82,7 @@ export default function Layout() {
       <aside className={`sidebar${navOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
-          CCG Flow
+          CCG Link
           <button type="button" className="sidebar-close" onClick={closeNav} aria-label={t('common.closeMenu')}>
             <IconClose />
           </button>

@@ -9,7 +9,7 @@ async function notify(userId, type, message, lien) {
   const user = await one('SELECT email, nom, prenom FROM users WHERE id = $1', [userId]);
   if (user) {
     try {
-      await mailer.sendMail({ to: user.email, subject: `[CCG Flow] ${type}`, text: message });
+      await mailer.sendMail({ to: user.email, subject: `[CCG Link] ${type}`, text: message });
     } catch (e) {
       console.error(`Échec envoi email de notification à ${user.email} :`, e.message);
     }
