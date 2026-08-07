@@ -120,7 +120,12 @@ async function submit(user, prId) {
   if (!pr) throw httpError(404, 'Demande introuvable.');
   assertOwnerAndStatus(pr, user, 'brouillon');
   const lines = await repo.getLines(prId);
-  if (lines.length === 0) throw httpError(400, 'Impossible de soumettre une demande sans ligne.');
+  if (lines.length === 0) {
+    // Le détail des articles (lignes) est facultatif si un proforma est déjà joint : dans ce cas le
+    // détail figure sur le proforma. Sinon, au moins une ligne est requise.
+    const att = await one('SELECT COUNT(*)::int AS n FROM attachments WHERE purchase_request_id = $1', [prId]);
+    if (!att || att.n === 0) throw httpError(400, 'Ajoutez au moins un article, ou joignez un proforma, avant de soumettre.');
+  }
 
   // Avant de mobiliser le Service Achat (recherche fournisseurs, devis...), l'expression de
   // besoin doit être validée par un validateur_besoin (n'importe qui détenant ce rôle sur cette

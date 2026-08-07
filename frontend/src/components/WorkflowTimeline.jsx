@@ -2,8 +2,10 @@ import { useI18n } from '../i18n/I18nContext';
 
 const STATUS_TO_MIN_ORDRE = {
   brouillon: 0,
-  en_attente_validation_besoin: 1,
-  soumise: 2,
+  // Depuis la migration 054, l'ordre est : 1 = Soumission par le demandeur, 2 = Validation de
+  // l'expression de besoin, 3 = Analyse par le service achat, etc.
+  en_attente_validation_besoin: 2,
+  soumise: 3,
   en_analyse_achat: 3,
   devis_en_cours: 4,
   devis_selectionne: 5,
