@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import client from '../../../api/client';
 import { useConfirm } from '../../../components/ConfirmProvider.jsx';
-import { ROLE_CODES, GLOBAL_ROLES, NIVEAUX, userStatus, STATUS_META, StatusBadge } from './shared.jsx';
+import { useI18n } from '../../../i18n/I18nContext';
+import { ROLE_CODES, GLOBAL_ROLES, NIVEAUX, userStatus, StatusBadge } from './shared.jsx';
 
 export default function DetailPage() {
   const confirm = useConfirm();
+  const { t } = useI18n();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
 
@@ -44,7 +46,7 @@ export default function DetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (!u) return <p>Chargement…</p>;
+  if (!u) return <p>{t('adm.common.loading')}</p>;
 
   async function addRole() {
     const rf = roleForm;
@@ -81,25 +83,25 @@ export default function DetailPage() {
   }
 
   async function toggleActive() {
-    const action = u.actif ? 'désactiver' : 'réactiver';
-    if (!(await confirm(`Confirmer : ${action} ${u.prenom} ${u.nom} ?`, { danger: u.actif, confirmLabel: u.actif ? 'Supprimer' : 'Réactiver' }))) return;
+    const verb = u.actif ? t('adm.users.verb.deactivate') : t('adm.users.verb.reactivate');
+    if (!(await confirm(t('adm.users.confirmToggle', { action: verb, name: `${u.prenom} ${u.nom}` }), { danger: u.actif, confirmLabel: u.actif ? t('common.delete') : t('adm.users.reactivate') }))) return;
     setError(''); setNotice(null);
     try {
       await client.put(`/users/${u.id}`, { actif: !u.actif });
-      setNotice({ type: 'success', text: `${u.prenom} ${u.nom} ${u.actif ? 'désactivé' : 'réactivé'}.` });
+      setNotice({ type: 'success', text: t('adm.users.msg.toggled', { name: `${u.prenom} ${u.nom}`, state: u.actif ? t('adm.users.state.deactivated') : t('adm.users.state.reactivated') }) });
       load();
-    } catch (err) { setError(err.response?.data?.error || `Impossible de ${action} cet utilisateur.`); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.toggle', { action: verb })); }
   }
 
   async function approveAccess() {
-    if (!(await confirm(`Valider l'accès de ${u.prenom} ${u.nom} ? Un mot de passe lui sera généré et envoyé par email à ${u.email}.`, { confirmLabel: 'Valider' }))) return;
+    if (!(await confirm(t('adm.users.confirmApprove', { name: `${u.prenom} ${u.nom}`, email: u.email }), { confirmLabel: t('adm.users.approve') }))) return;
     setError(''); setNotice(null); setSendingId(u.id);
     try {
       const { data } = await client.post(`/users/${u.id}/approve-access`);
-      if (data.notification?.sent) setNotice({ type: 'success', text: `Accès validé. Identifiants envoyés par email à ${u.email}.` });
-      else setNotice({ type: 'warning', text: `Accès validé, mais l'email n'a pas pu être envoyé. Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` });
+      if (data.notification?.sent) setNotice({ type: 'success', text: t('adm.users.msg.approvedEmailSent', { email: u.email }) });
+      else setNotice({ type: 'warning', text: t('adm.users.msg.approvedEmailFailed', { pw: data.generatedPassword }) });
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec de la validation.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.approve')); }
     finally { setSendingId(null); }
   }
 
@@ -107,10 +109,10 @@ export default function DetailPage() {
     setError(''); setNotice(null); setSendingId(u.id);
     try {
       await client.post(`/users/${u.id}/reject-access`, { note: rejectNote });
-      setNotice({ type: 'success', text: `Demande de ${u.email} rejetée${rejectNote.trim() ? ' (motif envoyé par email)' : ''}.` });
+      setNotice({ type: 'success', text: t('adm.users.msg.rejected', { email: u.email, suffix: rejectNote.trim() ? t('adm.users.msg.reasonEmailed') : '' }) });
       setRejectOpen(false); setRejectNote('');
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec du rejet.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.reject')); }
     finally { setSendingId(null); }
   }
 
@@ -119,9 +121,9 @@ export default function DetailPage() {
     try {
       await client.put(`/users/${u.id}`, editForm);
       setEditOpen(false);
-      setNotice({ type: 'success', text: 'Informations mises à jour.' });
+      setNotice({ type: 'success', text: t('adm.users.msg.infoUpdated') });
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec de la mise à jour.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.update')); }
     finally { setSendingId(null); }
   }
 
@@ -131,15 +133,16 @@ export default function DetailPage() {
       const { data } = await client.post(`/users/${u.id}/set-password`, { password: pw.password, notify: pw.notify });
       const gen = data.generatedPassword;
       if (pw.notify && data.notification?.sent) {
-        setNotice({ type: 'success', text: `Mot de passe mis à jour et envoyé par email à ${u.email}.` });
+        setNotice({ type: 'success', text: t('adm.users.msg.pwUpdatedSent', { email: u.email }) });
       } else if (pw.notify && !data.notification?.sent) {
-        setNotice({ type: 'warning', text: `Mot de passe mis à jour, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${gen ? ` Mot de passe généré : ${gen} — à communiquer manuellement.` : ''}` });
+        const errPart = data.notification?.error ? ` (${data.notification.error})` : '';
+        setNotice({ type: 'warning', text: t('adm.users.msg.pwUpdatedFailed', { err: errPart, pw: gen ? t('adm.users.msg.pwGen', { pw: gen }) : '' }) });
       } else {
-        setNotice({ type: 'success', text: `Mot de passe mis à jour pour ${u.email}.${gen ? ` Mot de passe généré : ${gen} — à lui communiquer.` : ''}` });
+        setNotice({ type: 'success', text: t('adm.users.msg.pwUpdated', { email: u.email }) + (gen ? t('adm.users.msg.pwGenComm', { pw: gen }) : '') });
       }
       setPwOpen(false);
       setPw({ password: '', notify: true });
-    } catch (err) { setError(err.response?.data?.error || 'Erreur lors de la mise à jour du mot de passe.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.pwUpdate')); }
     finally { setSendingId(null); }
   }
 
@@ -148,8 +151,8 @@ export default function DetailPage() {
   // l'email échoue, le mot de passe généré est affiché pour communication manuelle.
   async function resendCredentials() {
     const ok = await confirm(
-      `Renvoyer les identifiants à ${u.prenom} ${u.nom} (${u.email}) ? Un nouveau mot de passe sera généré et envoyé par email — l'ancien ne fonctionnera plus.`,
-      { confirmLabel: 'Renvoyer' }
+      t('adm.users.confirmResend', { name: `${u.prenom} ${u.nom}`, email: u.email }),
+      { confirmLabel: t('adm.users.resendConfirm') }
     );
     if (!ok) return;
     setError(''); setNotice(null); setSendingId(u.id);
@@ -157,11 +160,12 @@ export default function DetailPage() {
       const { data } = await client.post(`/users/${u.id}/set-password`, { notify: true });
       const gen = data.generatedPassword;
       if (data.notification?.sent) {
-        setNotice({ type: 'success', text: `Identifiants renvoyés par email à ${u.email}.` });
+        setNotice({ type: 'success', text: t('adm.users.msg.resent', { email: u.email }) });
       } else {
-        setNotice({ type: 'warning', text: `Nouveau mot de passe généré, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${gen ? ` Mot de passe : ${gen} — à lui communiquer manuellement.` : ''}` });
+        const errPart = data.notification?.error ? ` (${data.notification.error})` : '';
+        setNotice({ type: 'warning', text: t('adm.users.msg.resendFailed', { err: errPart, pw: gen ? t('adm.users.msg.pwPlain', { pw: gen }) : '' }) });
       }
-    } catch (err) { setError(err.response?.data?.error || 'Erreur lors de l’envoi des identifiants.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.resend')); }
     finally { setSendingId(null); }
   }
 
@@ -171,9 +175,9 @@ export default function DetailPage() {
     try {
       await client.post(`/users/${u.id}/copy-access-from`, { sourceUserId: Number(quick.copyFrom) });
       setQuick(q => ({ ...q, copyFrom: '' }));
-      setNotice({ type: 'success', text: 'Accès copiés depuis le compte source.' });
+      setNotice({ type: 'success', text: t('adm.users.msg.accessCopied') });
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec de la copie des accès.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.copyAccess')); }
   }
 
   async function applyProfile() {
@@ -183,9 +187,9 @@ export default function DetailPage() {
       const { data } = await client.post(`/access-profiles/${quick.profileId}/apply/${u.id}`);
       const r = data.applied || {};
       setQuick(q => ({ ...q, profileId: '' }));
-      setNotice({ type: 'success', text: `Profil appliqué (${r.rolesApplied || 0} rôle(s), ${r.modulesApplied || 0} module(s), ${r.busApplied || 0} BU).` });
+      setNotice({ type: 'success', text: t('adm.users.msg.profileApplied', { roles: r.rolesApplied || 0, modules: r.modulesApplied || 0, bu: r.busApplied || 0 }) });
       load();
-    } catch (err) { setError(err.response?.data?.error || "Échec de l'application du profil."); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.applyProfile')); }
   }
 
   async function saveAsProfile() {
@@ -195,22 +199,22 @@ export default function DetailPage() {
     try {
       await client.post(`/access-profiles/from-user/${u.id}`, { nom, description: (quick.saveDesc || '').trim() });
       setQuick(q => ({ ...q, saveOpen: false, saveName: '', saveDesc: '' }));
-      setNotice({ type: 'success', text: `Profil « ${nom} » enregistré — applicable à tout utilisateur.` });
+      setNotice({ type: 'success', text: t('adm.users.msg.profileSaved', { nom }) });
       client.get('/access-profiles').then(res => setProfiles(res.data));
-    } catch (err) { setError(err.response?.data?.error || "Échec de l'enregistrement du profil."); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.saveProfile')); }
   }
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <Link to="/admin/users" className="btn btn-secondary btn-sm">← Retour à la liste</Link>
+        <Link to="/admin/users" className="btn btn-secondary btn-sm">{t('adm.users.backToList')}</Link>
       </div>
 
       {notice && (
         <div className={`alert ${notice.type === 'success' ? 'alert-success' : 'alert-warning'}`}
           style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <span>{notice.text}</span>
-          <button onClick={() => setNotice(null)} className="btn-icon" aria-label="Fermer">×</button>
+          <button onClick={() => setNotice(null)} className="btn-icon" aria-label={t('adm.common.close')}>×</button>
         </div>
       )}
       {error && <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>}
@@ -233,38 +237,38 @@ export default function DetailPage() {
             {u.access_status === 'pending' ? (
               <>
                 <button onClick={approveAccess} disabled={sendingId === u.id} className="btn btn-primary btn-sm">
-                  {sendingId === u.id ? '…' : 'Valider l’accès'}
+                  {sendingId === u.id ? '…' : t('adm.users.approveAccess')}
                 </button>
                 <button onClick={() => setRejectOpen(o => !o)} className="btn btn-danger-ghost btn-sm">
-                  {rejectOpen ? 'Fermer' : 'Rejeter'}
+                  {rejectOpen ? t('adm.common.close') : t('adm.users.reject')}
                 </button>
               </>
             ) : (
               <>
-                <button onClick={() => setPwOpen(o => !o)} className="btn btn-secondary btn-sm" title="Définir / réinitialiser le mot de passe et l’envoyer par email">
-                  {pwOpen ? 'Fermer' : 'Mot de passe'}
+                <button onClick={() => setPwOpen(o => !o)} className="btn btn-secondary btn-sm" title={t('adm.users.pwTitle')}>
+                  {pwOpen ? t('adm.common.close') : t('adm.users.password')}
                 </button>
-                <button onClick={resendCredentials} disabled={sendingId === u.id} className="btn btn-secondary btn-sm" title="Générer un nouveau mot de passe et l’envoyer par email à l’utilisateur">
-                  {sendingId === u.id ? '…' : 'Renvoyer les identifiants'}
+                <button onClick={resendCredentials} disabled={sendingId === u.id} className="btn btn-secondary btn-sm" title={t('adm.users.resendTitle')}>
+                  {sendingId === u.id ? '…' : t('adm.users.resend')}
                 </button>
                 <button onClick={toggleActive} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
-                  {u.actif ? 'Supprimer (désactiver)' : 'Réactiver'}
+                  {u.actif ? t('adm.users.deleteDeactivate') : t('adm.users.reactivate')}
                 </button>
               </>
             )}
             <button onClick={() => setEditOpen(o => !o)} className="btn btn-secondary btn-sm">
-              {editOpen ? 'Fermer' : 'Éditer'}
+              {editOpen ? t('adm.common.close') : t('common.edit')}
             </button>
           </div>
         </div>
 
         {rejectOpen && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
-            <textarea placeholder="Motif du rejet (envoyé au demandeur par email)" value={rejectNote}
+            <textarea placeholder={t('adm.users.rejectReasonPlaceholder')} value={rejectNote}
               onChange={e => setRejectNote(e.target.value)}
               style={{ display: 'block', width: '100%', marginBottom: 8 }} />
             <button onClick={rejectAccess} disabled={sendingId === u.id} className="btn btn-danger btn-sm">
-              {sendingId === u.id ? 'Rejet…' : 'Confirmer le rejet'}
+              {sendingId === u.id ? t('adm.users.rejecting') : t('adm.users.confirmReject')}
             </button>
           </div>
         )}
@@ -272,12 +276,12 @@ export default function DetailPage() {
         {editOpen && editForm && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
             <div className="form-inline" style={{ flexWrap: 'wrap' }}>
-              <input placeholder="Prénom" value={editForm.prenom} onChange={e => setEditForm({ ...editForm, prenom: e.target.value })} />
-              <input placeholder="Nom" value={editForm.nom} onChange={e => setEditForm({ ...editForm, nom: e.target.value })} />
-              <input placeholder="Email" type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
-              <input placeholder="Téléphone" value={editForm.telephone} onChange={e => setEditForm({ ...editForm, telephone: e.target.value })} />
-              <input placeholder="Fonction" value={editForm.fonction} onChange={e => setEditForm({ ...editForm, fonction: e.target.value })} />
-              <button onClick={saveEdit} disabled={sendingId === u.id} className="btn btn-primary btn-sm">Enregistrer</button>
+              <input placeholder={t('adm.users.f.prenom')} value={editForm.prenom} onChange={e => setEditForm({ ...editForm, prenom: e.target.value })} />
+              <input placeholder={t('adm.users.f.nom')} value={editForm.nom} onChange={e => setEditForm({ ...editForm, nom: e.target.value })} />
+              <input placeholder={t('adm.users.f.email')} type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+              <input placeholder={t('adm.users.f.telephone')} value={editForm.telephone} onChange={e => setEditForm({ ...editForm, telephone: e.target.value })} />
+              <input placeholder={t('adm.users.f.fonction')} value={editForm.fonction} onChange={e => setEditForm({ ...editForm, fonction: e.target.value })} />
+              <button onClick={saveEdit} disabled={sendingId === u.id} className="btn btn-primary btn-sm">{t('common.save')}</button>
             </div>
           </div>
         )}
@@ -285,18 +289,18 @@ export default function DetailPage() {
         {pwOpen && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--color-hover)', border: '1px solid var(--color-border)' }}>
             <div className="form-inline" style={{ flexWrap: 'wrap' }}>
-              <input type="text" placeholder="Nouveau mot de passe (vide = généré)" value={pw.password}
+              <input type="text" placeholder={t('adm.users.f.newPw')} value={pw.password}
                 onChange={e => setPw({ ...pw, password: e.target.value })} style={{ minWidth: 260 }} />
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
                 <input type="checkbox" checked={pw.notify} onChange={e => setPw({ ...pw, notify: e.target.checked })} />
-                Envoyer par email
+                {t('adm.users.sendByEmail')}
               </label>
               <button onClick={applyPassword} disabled={sendingId === u.id} className="btn btn-primary btn-sm">
-                {sendingId === u.id ? 'Application…' : 'Appliquer'}
+                {sendingId === u.id ? t('adm.users.applying') : t('adm.users.apply')}
               </button>
             </div>
             <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
-              Définit un nouveau mot de passe pour {u.prenom} {u.nom} (l'actuel sera remplacé). Laissez le champ vide pour en générer un automatiquement. Décochez « Envoyer par email » pour le communiquer vous-même.
+              {t('adm.users.pwHelp', { name: `${u.prenom} ${u.nom}` })}
             </p>
           </div>
         )}
@@ -305,76 +309,76 @@ export default function DetailPage() {
       {u.access_status !== 'pending' && (
         <div className="card">
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-            Attribution rapide
+            {t('adm.users.quickAssign')}
           </div>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
             <div className="form-inline">
               <select value={quick.copyFrom} onChange={e => setQuick(q => ({ ...q, copyFrom: e.target.value }))}>
-                <option value="">Copier les accès de…</option>
+                <option value="">{t('adm.users.copyFrom')}</option>
                 {otherUsers.filter(x => x.id !== u.id && x.access_status !== 'pending').map(x => (
                   <option key={x.id} value={x.id}>{x.prenom} {x.nom} — {x.email}</option>
                 ))}
               </select>
-              <button onClick={copyAccessFrom} className="btn btn-secondary btn-sm" disabled={!quick.copyFrom}>Copier</button>
+              <button onClick={copyAccessFrom} className="btn btn-secondary btn-sm" disabled={!quick.copyFrom}>{t('adm.users.copy')}</button>
             </div>
             {profiles.length > 0 && (
               <div className="form-inline">
                 <select value={quick.profileId} onChange={e => setQuick(q => ({ ...q, profileId: e.target.value }))}>
-                  <option value="">Appliquer un profil…</option>
+                  <option value="">{t('adm.users.applyProfileOpt')}</option>
                   {profiles.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
                 </select>
-                <button onClick={applyProfile} className="btn btn-secondary btn-sm" disabled={!quick.profileId}>Appliquer</button>
+                <button onClick={applyProfile} className="btn btn-secondary btn-sm" disabled={!quick.profileId}>{t('adm.users.apply')}</button>
               </div>
             )}
             <button onClick={() => setQuick(q => ({ ...q, saveOpen: !q.saveOpen }))} className="btn btn-secondary btn-sm">
-              {quick.saveOpen ? 'Annuler' : 'Enregistrer comme profil'}
+              {quick.saveOpen ? t('common.cancel') : t('adm.users.saveAsProfile')}
             </button>
           </div>
           {quick.saveOpen && (
             <div className="form-inline" style={{ marginTop: 8 }}>
-              <input placeholder="Nom du profil (ex. Responsable Achat SOGUIPAL)" value={quick.saveName}
+              <input placeholder={t('adm.users.profileNamePlaceholder')} value={quick.saveName}
                 onChange={e => setQuick(q => ({ ...q, saveName: e.target.value }))} style={{ minWidth: 260 }} />
-              <input placeholder="Description (optionnel)" value={quick.saveDesc}
+              <input placeholder={t('adm.users.profileDescPlaceholder')} value={quick.saveDesc}
                 onChange={e => setQuick(q => ({ ...q, saveDesc: e.target.value }))} style={{ minWidth: 200 }} />
-              <button onClick={saveAsProfile} className="btn btn-primary btn-sm" disabled={!(quick.saveName || '').trim()}>Enregistrer le profil</button>
+              <button onClick={saveAsProfile} className="btn btn-primary btn-sm" disabled={!(quick.saveName || '').trim()}>{t('adm.users.saveProfile')}</button>
             </div>
           )}
           <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--color-text-faint)' }}>
-            Copier ou appliquer un profil <b>s'ajoute</b> aux accès existants (rien n'est retiré).
+            {t('adm.users.quickHelpPre')}<b>{t('adm.users.addsWord')}</b>{t('adm.users.quickHelpPost')}
           </p>
         </div>
       )}
 
       <div className="card">
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Rôles workflow achat</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{t('adm.users.rolesTitle')}</div>
         <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {u.roles.map(r => (
             <span key={r.id} className="badge" style={{ background: 'var(--color-border)', color: 'var(--color-text)' }}>
-              {r.role_code}{r.entity_code ? ` (${r.entity_code})` : ''}
+              {t('adm.role.' + r.role_code)}{r.entity_code ? ` (${r.entity_code})` : ''}
               {' '}<button onClick={() => removeRole(r.id)} className="btn-icon">×</button>
             </span>
           ))}
-          {u.roles.length === 0 && <span className="empty-row">Aucun rôle.</span>}
+          {u.roles.length === 0 && <span className="empty-row">{t('adm.users.noRoles')}</span>}
         </div>
         <div className="form-inline" style={{ marginTop: 10 }}>
           <select value={roleForm.role_code || ''} onChange={e => setRoleForm({ ...roleForm, role_code: e.target.value })}>
-            <option value="">Rôle…</option>
-            {ROLE_CODES.map(r => <option key={r} value={r}>{r}</option>)}
+            <option value="">{t('adm.users.roleOpt')}</option>
+            {ROLE_CODES.map(r => <option key={r} value={r}>{t('adm.role.' + r)}</option>)}
           </select>
           {roleForm.role_code && !GLOBAL_ROLES.includes(roleForm.role_code) && (
             <select value={roleForm.entity_id || ''} onChange={e => setRoleForm({ ...roleForm, entity_id: e.target.value })}>
-              <option value="">Entité…</option>
-              <option value="all">Toutes les entités</option>
+              <option value="">{t('adm.users.entityOpt')}</option>
+              <option value="all">{t('adm.users.allEntities')}</option>
               {entities.map(en => <option key={en.id} value={en.id}>{en.nom}</option>)}
             </select>
           )}
-          <button onClick={addRole} className="btn btn-primary btn-sm">+ Ajouter le rôle</button>
+          <button onClick={addRole} className="btn btn-primary btn-sm">{t('adm.users.addRole')}</button>
         </div>
       </div>
 
       <div className="card">
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-          Accès aux modules
+          {t('adm.users.moduleAccess')}
         </div>
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {moduleCatalog.map(mod => (
@@ -384,7 +388,7 @@ export default function DetailPage() {
       </div>
 
       <div className="card">
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Accès Business Units (Stock du Jour / Mouvement Stock)</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{t('adm.users.buAccess')}</div>
         <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {u.businessUnits.map(b => (
             <span key={b.id} className="badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)' }}>
@@ -392,15 +396,15 @@ export default function DetailPage() {
               {' '}<button onClick={() => removeBusinessUnit(b.id)} className="btn-icon">×</button>
             </span>
           ))}
-          {u.businessUnits.length === 0 && <span className="empty-row">Aucune BU accordée (lecture seule sur toutes si un sous-module Stock est accordé).</span>}
+          {u.businessUnits.length === 0 && <span className="empty-row">{t('adm.users.noBu')}</span>}
         </div>
         <div className="form-inline" style={{ marginTop: 10 }}>
           <select value={buForm} onChange={e => setBuForm(e.target.value)}>
-            <option value="">Business Unit…</option>
-            <option value="all">Toutes les BU</option>
+            <option value="">{t('adm.users.buOpt')}</option>
+            <option value="all">{t('adm.users.allBu')}</option>
             {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
           </select>
-          <button onClick={addBusinessUnit} className="btn btn-primary btn-sm">+ Accorder la BU</button>
+          <button onClick={addBusinessUnit} className="btn btn-primary btn-sm">{t('adm.users.grantBu')}</button>
         </div>
       </div>
     </div>
@@ -410,6 +414,7 @@ export default function DetailPage() {
 // Un module = un bloc ; ses sous-modules (ou lui-même s'il n'en a pas — voir modules.js §2.3)
 // sont chacun une ligne avec leur propre sélecteur de niveau.
 function ModuleAccessGroup({ mod, user, onChange }) {
+  const { t } = useI18n();
   const rows = mod.subModules.length ? mod.subModules : [{ key: mod.key, label: mod.label }];
   return (
     <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' }}>
@@ -424,7 +429,7 @@ function ModuleAccessGroup({ mod, user, onChange }) {
               {mod.subModules.length ? row.label : null}
             </span>
             <select value={current} onChange={e => onChange(row.key, e.target.value)} style={{ fontSize: 12 }}>
-              {NIVEAUX.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+              {NIVEAUX.map(n => <option key={n.value} value={n.value}>{t(n.labelKey)}</option>)}
             </select>
           </div>
         );

@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Branding par entité (logo d'entête, signature, cachet) appliqué aux documents générés
-// (demande de devis, bon de commande). Réservé au super_admin.
+// (demande de devis, bon de commande). Réservé au super_admin. Les libellés sont traduits à
+// l'affichage (labelKey/hintKey), la clé technique (key) ne change pas.
 const KINDS = [
-  { key: 'logo', label: 'Logo (entête)', hint: 'Affiché en haut du document. PNG conseillé (fond transparent).' },
-  { key: 'signature', label: 'Signature', hint: 'Signature scannée, apposée sur le bon de commande.' },
-  { key: 'stamp', label: 'Cachet / tampon', hint: 'Tampon de l’entité, apposé à côté de la signature.' },
+  { key: 'logo', labelKey: 'adm.brand.kind.logo', hintKey: 'adm.brand.kind.logoHint' },
+  { key: 'signature', labelKey: 'adm.brand.kind.signature', hintKey: 'adm.brand.kind.signatureHint' },
+  { key: 'stamp', labelKey: 'adm.brand.kind.stamp', hintKey: 'adm.brand.kind.stampHint' },
 ];
 
 // Aperçu d'une image protégée : récupérée en blob (avec le jeton), pas via <img src> direct.
 function BrandingPreview({ entityId, kind, present, reloadKey }) {
+  const { t } = useI18n();
   const [url, setUrl] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +26,7 @@ function BrandingPreview({ entityId, kind, present, reloadKey }) {
     return () => { cancelled = true; if (obj) URL.revokeObjectURL(obj); };
   }, [entityId, kind, present, reloadKey]);
 
-  if (!present) return <span style={{ color: 'var(--color-text-faint)', fontSize: 13 }}>Aucune image</span>;
+  if (!present) return <span style={{ color: 'var(--color-text-faint)', fontSize: 13 }}>{t('adm.brand.noImage')}</span>;
   if (!url) return <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>…</span>;
   return (
     <img
@@ -36,6 +39,7 @@ function BrandingPreview({ entityId, kind, present, reloadKey }) {
 
 export default function DocumentsBranding() {
   const confirm = useConfirm();
+  const { t } = useI18n();
   const [entities, setEntities] = useState([]);
   const [flags, setFlags] = useState({}); // { [entityId]: { logo, signature, stamp } }
   const [reloadKey, setReloadKey] = useState(0);
@@ -43,8 +47,8 @@ export default function DocumentsBranding() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    client.get('/entities').then(res => setEntities(res.data)).catch(() => setError('Impossible de charger les entités.'));
-  }, []);
+    client.get('/entities').then(res => setEntities(res.data)).catch(() => setError(t('adm.brand.loadError')));
+  }, [t]);
 
   useEffect(() => {
     entities.forEach(e => {
@@ -62,21 +66,21 @@ export default function DocumentsBranding() {
       await client.put(`/entities/${entityId}/branding/${kind}`, fd);
       setReloadKey(k => k + 1);
     } catch (err) {
-      setError(err.response?.data?.error || 'Échec du téléversement.');
+      setError(err.response?.data?.error || t('ref.uploadFailed'));
     } finally {
       setBusy(null);
     }
   }
 
   async function remove(entityId, kind) {
-    if (!(await confirm('Supprimer cette image ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
+    if (!(await confirm(t('adm.brand.confirmRemove'), { danger: true, confirmLabel: t('common.delete') }))) return;
     setError('');
     setBusy(`${entityId}-${kind}`);
     try {
       await client.delete(`/entities/${entityId}/branding/${kind}`);
       setReloadKey(k => k + 1);
     } catch (err) {
-      setError(err.response?.data?.error || 'Échec de la suppression.');
+      setError(err.response?.data?.error || t('ref.deleteFailed'));
     } finally {
       setBusy(null);
     }
@@ -84,11 +88,9 @@ export default function DocumentsBranding() {
 
   return (
     <div>
-      <h1 className="page-title">Documents & branding</h1>
+      <h1 className="page-title">{t('adm.brand.title')}</h1>
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 640, marginTop: 0 }}>
-        Logo d’entête, signature et cachet appliqués aux documents générés (demande de devis, bon de
-        commande) — <strong>par entité</strong>. Le document utilise automatiquement les éléments de
-        l’entité concernée par la demande. Formats acceptés : PNG ou JPEG (4 Mo max).
+        {t('adm.brand.introPre')}<strong>{t('adm.brand.perEntity')}</strong>{t('adm.brand.introPost')}
       </p>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -102,20 +104,20 @@ export default function DocumentsBranding() {
               const isBusy = busy === `${e.id}-${k.key}`;
               return (
                 <div key={k.key} style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 14 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{k.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>{k.hint}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{t(k.labelKey)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>{t(k.hintKey)}</div>
                   <div style={{ minHeight: 72, display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                     <BrandingPreview entityId={e.id} kind={k.key} present={present} reloadKey={reloadKey} />
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
-                      {isBusy ? '…' : (present ? 'Remplacer' : 'Téléverser')}
+                      {isBusy ? '…' : (present ? t('adm.brand.replace') : t('adm.brand.upload'))}
                       <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} disabled={isBusy}
                         onChange={ev => { upload(e.id, k.key, ev.target.files[0]); ev.target.value = ''; }} />
                     </label>
                     {present && (
                       <button className="btn btn-danger-ghost btn-sm" disabled={isBusy} onClick={() => remove(e.id, k.key)}>
-                        Supprimer
+                        {t('common.delete')}
                       </button>
                     )}
                   </div>

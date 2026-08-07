@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../../api/client';
 import { useConfirm } from '../../../components/ConfirmProvider.jsx';
+import { useI18n } from '../../../i18n/I18nContext';
 import { ROLE_CODES, userStatus, STATUS_META, StatusBadge } from './shared.jsx';
 
 const PAGE_SIZE = 20;
 
 export default function ListPage() {
   const confirm = useConfirm();
+  const { t } = useI18n();
   const [users, setUsers] = useState([]);
   const [moduleCatalog, setModuleCatalog] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '', notify: true });
@@ -72,43 +74,44 @@ export default function ListPage() {
       }
       const who = `${form.prenom} ${form.nom} (${form.email})`;
       if (form.notify && data.notification?.sent) {
-        setNotice({ type: 'success', text: `Utilisateur créé. Identifiants envoyés par email à ${form.email}.` });
+        setNotice({ type: 'success', text: t('adm.users.msg.createdEmailSent', { email: form.email }) });
       } else if (form.notify && !data.notification?.sent) {
-        const pw = data.generatedPassword ? ` Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` : ' Communiquez-lui manuellement le mot de passe saisi.';
-        setNotice({ type: 'warning', text: `Utilisateur créé, mais l'email n'a pas pu être envoyé${data.notification?.error ? ` (${data.notification.error})` : ''}.${pw}` });
+        const pw = data.generatedPassword ? t('adm.users.msg.pwGen', { pw: data.generatedPassword }) : t('adm.users.msg.pwManual');
+        const errPart = data.notification?.error ? ` (${data.notification.error})` : '';
+        setNotice({ type: 'warning', text: t('adm.users.msg.createdEmailFailed', { err: errPart, pw }) });
       } else if (data.generatedPassword) {
-        setNotice({ type: 'success', text: `Utilisateur ${who} créé. Mot de passe : ${data.generatedPassword} — à lui communiquer (il pourra le changer ensuite).` });
+        setNotice({ type: 'success', text: t('adm.users.msg.createdWithPw', { who, pw: data.generatedPassword }) });
       } else {
-        setNotice({ type: 'success', text: `Utilisateur ${who} créé.` });
+        setNotice({ type: 'success', text: t('adm.users.msg.created', { who }) });
       }
       setForm({ nom: '', prenom: '', email: '', password: '', notify: true });
       setShowCreateForm(false);
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
+    } catch (err) { setError(err.response?.data?.error || t('ref.error')); }
   }
 
   async function deleteProfile(id, nom) {
-    if (!(await confirm(`Désactiver  le profil « ${nom} » ? Les utilisateurs déjà désactivés ne sont pas modifiés.`, { danger: true, confirmLabel: 'Désactiver ' }))) return;
+    if (!(await confirm(t('adm.users.confirmDeactivateProfile', { nom }), { danger: true, confirmLabel: t('adm.users.deactivate') }))) return;
     setError(''); setNotice(null);
     try {
       await client.delete(`/access-profiles/${id}`);
       loadProfiles();
-    } catch (err) { setError(err.response?.data?.error || 'Échec de la suppression du profil.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.deleteProfile')); }
   }
 
   // --- Demandes d'accès (statut "à valider") -------------------------------------------------
   async function approveAccess(u) {
-    if (!(await confirm(`Valider l'accès de ${u.prenom} ${u.nom} ? Un mot de passe lui sera généré et envoyé par email à ${u.email}.`, { confirmLabel: 'Valider' }))) return;
+    if (!(await confirm(t('adm.users.confirmApprove', { name: `${u.prenom} ${u.nom}`, email: u.email }), { confirmLabel: t('adm.users.approve') }))) return;
     setError(''); setNotice(null); setSendingId(u.id);
     try {
       const { data } = await client.post(`/users/${u.id}/approve-access`);
       if (data.notification?.sent) {
-        setNotice({ type: 'success', text: `Accès validé. Identifiants envoyés par email à ${u.email}.` });
+        setNotice({ type: 'success', text: t('adm.users.msg.approvedEmailSent', { email: u.email }) });
       } else {
-        setNotice({ type: 'warning', text: `Accès validé, mais l'email n'a pas pu être envoyé. Mot de passe généré : ${data.generatedPassword} — à communiquer manuellement.` });
+        setNotice({ type: 'warning', text: t('adm.users.msg.approvedEmailFailed', { pw: data.generatedPassword }) });
       }
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec de la validation.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.approve')); }
     finally { setSendingId(null); }
   }
 
@@ -120,10 +123,10 @@ export default function ListPage() {
     setError(''); setNotice(null); setSendingId(u.id);
     try {
       await client.post(`/users/${u.id}/reject-access`, { note });
-      setNotice({ type: 'success', text: `Demande de ${u.email} rejetée${note.trim() ? ' (motif envoyé par email)' : ''}.` });
+      setNotice({ type: 'success', text: t('adm.users.msg.rejected', { email: u.email, suffix: note.trim() ? t('adm.users.msg.reasonEmailed') : '' }) });
       setRejectPanel(p => { const n = { ...p }; delete n[u.id]; return n; });
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Échec du rejet.'); }
+    } catch (err) { setError(err.response?.data?.error || t('adm.users.err.reject')); }
     finally { setSendingId(null); }
   }
 
@@ -131,23 +134,23 @@ export default function ListPage() {
   // en base, la table users étant référencée par les demandes d'achat, l'audit, les mouvements de
   // stock, etc. — désactiver reste réversible ("Réactiver") et ne casse aucun historique.
   async function toggleActive(u) {
-    const action = u.actif ? 'la désactivation du profile de ' : 'la réactivation  du profile de';
-    if (!(await confirm(`Confirmer : ${action} ${u.prenom} ${u.nom} ?`, { danger: u.actif, confirmLabel: u.actif ? 'Désactiver ' : 'Réactiver' }))) return;
+    const action = u.actif ? t('adm.users.action.deactivateOf') : t('adm.users.action.reactivateOf');
+    if (!(await confirm(t('adm.users.confirmToggle', { action, name: `${u.prenom} ${u.nom}` }), { danger: u.actif, confirmLabel: u.actif ? t('adm.users.deactivate') : t('adm.users.reactivate') }))) return;
     setError('');
     setNotice(null);
     try {
       await client.put(`/users/${u.id}`, { actif: !u.actif });
-      setNotice({ type: 'success', text: `${u.prenom} ${u.nom} ${u.actif ? 'désactivé' : 'réactivé'}.` });
+      setNotice({ type: 'success', text: t('adm.users.msg.toggled', { name: `${u.prenom} ${u.nom}`, state: u.actif ? t('adm.users.state.deactivated') : t('adm.users.state.reactivated') }) });
       load();
     } catch (err) {
-      const action = u.actif ? 'désactiver' : 'réactiver';
-      setError(err.response?.data?.error || `Impossible de ${action} cet utilisateur.`);
+      const verb = u.actif ? t('adm.users.verb.deactivate') : t('adm.users.verb.reactivate');
+      setError(err.response?.data?.error || t('adm.users.err.toggle', { action: verb }));
     }
   }
 
   function roleSummary(u) {
     if (u.roles.length === 0) return <span className="empty-row">—</span>;
-    return [...new Set(u.roles.map(r => r.role_code))].join(', ');
+    return [...new Set(u.roles.map(r => r.role_code))].map(rc => t('adm.role.' + rc)).join(', ');
   }
 
   function moduleSummary(u) {
@@ -159,40 +162,40 @@ export default function ListPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Utilisateurs</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>{t('adm.users.title')}</h1>
         <button onClick={() => setShowCreateForm(o => !o)} className="btn btn-primary">
-          {showCreateForm ? 'Annuler' : '+ Ajouter un utilisateur'}
+          {showCreateForm ? t('common.cancel') : t('adm.users.addUser')}
         </button>
       </div>
 
       {showCreateForm && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h2>Nouvel utilisateur</h2>
+          <h2>{t('adm.users.newUser')}</h2>
           <form onSubmit={createUser} className="form-inline">
-            <input placeholder="Nom" required value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
-            <input placeholder="Prénom" required value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
-            <input placeholder="Email" type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            <input placeholder={form.notify ? 'Mot de passe (vide = généré)' : 'Mot de passe (optionnel)'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            <input placeholder={t('adm.users.f.nom')} required value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} />
+            <input placeholder={t('adm.users.f.prenom')} required value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} />
+            <input placeholder={t('adm.users.f.email')} type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <input placeholder={form.notify ? t('adm.users.f.pwGenerated') : t('adm.users.f.pwOptional')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
               <input type="checkbox" checked={form.notify} onChange={e => setForm({ ...form, notify: e.target.checked })} />
-              Notifier par email
+              {t('adm.users.notifyEmail')}
             </label>
-            <select value={form.copyFromUserId || ''} onChange={e => setForm({ ...form, copyFromUserId: e.target.value })} title="Reprend rôles, accès modules et BU du compte choisi">
-              <option value="">Copier les accès de… (optionnel)</option>
+            <select value={form.copyFromUserId || ''} onChange={e => setForm({ ...form, copyFromUserId: e.target.value })} title={t('adm.users.copyTitle')}>
+              <option value="">{t('adm.users.copyFromOptional')}</option>
               {users.filter(u => u.access_status !== 'pending').map(u => (
                 <option key={u.id} value={u.id}>{u.prenom} {u.nom} — {u.email}</option>
               ))}
             </select>
             {profiles.length > 0 && (
-              <select value={form.applyProfileId || ''} onChange={e => setForm({ ...form, applyProfileId: e.target.value })} title="Le profil sera appliqué juste après la création">
-                <option value="">…ou appliquer un profil</option>
+              <select value={form.applyProfileId || ''} onChange={e => setForm({ ...form, applyProfileId: e.target.value })} title={t('adm.users.applyProfileTitle')}>
+                <option value="">{t('adm.users.orApplyProfile')}</option>
                 {profiles.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
               </select>
             )}
-            <button type="submit" className="btn btn-primary">Créer</button>
+            <button type="submit" className="btn btn-primary">{t('adm.users.create')}</button>
           </form>
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
-            Si « Notifier par email » est coché, l'utilisateur reçoit ses identifiants et un lien de connexion. Laissez le mot de passe vide pour en générer un automatiquement.
+            {t('adm.users.createHelp')}
           </p>
           {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
         </div>
@@ -201,21 +204,21 @@ export default function ListPage() {
       {profiles.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <strong>Profils d'accès</strong>
+            <strong>{t('adm.users.profilesTitle')}</strong>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-              Modèles réutilisables (rôles + accès modules + BU) — applicables à un utilisateur depuis sa fiche détail.
+              {t('adm.users.profilesHint')}
             </span>
           </div>
           <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {profiles.map(p => {
               const d = p.data || {};
-              const summary = `${(d.roles || []).length} rôle(s) · ${(d.subModules || []).length} module(s) · ${(d.businessUnits || []).length} BU`;
+              const summary = t('adm.users.profileSummary', { roles: (d.roles || []).length, modules: (d.subModules || []).length, bu: (d.businessUnits || []).length });
               return (
                 <span key={p.id} className="badge" style={{ background: 'var(--color-primary-bg, var(--color-border))', color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   title={`${p.description ? p.description + ' — ' : ''}${summary}`}>
                   <strong>{p.nom}</strong>
                   <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>({summary})</span>
-                  <button onClick={() => deleteProfile(p.id, p.nom)} className="btn-icon" aria-label="Désactiver  le profil">×</button>
+                  <button onClick={() => deleteProfile(p.id, p.nom)} className="btn-icon" aria-label={t('adm.users.deactivateProfileAria')}>×</button>
                 </span>
               );
             })}
@@ -229,21 +232,21 @@ export default function ListPage() {
           style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
         >
           <span>{notice.text}</span>
-          <button onClick={() => setNotice(null)} className="btn-icon" aria-label="Fermer">×</button>
+          <button onClick={() => setNotice(null)} className="btn-icon" aria-label={t('adm.common.close')}>×</button>
         </div>
       )}
       {error && !showCreateForm && <div className="alert alert-danger" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <input
-          placeholder="Rechercher (nom, prénom, email)…"
+          placeholder={t('adm.common.searchNameEmail')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ minWidth: 260 }}
         />
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-          <option value="">Tous les rôles</option>
-          {ROLE_CODES.map(r => <option key={r} value={r}>{r}</option>)}
+          <option value="">{t('adm.users.allRoles')}</option>
+          {ROLE_CODES.map(r => <option key={r} value={r}>{t('adm.role.' + r)}</option>)}
         </select>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           {Object.entries(STATUS_META).map(([key, meta]) => {
@@ -252,14 +255,14 @@ export default function ListPage() {
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap', cursor: 'pointer' }}>
                 <input type="checkbox" checked={statusFilter[key]}
                   onChange={e => setStatusFilter(s => ({ ...s, [key]: e.target.checked }))} />
-                <span className="badge" style={{ background: meta.bg, color: meta.fg }}>{meta.label}</span>
+                <span className="badge" style={{ background: meta.bg, color: meta.fg }}>{t(meta.labelKey)}</span>
                 <span style={{ color: 'var(--color-text-faint)' }}>{count}</span>
               </label>
             );
           })}
         </div>
         <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-          {filteredUsers.length} / {users.length} utilisateur{users.length > 1 ? 's' : ''}
+          {t('adm.users.countFiltered', { shown: filteredUsers.length, total: users.length, word: users.length > 1 ? t('adm.users.usersWord') : t('adm.users.userWord') })}
         </span>
       </div>
 
@@ -268,12 +271,12 @@ export default function ListPage() {
           <table>
             <thead>
               <tr>
-                <th>Nom</th>
-                <th>Prénoms</th>
-                <th>Rôle</th>
-                <th>Profil</th>
-                <th>Module</th>
-                <th>Action</th>
+                <th>{t('adm.users.col.nom')}</th>
+                <th>{t('adm.users.col.prenoms')}</th>
+                <th>{t('adm.users.col.role')}</th>
+                <th>{t('adm.users.col.profil')}</th>
+                <th>{t('adm.users.col.module')}</th>
+                <th>{t('adm.users.col.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -284,7 +287,7 @@ export default function ListPage() {
                   toggleActive={toggleActive} />
               ))}
               {filteredUsers.length === 0 && (
-                <tr><td className="empty-row" colSpan={6}>Aucun utilisateur ne correspond à ce filtre.</td></tr>
+                <tr><td className="empty-row" colSpan={6}>{t('adm.users.noneMatch')}</td></tr>
               )}
             </tbody>
           </table>
@@ -293,12 +296,12 @@ export default function ListPage() {
 
       {filteredUsers.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, fontSize: 13, color: 'var(--color-text-muted)' }}>
-          <span>{filteredUsers.length} utilisateur{filteredUsers.length > 1 ? 's' : ''} au total</span>
+          <span>{t('adm.users.totalCount', { count: filteredUsers.length, word: filteredUsers.length > 1 ? t('adm.users.usersWord') : t('adm.users.userWord') })}</span>
           {totalPages > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Précédent</button>
-              <span>Page {page} / {totalPages}</span>
-              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Suivant →</button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{t('adm.users.prev')}</button>
+              <span>{t('adm.users.pageOf', { page, total: totalPages })}</span>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>{t('adm.users.next')}</button>
             </div>
           )}
         </div>
@@ -308,6 +311,7 @@ export default function ListPage() {
 }
 
 function UserRow({ u, roleSummary, moduleSummary, sendingId, rejectPanel, setRejectPanel, toggleReject, approveAccess, rejectAccess, toggleActive }) {
+  const { t } = useI18n();
   const isPending = u.access_status === 'pending';
   return (
     <>
@@ -319,21 +323,21 @@ function UserRow({ u, roleSummary, moduleSummary, sendingId, rejectPanel, setRej
         <td>{moduleSummary(u)}</td>
         <td>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Link to={`/admin/users/${u.id}`} className="btn btn-secondary btn-sm">Détail</Link>
+            <Link to={`/admin/users/${u.id}`} className="btn btn-secondary btn-sm">{t('adm.users.detail')}</Link>
             {isPending ? (
               <>
                 <button onClick={() => approveAccess(u)} disabled={sendingId === u.id} className="btn btn-primary btn-sm">
-                  {sendingId === u.id ? '…' : 'Valider'}
+                  {sendingId === u.id ? '…' : t('adm.users.approve')}
                 </button>
                 <button onClick={() => toggleReject(u)} className="btn btn-danger-ghost btn-sm">
-                  {rejectPanel[u.id] !== undefined ? 'Fermer' : 'Rejeter'}
+                  {rejectPanel[u.id] !== undefined ? t('adm.common.close') : t('adm.users.reject')}
                 </button>
               </>
             ) : (
               <>
-                <Link to={`/admin/users/${u.id}?edit=1`} className="btn btn-secondary btn-sm">Éditer</Link>
+                <Link to={`/admin/users/${u.id}?edit=1`} className="btn btn-secondary btn-sm">{t('common.edit')}</Link>
                 <button onClick={() => toggleActive(u)} className={u.actif ? 'btn btn-danger-ghost btn-sm' : 'btn btn-secondary btn-sm'}>
-                  {u.actif ? 'Désactiver ' : 'Réactiver'}
+                  {u.actif ? t('adm.users.deactivate') : t('adm.users.reactivate')}
                 </button>
               </>
             )}
@@ -343,11 +347,11 @@ function UserRow({ u, roleSummary, moduleSummary, sendingId, rejectPanel, setRej
       {rejectPanel[u.id] !== undefined && (
         <tr>
           <td colSpan={6} style={{ background: 'var(--color-hover)' }}>
-            <textarea placeholder="Motif du rejet (envoyé au demandeur par email)" value={rejectPanel[u.id]}
+            <textarea placeholder={t('adm.users.rejectReasonPlaceholder')} value={rejectPanel[u.id]}
               onChange={e => setRejectPanel(p => ({ ...p, [u.id]: e.target.value }))}
               style={{ display: 'block', width: '100%', marginBottom: 8 }} />
             <button onClick={() => rejectAccess(u)} disabled={sendingId === u.id} className="btn btn-danger btn-sm">
-              {sendingId === u.id ? 'Rejet…' : 'Confirmer le rejet'}
+              {sendingId === u.id ? t('adm.users.rejecting') : t('adm.users.confirmReject')}
             </button>
           </td>
         </tr>

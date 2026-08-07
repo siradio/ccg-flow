@@ -4,17 +4,18 @@ import {
 } from 'recharts';
 import client from '../../api/client';
 import Loading from '../../components/Loading';
+import { useI18n } from '../../i18n/I18nContext';
 
 const RANGES = [
-  { days: 7, label: '7 jours' },
-  { days: 30, label: '30 jours' },
-  { days: 90, label: '90 jours' },
+  { days: 7, labelKey: 'adm.stats.range.d7' },
+  { days: 30, labelKey: 'adm.stats.range.d30' },
+  { days: 90, labelKey: 'adm.stats.range.d90' },
 ];
 
-function fmtDateTime(v) {
+function fmtDateTime(v, lang) {
   if (!v) return '—';
   const d = new Date(v);
-  return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 // Étiquette d'axe compacte (jj/mm) à partir d'une clé 'YYYY-MM-DD'.
 function fmtTick(day) {
@@ -33,6 +34,7 @@ function KpiCard({ label, value, hint }) {
 }
 
 export default function Statistiques() {
+  const { t, lang } = useI18n();
   const [stats, setStats] = useState(null);
   const [daily, setDaily] = useState([]);
   const [days, setDays] = useState(30);
@@ -40,8 +42,8 @@ export default function Statistiques() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    client.get('/stats/logins').then(res => setStats(res.data)).catch(e => setError(e.response?.data?.error || 'Erreur de chargement.'));
-  }, []);
+    client.get('/stats/logins').then(res => setStats(res.data)).catch(e => setError(e.response?.data?.error || t('adm.stats.loadError')));
+  }, [t]);
   useEffect(() => {
     client.get(`/stats/logins/daily?days=${days}`).then(res => setDaily(res.data)).catch(() => {});
   }, [days]);
@@ -56,30 +58,30 @@ export default function Statistiques() {
   if (error) return <div className="alert alert-danger">{error}</div>;
   if (!stats) return <Loading />;
 
-  const t = stats.totals;
+  const tot = stats.totals;
 
   return (
     <div>
-      <h1 className="page-title">Statistiques d'utilisation</h1>
+      <h1 className="page-title">{t('adm.stats.title')}</h1>
       <p style={{ color: 'var(--color-text-muted)', marginTop: -6, fontSize: 13 }}>
-        Connexions à la plateforme. Le suivi a démarré à la mise en service de cette page — les connexions antérieures ne sont pas comptabilisées.
+        {t('adm.stats.subtitle')}
       </p>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-        <KpiCard label="Connexions (total)" value={t.total_logins} hint="depuis le début du suivi" />
-        <KpiCard label="Connexions 7 j" value={t.logins_7d} hint={`${t.logins_30d} sur 30 j`} />
-        <KpiCard label="Utilisateurs actifs 7 j" value={t.active_7d} hint={`${t.active_30d} actifs sur 30 j`} />
-        <KpiCard label="Comptes jamais connectés" value={t.never_connected} hint={`sur ${t.total_users} comptes`} />
+        <KpiCard label={t('adm.stats.kpi.totalLogins')} value={tot.total_logins} hint={t('adm.stats.kpi.sinceStart')} />
+        <KpiCard label={t('adm.stats.kpi.logins7')} value={tot.logins_7d} hint={t('adm.stats.kpi.over30', { n: tot.logins_30d })} />
+        <KpiCard label={t('adm.stats.kpi.active7')} value={tot.active_7d} hint={t('adm.stats.kpi.active30', { n: tot.active_30d })} />
+        <KpiCard label={t('adm.stats.kpi.neverConnected')} value={tot.never_connected} hint={t('adm.stats.kpi.ofAccounts', { n: tot.total_users })} />
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-          <strong>Connexions par jour</strong>
+          <strong>{t('adm.stats.perDay')}</strong>
           <div className="form-inline">
             {RANGES.map(r => (
               <button key={r.days} onClick={() => setDays(r.days)}
                 className={`btn btn-sm ${days === r.days ? 'btn-primary' : 'btn-secondary'}`}>
-                {r.label}
+                {t(r.labelKey)}
               </button>
             ))}
           </div>
@@ -92,10 +94,10 @@ export default function Statistiques() {
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
               <Tooltip
                 labelFormatter={fmtTick}
-                formatter={v => [v, 'Connexions']}
+                formatter={v => [v, t('adm.stats.connections')]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)' }}
               />
-              <Bar dataKey="count" name="Connexions" fill="#2454e0" radius={[3, 3, 0, 0]} maxBarSize={38} />
+              <Bar dataKey="count" name={t('adm.stats.connections')} fill="#2454e0" radius={[3, 3, 0, 0]} maxBarSize={38} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -103,34 +105,34 @@ export default function Statistiques() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-          <strong>Connexions par utilisateur</strong>
-          <input placeholder="Rechercher (nom, prénom, email)…" value={search} onChange={e => setSearch(e.target.value)} style={{ minWidth: 240 }} />
+          <strong>{t('adm.stats.perUser')}</strong>
+          <input placeholder={t('adm.common.searchNameEmail')} value={search} onChange={e => setSearch(e.target.value)} style={{ minWidth: 240 }} />
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Utilisateur</th>
-                <th>Email</th>
-                <th style={{ textAlign: 'right' }}>Connexions</th>
-                <th>Dernière connexion</th>
+                <th>{t('adm.stats.col.user')}</th>
+                <th>{t('adm.stats.col.email')}</th>
+                <th style={{ textAlign: 'right' }}>{t('adm.stats.col.logins')}</th>
+                <th>{t('adm.stats.col.lastLogin')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map(u => (
                 <tr key={u.id}>
-                  <td>{u.prenom} {u.nom}{u.actif ? '' : ' (désactivé)'}</td>
+                  <td>{u.prenom} {u.nom}{u.actif ? '' : t('adm.stats.disabledSuffix')}</td>
                   <td style={{ color: 'var(--color-text-muted)' }}>{u.email}</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>
                     {u.login_count > 0
                       ? u.login_count
                       : <span style={{ color: 'var(--color-text-faint)', fontWeight: 400 }}>—</span>}
                   </td>
-                  <td style={{ color: u.last_login ? 'var(--color-text)' : 'var(--color-text-faint)' }}>{fmtDateTime(u.last_login)}</td>
+                  <td style={{ color: u.last_login ? 'var(--color-text)' : 'var(--color-text-faint)' }}>{fmtDateTime(u.last_login, lang)}</td>
                 </tr>
               ))}
               {filteredUsers.length === 0 && (
-                <tr><td colSpan={4} className="empty-row">Aucun utilisateur ne correspond.</td></tr>
+                <tr><td colSpan={4} className="empty-row">{t('adm.stats.noneMatch')}</td></tr>
               )}
             </tbody>
           </table>
