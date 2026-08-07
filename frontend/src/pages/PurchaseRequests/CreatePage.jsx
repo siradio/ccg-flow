@@ -66,6 +66,10 @@ export default function CreatePage() {
   function addLine() { setLines(ls => [...ls, emptyLine()]); }
   function removeLine(key) { setLines(ls => (ls.length > 1 ? ls.filter(l => l.key !== key) : ls)); }
 
+  // Articles proposés à l'achat : on EXCLUT les produits finis — ils sont fabriqués en interne et
+  // ne font pas l'objet d'une demande d'achat (qui concerne matières premières, consommables, etc.).
+  const articleOptions = products.filter(p => p.type_article !== 'produit_fini');
+
   // Une ligne est « complète » si elle désigne un article (référentiel OU description libre) ET a une quantité > 0.
   const validLines = lines.filter(l => (l.productId || l.descriptionLibre.trim()) && Number(l.quantite) > 0);
 
@@ -156,9 +160,9 @@ export default function CreatePage() {
                     {t('prc.article')}
                     <select value={l.productId} onChange={e => onPickProduct(l.key, e.target.value)} disabled={!form.entityId}>
                       <option value="">{t('prc.freeItem')}</option>
-                      {products.length > 0 && (
+                      {articleOptions.length > 0 && (
                         <optgroup label={t('prc.fromReferential')}>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.code ? p.code + ' — ' : ''}{p.designation}</option>)}
+                          {articleOptions.map(p => <option key={p.id} value={p.id}>{p.code ? p.code + ' — ' : ''}{p.designation}</option>)}
                         </optgroup>
                       )}
                     </select>
