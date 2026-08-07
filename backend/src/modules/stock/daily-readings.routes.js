@@ -24,9 +24,12 @@ router.get('/grid', requireSubModule('stock.releve_jour'), async (req, res, next
     const rows = await all(
       `SELECT p.id AS product_id, p.code, p.designation, p.unite,
               se.quantite AS releve, se.commentaire,
-              COALESCE(bal.qty, 0) AS theorique
+              COALESCE(bal.qty, 0) AS theorique,
+              NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par,
+              se.updated_at AS saisi_le
        FROM products p
        LEFT JOIN stock_entries se ON se.product_id = p.id AND se.date_stock = $2
+       LEFT JOIN users u ON u.id = se.updated_by
        LEFT JOIN (SELECT product_id, SUM(stock_actuel) AS qty FROM v_stock_balances GROUP BY product_id) bal ON bal.product_id = p.id
        WHERE p.business_unit_id = $1 AND p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
        ORDER BY p.designation`, [buId, date]);
@@ -110,10 +113,12 @@ router.get('/dashboard', requireSubModule('stock.releve_jour'), async (req, res,
     const rows = await all(
       `SELECT DISTINCT ON (se.product_id) se.product_id, se.date_stock, se.quantite AS releve,
               p.code, p.designation, p.business_unit_id, bu.nom AS bu_nom,
-              COALESCE(bal.qty, 0) AS theorique
+              COALESCE(bal.qty, 0) AS theorique,
+              NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par
        FROM stock_entries se
        JOIN products p ON p.id = se.product_id
        LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       LEFT JOIN users u ON u.id = se.updated_by
        LEFT JOIN (SELECT product_id, SUM(stock_actuel) AS qty FROM v_stock_balances GROUP BY product_id) bal ON bal.product_id = se.product_id
        WHERE ${where.join(' AND ')}
        ORDER BY se.product_id, se.date_stock DESC`, params);

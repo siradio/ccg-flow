@@ -184,6 +184,8 @@ export const translations = {
     'stockreleve.th.date': 'Date',
     'stockreleve.th.theo': 'Théorique',
     'stockreleve.th.ecart': 'Écart',
+    'stockreleve.th.by': 'Par',
+    'stockreleve.lastBy': 'Dernier relevé par {name} · {date}',
     // ── Stock : filtres communs & statuts ──
     'stockcommon.bu': 'Business Unit',
     'stockcommon.all': 'Toutes',
@@ -1558,6 +1560,8 @@ export const translations = {
     'stockreleve.th.date': 'Date',
     'stockreleve.th.theo': 'Theoretical',
     'stockreleve.th.ecart': 'Variance',
+    'stockreleve.th.by': 'By',
+    'stockreleve.lastBy': 'Last reading by {name} · {date}',
     // ── Stock: common filters & statuses ──
     'stockcommon.bu': 'Business Unit',
     'stockcommon.all': 'All',

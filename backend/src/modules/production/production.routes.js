@@ -22,9 +22,12 @@ router.get('/grid', requireSubModule('production.releve'), async (req, res, next
     if (visible !== null && !visible.includes(buId)) return res.json([]);
     res.json(await all(
       `SELECT p.id AS product_id, p.code, p.designation, p.unite,
-              pe.quantite AS produit, pe.commentaire
+              pe.quantite AS produit, pe.commentaire,
+              NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par,
+              pe.updated_at AS saisi_le
        FROM products p
        LEFT JOIN production_entries pe ON pe.product_id = p.id AND pe.date_production = $2
+       LEFT JOIN users u ON u.id = pe.updated_by
        WHERE p.business_unit_id = $1 AND p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
        ORDER BY p.designation`, [buId, date]));
   } catch (e) { next(e); }
@@ -67,12 +70,20 @@ router.get('/dashboard', requireSubModule('production.suivi'), async (req, res, 
     res.json(await all(
       `SELECT p.id AS product_id, p.code, p.designation, p.unite, p.business_unit_id, bu.nom AS bu_nom,
               SUM(pe.quantite) AS total_produit, COUNT(*)::int AS jours_saisis,
-              MAX(pe.date_production) AS dernier_jour
+              MAX(pe.date_production) AS dernier_jour,
+              la.saisi_par
        FROM production_entries pe
        JOIN products p ON p.id = pe.product_id
        LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       LEFT JOIN LATERAL (
+         SELECT NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par
+         FROM production_entries pe2 JOIN users u ON u.id = pe2.updated_by
+         WHERE pe2.product_id = p.id AND pe2.date_production BETWEEN $1 AND $2
+         ORDER BY pe2.date_production DESC, pe2.updated_at DESC NULLS LAST
+         LIMIT 1
+       ) la ON true
        WHERE ${where.join(' AND ')}
-       GROUP BY p.id, p.code, p.designation, p.unite, p.business_unit_id, bu.nom
+       GROUP BY p.id, p.code, p.designation, p.unite, p.business_unit_id, bu.nom, la.saisi_par
        ORDER BY total_produit DESC`, params));
   } catch (e) { next(e); }
 });

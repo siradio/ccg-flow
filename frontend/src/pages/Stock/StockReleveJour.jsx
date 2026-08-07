@@ -20,6 +20,7 @@ const SAISIE_COLS = [
 const SUIVI_COLS = [
   { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
   { key: 'releve', label: 'Dernier relevé', type: 'number' }, { key: 'date_stock', label: 'Date', type: 'date' },
+  { key: 'saisi_par', label: 'Par' },
   { key: 'theorique', label: 'Théorique', type: 'number' }, { key: 'ecart', label: 'Écart', type: 'number' },
 ];
 
@@ -40,7 +41,7 @@ function Segmented({ tab, setTab }) {
 
 export default function StockReleveJour() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const canView = hasSubModuleLevel(user, 'stock.releve_jour');
   const canSaisir = hasSubModuleLevel(user, 'stock.releve_jour', 'ajout');
 
@@ -100,6 +101,12 @@ export default function StockReleveJour() {
     return { ...r, releve: q === '' || q == null ? '' : Number(q), ecart: q === '' || q == null ? '' : Number(q) - Number(r.theorique) };
   }), [grid, edits]);
 
+  // Auteur du dernier relevé enregistré pour la BU/date affichée : ligne du grid au updated_at le
+  // plus récent (les lignes sans relevé n'ont ni saisi_par ni saisi_le).
+  const lastSaved = useMemo(() => grid
+    .filter(r => r.saisi_le && r.saisi_par)
+    .sort((a, b) => new Date(b.saisi_le) - new Date(a.saisi_le))[0] || null, [grid]);
+
   const fmtBucket = b => {
     const s = String(b).slice(0, 10);
     if (evoGran === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
@@ -147,7 +154,10 @@ export default function StockReleveJour() {
               <select value={buId} onChange={e => { setMsg(null); setBuId(e.target.value); }}>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}</select>
             </label>
             <label className="field">{t('stockreleve.date')}<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('stockreleve.entered', { n: nbSaisis, total: grid.length })}</div>
+            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'right' }}>
+              {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}
+              {lastSaved && <><br /><span style={{ fontSize: 12 }}>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}</span></>}
+            </div>
           </div>
           {msg && <div className={`alert ${msg.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
           {grid.length === 0 && <p className="empty-row">{t('stockreleve.noProduct')}</p>}
@@ -240,7 +250,7 @@ export default function StockReleveJour() {
             <div className="card" style={{ padding: 0 }}>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('stockreleve.th.lastReleve')}</th><th>{t('stockreleve.th.date')}</th><th className="num">{t('stockreleve.th.theo')}</th><th className="num">{t('stockreleve.th.ecart')}</th></tr></thead>
+                  <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('stockreleve.th.lastReleve')}</th><th>{t('stockreleve.th.date')}</th><th>{t('stockreleve.th.by')}</th><th className="num">{t('stockreleve.th.theo')}</th><th className="num">{t('stockreleve.th.ecart')}</th></tr></thead>
                   <tbody>
                     {dash.map(r => (
                       <tr key={r.product_id}>
@@ -248,6 +258,7 @@ export default function StockReleveJour() {
                         <td>{r.bu_nom}</td>
                         <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmt(r.releve)}</td>
                         <td>{r.date_stock ? String(r.date_stock).slice(0, 10).split('-').reverse().join('/') : '—'}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{r.saisi_par || '—'}</td>
                         <td className="num" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-muted)' }}>{fmt(r.theorique)}</td>
                         <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: ecartColor(Number(r.ecart)) }}>{Number(r.ecart) > 0 ? '+' : ''}{fmt(r.ecart)}</td>
                       </tr>

@@ -16,7 +16,7 @@ const SAISIE_COLS = [{ key: 'code', label: 'Code' }, { key: 'designation', label
 const SUIVI_COLS = [
   { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
   { key: 'total_produit', label: 'Total produit', type: 'number' }, { key: 'jours_saisis', label: 'Jours saisis', type: 'number' },
-  { key: 'dernier_jour', label: 'Dernier jour', type: 'date' },
+  { key: 'dernier_jour', label: 'Dernier jour', type: 'date' }, { key: 'saisi_par', label: 'Par' },
 ];
 
 function Segmented({ tab, setTab }) {
@@ -36,7 +36,7 @@ function Segmented({ tab, setTab }) {
 
 export default function ProductionReleve() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const canView = hasSubModuleLevel(user, 'production.releve') || hasSubModuleLevel(user, 'production.suivi');
   const canSaisir = hasSubModuleLevel(user, 'production.releve', 'ajout');
   const canSuivi = hasSubModuleLevel(user, 'production.suivi');
@@ -99,6 +99,8 @@ export default function ProductionReleve() {
 
   const nbSaisis = Object.values(edits).filter(v => v.quantite !== '' && v.quantite != null).length;
   const totalJour = Object.values(edits).reduce((s, v) => s + (Number(v.quantite) || 0), 0);
+  // Auteur du dernier relevé de production enregistré (BU/date affichée) : ligne au updated_at le plus récent.
+  const lastSaved = grid.filter(r => r.saisi_le && r.saisi_par).sort((a, b) => new Date(b.saisi_le) - new Date(a.saisi_le))[0] || null;
   const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '' }));
   const totalPeriode = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
   const fmtBucket = b => {
@@ -129,6 +131,7 @@ export default function ProductionReleve() {
             <label className="field">{t('stockreleve.date')}<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'right' }}>
               {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}<br /><strong>{t('prodrel.totalDay', { v: fmt(totalJour) })}</strong>
+              {lastSaved && <><br /><span style={{ fontSize: 12, fontWeight: 400 }}>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}</span></>}
             </div>
           </div>
           {msg && <div className={`alert ${msg.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
@@ -228,7 +231,7 @@ export default function ProductionReleve() {
               <div className="card" style={{ padding: 0 }}>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('prodrel.th.totalProduced')}</th><th className="num">{t('prodrel.th.daysEntered')}</th><th>{t('prodrel.th.lastDay')}</th></tr></thead>
+                    <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('prodrel.th.totalProduced')}</th><th className="num">{t('prodrel.th.daysEntered')}</th><th>{t('prodrel.th.lastDay')}</th><th>{t('stockreleve.th.by')}</th></tr></thead>
                     <tbody>
                       {suivi.map(r => (
                         <tr key={r.product_id}>
@@ -237,6 +240,7 @@ export default function ProductionReleve() {
                           <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmt(r.total_produit)} {r.unite || ''}</td>
                           <td className="num">{r.jours_saisis}</td>
                           <td>{d10(r.dernier_jour)}</td>
+                          <td style={{ color: 'var(--color-text-muted)' }}>{r.saisi_par || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
