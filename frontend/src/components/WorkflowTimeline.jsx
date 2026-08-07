@@ -1,3 +1,5 @@
+import { useI18n } from '../i18n/I18nContext';
+
 const STATUS_TO_MIN_ORDRE = {
   brouillon: 0,
   en_attente_validation_besoin: 1,
@@ -12,6 +14,7 @@ const STATUS_TO_MIN_ORDRE = {
 };
 
 export default function WorkflowTimeline({ pr, steps }) {
+  const { t } = useI18n();
   if (!steps?.length) return null;
   const sorted = [...steps].sort((a, b) => a.ordre - b.ordre);
 
@@ -27,7 +30,7 @@ export default function WorkflowTimeline({ pr, steps }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {pr.status === 'rejetee' && (
         <div className="alert alert-danger" style={{ marginBottom: 8 }}>
-          Demande refusée définitivement.
+          {t('prd.rejectedFinal')}
         </div>
       )}
       {sorted.map(step => {
@@ -51,7 +54,7 @@ export default function WorkflowTimeline({ pr, steps }) {
             }}>{colors.label}</span>
             <span style={{ fontWeight: state === 'current' ? 600 : 400 }}>{step.nom}</span>
             {approval?.statut === 'refusee' && (
-              <span style={{ color: 'var(--color-danger)', fontSize: 12 }}>— refusé précédemment : {approval.commentaire}</span>
+              <span style={{ color: 'var(--color-danger)', fontSize: 12 }}>— {t('prd.rejectedBefore', { comment: approval.commentaire })}</span>
             )}
           </div>
         );

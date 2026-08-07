@@ -6,6 +6,7 @@ import WorkflowTimeline from '../../components/WorkflowTimeline';
 import { StatusBadge } from './statusLabels.jsx';
 import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
 import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Les téléchargements passent par l'API JWT : un <a href> direct n'enverrait pas le header
 // d'autorisation, d'où un fetch authentifié suivi de l'ouverture d'une blob URL.
@@ -18,6 +19,7 @@ async function openAuthenticatedFile(path) {
 export default function DetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const [pr, setPr] = useState(null);
   const [steps, setSteps] = useState([]);
   const [products, setProducts] = useState([]);
@@ -62,7 +64,7 @@ export default function DetailPage() {
   // vient de cliquer un bouton de validation plus bas (ex. ValidationSection, QuotesSection).
   function showToast(message) {
     setToast(message);
-    setTimeout(() => setToast(t => (t === message ? null : t)), 3500);
+    setTimeout(() => setToast(cur => (cur === message ? null : cur)), 3500);
   }
 
   // Retourne true/false selon le résultat — les appelants qui enchaînent une remise à zéro de
@@ -77,7 +79,7 @@ export default function DetailPage() {
       if (successMessage) showToast(successMessage);
       return true;
     } catch (err) {
-      setError(err.response?.data?.error || 'Une erreur est survenue.');
+      setError(err.response?.data?.error || t('prd.genericError'));
       return false;
     }
   }
@@ -90,7 +92,7 @@ export default function DetailPage() {
     return res.data;
   }
 
-  if (!pr) return <p>Chargement…</p>;
+  if (!pr) return <p>{t('prd.loading')}</p>;
   const isRequester = pr.requester_user_id === user.id;
 
   return (
@@ -111,24 +113,24 @@ export default function DetailPage() {
       {error && <div className="alert alert-danger">{error}</div>}
 
       <section className="card">
-        <h2>Suivi du workflow</h2>
+        <h2>{t('prd.workflowTracking')}</h2>
         <WorkflowTimeline pr={pr} steps={steps} />
       </section>
 
       <section className="card">
-        <h2>Informations</h2>
-        <p><strong>Entité :</strong> {pr.entity_nom}</p>
+        <h2>{t('prd.info')}</h2>
+        <p><strong>{t('prc.entity')} :</strong> {pr.entity_nom}</p>
         {pr.entity_code === 'SOGUIPAL' && (
-          <p><strong>Business Unit :</strong> {pr.business_unit_nom || 'Toutes les BU'}</p>
+          <p><strong>{t('stockreleve.bu')} :</strong> {pr.business_unit_nom || t('cockpit.allBu')}</p>
         )}
-        <p><strong>Demandeur :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
-        {pr.justification && <p><strong>Justification :</strong> {pr.justification}</p>}
-        <p style={{ marginBottom: 0 }}><strong>Montant final :</strong> {pr.montant_final ? `${pr.montant_final} ${pr.devise}` : '—'}</p>
+        <p><strong>{t('prd.requester')} :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
+        {pr.justification && <p><strong>{t('prc.justification')} :</strong> {pr.justification}</p>}
+        <p style={{ marginBottom: 0 }}><strong>{t('prd.finalAmount')} :</strong> {pr.montant_final ? `${pr.montant_final} ${pr.devise}` : '—'}</p>
       </section>
 
       {pr.attachments?.length > 0 && (
         <section className="card">
-          <h2>Pièces jointes</h2>
+          <h2>{t('prd.attachments')}</h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {pr.attachments.map(a => (
               <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -138,7 +140,7 @@ export default function DetailPage() {
                 </button>
                 {a.taille != null && (
                   <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                    {Math.max(1, Math.round(a.taille / 1024))} Ko
+                    {Math.max(1, Math.round(a.taille / 1024))} {t('prd.kb')}
                   </span>
                 )}
               </li>
@@ -152,8 +154,8 @@ export default function DetailPage() {
       {pr.status === 'brouillon' && isRequester && (
         <section className="card">
           <button className="btn btn-primary" disabled={pr.lines.length === 0}
-            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), "Demande soumise pour validation de l'expression de besoin.")}>
-            Soumettre l'expression de besoin
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/submit`), t('prd.submitNeedToast'))}>
+            {t('prd.submitNeed')}
           </button>
         </section>
       )}
@@ -172,6 +174,7 @@ export default function DetailPage() {
 }
 
 function LinesSection({ pr, products, isRequester, guarded }) {
+  const { t } = useI18n();
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const editable = pr.status === 'brouillon' && isRequester;
 
@@ -186,11 +189,11 @@ function LinesSection({ pr, products, isRequester, guarded }) {
 
   return (
     <section className="card">
-      <h2>Lignes</h2>
+      <h2>{t('prd.lines')}</h2>
       <div className="table-wrap" style={{ marginBottom: editable ? 12 : 0 }}>
         <table>
           <thead><tr>
-            <th>Désignation</th><th>Quantité</th><th>Unité</th><th>Fournisseur retenu</th>{editable && <th />}
+            <th>{t('prd.designation')}</th><th>{t('prd.quantity')}</th><th>{t('prd.unit')}</th><th>{t('prd.selectedSupplier')}</th>{editable && <th />}
           </tr></thead>
           <tbody>
             {pr.lines.map(l => (
@@ -203,30 +206,30 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                   <td>
                     <button className="btn btn-danger btn-sm"
                       onClick={() => guarded(() => client.delete(`/purchase-requests/${pr.id}/lines/${l.id}`))}>
-                      Supprimer
+                      {t('common.delete')}
                     </button>
                   </td>
                 )}
               </tr>
             ))}
-            {pr.lines.length === 0 && <tr><td className="empty-row" colSpan={editable ? 5 : 4}>Aucune ligne.</td></tr>}
+            {pr.lines.length === 0 && <tr><td className="empty-row" colSpan={editable ? 5 : 4}>{t('prd.noLines')}</td></tr>}
           </tbody>
         </table>
       </div>
       {editable && (
         <form onSubmit={addLine} className="form-inline">
           <select value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })}>
-            <option value="">Article libre…</option>
+            <option value="">{t('prd.freeItem')}</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
           </select>
           {!form.productId && (
-            <input placeholder="Description" value={form.descriptionLibre}
+            <input placeholder={t('prd.description')} value={form.descriptionLibre}
               onChange={e => setForm({ ...form, descriptionLibre: e.target.value })} />
           )}
-          <input placeholder="Quantité" type="number" required value={form.quantite}
+          <input placeholder={t('prd.quantity')} type="number" required value={form.quantite}
             onChange={e => setForm({ ...form, quantite: e.target.value })} style={{ width: 100 }} />
-          <input placeholder="Unité" value={form.unite} onChange={e => setForm({ ...form, unite: e.target.value })} style={{ width: 100 }} />
-          <button type="submit" className="btn btn-primary">Ajouter</button>
+          <input placeholder={t('prd.unit')} value={form.unite} onChange={e => setForm({ ...form, unite: e.target.value })} style={{ width: 100 }} />
+          <button type="submit" className="btn btn-primary">{t('common.add')}</button>
         </form>
       )}
     </section>
@@ -247,6 +250,7 @@ function defaultQuoteRequestBody(numero) {
 
 function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier, entities }) {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [selected, setSelected] = useState([]);
   const [message, setMessage] = useState('');
@@ -284,9 +288,9 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
       await client.post(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/send`, email ? { email } : {});
       setSendResults(r => ({ ...r, [s.supplier_id]: { sent: true } }));
       setNeedEmail(n => ({ ...n, [s.id]: false }));
-    }, `Demande de devis envoyée à ${s.supplier_nom}.`);
+    }, t('prd.sentToSupplier', { nom: s.supplier_nom }));
     setSendingOne(null);
-    if (!ok) setSendResults(r => ({ ...r, [s.supplier_id]: { sent: false, error: "Échec de l'envoi." } }));
+    if (!ok) setSendResults(r => ({ ...r, [s.supplier_id]: { sent: false, error: t('prd.sendFailed') } }));
   }
 
   const canCreate = canAct && ['soumise', 'en_analyse_achat'].includes(pr.status);
@@ -304,7 +308,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
       setNewSupplier(defaultNewSupplier(pr.entity_id));
       setShowAddSupplier(false);
     } catch (err) {
-      setAddError(err.response?.data?.error || "Erreur lors de l'ajout du fournisseur.");
+      setAddError(err.response?.data?.error || t('prd.addSupplierError'));
     } finally {
       setAdding(false);
     }
@@ -312,11 +316,11 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
 
   return (
     <section className="card">
-      <h2>Demande de devis</h2>
+      <h2>{t('prd.quoteRequest')}</h2>
       {canCreate && (
         <div style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            Sélectionnez au moins {minSuppliers} fournisseur{minSuppliers > 1 ? 's' : ''} à consulter :
+            {t('prd.selectAtLeast', { n: minSuppliers })}
           </p>
           {suppliers.map(s => (
             <label key={s.id} style={{ display: 'block', fontSize: 14, marginBottom: 2 }}>
@@ -327,49 +331,48 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
           ))}
           {suppliers.length < minSuppliers && (
             <p className="alert alert-danger" style={{ marginTop: 8 }}>
-              Cette entité n'a que {suppliers.length} fournisseur(s) référencé(s), il en faut au moins {minSuppliers}.
-              Ajoutez-en un ci-dessous, via Référentiels → Fournisseurs, ou baissez le seuil dans Workflow → Paramètres.
+              {t('prd.notEnoughSuppliers', { n: suppliers.length, min: minSuppliers })}
             </p>
           )}
 
           {!showAddSupplier ? (
             <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => setShowAddSupplier(true)}>
-              + Ajouter un fournisseur
+              {t('prd.addSupplier')}
             </button>
           ) : (
             <form onSubmit={submitNewSupplier} className="form-inline" style={{ marginTop: 10, padding: 10, background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
-              <strong style={{ width: '100%', fontSize: 13 }}>Nouveau fournisseur — mêmes champs que le référentiel</strong>
+              <strong style={{ width: '100%', fontSize: 13 }}>{t('prd.newSupplierTitle')}</strong>
               {SUPPLIER_FIELDS.map(f => (
                 <FieldInput key={f.key} field={f} value={newSupplier[f.key]} onChange={v => setNewSupplier({ ...newSupplier, [f.key]: v })} entities={entities} />
               ))}
-              <button type="submit" className="btn btn-primary btn-sm" disabled={adding}>{adding ? '…' : 'Ajouter'}</button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={adding}>{adding ? '…' : t('common.add')}</button>
               <button type="button" className="btn btn-secondary btn-sm"
-                onClick={() => { setShowAddSupplier(false); setAddError(''); }}>Annuler</button>
+                onClick={() => { setShowAddSupplier(false); setAddError(''); }}>{t('common.cancel')}</button>
               {addError && <div className="alert alert-danger" style={{ width: '100%' }}>{addError}</div>}
             </form>
           )}
 
-          <textarea placeholder="Message aux fournisseurs (laisser vide pour le texte par défaut)" value={message} onChange={e => setMessage(e.target.value)}
+          <textarea placeholder={t('prd.messagePlaceholder')} value={message} onChange={e => setMessage(e.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 8 }} />
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
-            Ce texte sera le corps de l'email envoyé (et celui proposé au "copier" ci-dessous) — modifiable jusqu'à l'envoi.
+            {t('prd.messageHint')}
           </p>
           <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={selected.length < minSuppliers}
-            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }), 'Consultation lancée auprès des fournisseurs sélectionnés.')}>
-            Lancer la consultation
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }), t('prd.launchConsultToast'))}>
+            {t('prd.launchConsult')}
           </button>
         </div>
       )}
 
       {pr.quote_requests.map(qr => (
         <div key={qr.id} style={{ marginBottom: 12 }}>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '4px 0' }}>Consultation du {new Date(qr.created_at).toLocaleDateString('fr-FR')}</p>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '4px 0' }}>{t('prd.consultOf', { date: new Date(qr.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') })}</p>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {qr.suppliers.map(s => {
               const result = sendResults[s.supplier_id];
               return (
                 <li key={s.id} style={{ marginBottom: 4 }}>
-                  {s.supplier_nom} — {s.statut}
+                  {s.supplier_nom} — {t('qrstatut.' + s.statut)}
                   {result?.sent === false && (
                     <span style={{ color: 'var(--color-danger)' }}> — {result.error}</span>
                   )}
@@ -381,7 +384,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
                   {' '}
                   <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
                     onClick={() => copyEmailText(qr, s)}>
-                    {copiedId === s.id ? 'Copié ✓' : 'Copier le texte'}
+                    {copiedId === s.id ? t('prd.copied') : t('prd.copyText')}
                   </button>
                   {canAct && (
                     <>
@@ -389,19 +392,19 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
                       <button type="button" className="btn btn-primary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
                         disabled={sendingOne === s.id}
                         onClick={() => sendToSupplier(s)}>
-                        {sendingOne === s.id ? 'Envoi…' : (s.statut === 'envoye' ? 'Renvoyer par email' : 'Envoyer par email')}
+                        {sendingOne === s.id ? t('prd.sending') : (s.statut === 'envoye' ? t('prd.resendEmail') : t('prd.sendEmail'))}
                       </button>
                       {needEmail[s.id] && (
                         <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
-                          <input type="email" placeholder="email du fournisseur" value={emailFor[s.id] || ''}
+                          <input type="email" placeholder={t('prd.supplierEmail')} value={emailFor[s.id] || ''}
                             onChange={e => setEmailFor(f => ({ ...f, [s.id]: e.target.value }))}
                             style={{ fontSize: 12, padding: '2px 6px', width: 190 }} />
                           <button type="button" className="btn btn-primary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
                             disabled={sendingOne === s.id || !(emailFor[s.id] || '').trim()}
-                            onClick={() => sendToSupplier(s)}>Envoyer</button>
+                            onClick={() => sendToSupplier(s)}>{t('prd.send')}</button>
                         </span>
                       )}
-                      {result?.sent === true && <span style={{ color: 'var(--color-success-fg)' }}> — envoyé ✓</span>}
+                      {result?.sent === true && <span style={{ color: 'var(--color-success-fg)' }}> — {t('prd.sentOk')}</span>}
                     </>
                   )}
                 </li>
@@ -411,11 +414,11 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
           {canAct && qr.suppliers.some(s => s.statut === 'a_envoyer') && (
             <>
               <button className="btn btn-secondary" style={{ marginTop: 8 }}
-                onClick={() => guarded(() => sendQuoteRequestBatch(qr.id), 'Demandes de devis envoyées.')}>
-                Envoyer les demandes de devis
+                onClick={() => guarded(() => sendQuoteRequestBatch(qr.id), t('prd.sentAllQuotes'))}>
+                {t('prd.sendAllQuotes')}
               </button>
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
-                Si l'envoi échoue (ex. messagerie indisponible), utilisez "PDF" + "Copier le texte" pour l'envoyer vous-même depuis votre propre messagerie.
+                {t('prd.sendFallbackHint')}
               </p>
             </>
           )}
@@ -427,6 +430,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
 
 function QuotesSection({ pr, guarded }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', notes: '', file: null });
 
@@ -444,16 +448,16 @@ function QuotesSection({ pr, guarded }) {
     data.append('montant', form.montant);
     data.append('devise', pr.devise);
     if (form.file) data.append('file', form.file);
-    guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), 'Devis enregistré.')
+    guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
       .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', notes: '', file: null }); });
   }
 
   return (
     <section className="card">
-      <h2>Devis reçus</h2>
+      <h2>{t('prd.quotesReceived')}</h2>
       <div className="table-wrap" style={{ marginBottom: 12 }}>
         <table>
-          <thead><tr><th>Fournisseur</th><th>Montant</th><th>Devise</th><th>Devis (PDF)</th><th>Retenu</th>{canSelect && <th />}</tr></thead>
+          <thead><tr><th>{t('prd.supplier')}</th><th>{t('prd.amount')}</th><th>{t('prd.currency')}</th><th>{t('prd.quotePdf')}</th><th>{t('prd.selected')}</th>{canSelect && <th />}</tr></thead>
           <tbody>
             {pr.quotes.map(q => (
               <tr key={q.id}>
@@ -463,15 +467,15 @@ function QuotesSection({ pr, guarded }) {
                 <td>
                   {q.attachment_id ? (
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => openAuthenticatedFile(`/attachments/${q.attachment_id}`)}>
-                      Voir
+                      {t('prd.view')}
                     </button>
                   ) : '—'}
                 </td>
                 <td>{q.selectionne ? '✓' : ''}</td>
                 {canSelect && !q.selectionne && (
                   <td><button className="btn btn-primary btn-sm"
-                    onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), 'Devis retenu comme offre sélectionnée.')}>
-                    Sélectionner
+                    onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), t('prd.quoteSelectedToast'))}>
+                    {t('prd.selectBtn')}
                   </button></td>
                 )}
               </tr>
@@ -482,15 +486,15 @@ function QuotesSection({ pr, guarded }) {
       {canAddQuote && withoutQuote.length > 0 && (
         <form onSubmit={submitQuote} className="form-inline">
           <select required value={form.quoteRequestSupplierId} onChange={e => setForm({ ...form, quoteRequestSupplierId: e.target.value })}>
-            <option value="">Fournisseur…</option>
+            <option value="">{t('prd.supplierDots')}</option>
             {withoutQuote.map(s => <option key={s.id} value={s.id}>{s.supplier_nom}</option>)}
           </select>
-          <input placeholder="Montant" type="number" required value={form.montant} onChange={e => setForm({ ...form, montant: e.target.value })} style={{ width: 140 }} />
+          <input placeholder={t('prd.amount')} type="number" required value={form.montant} onChange={e => setForm({ ...form, montant: e.target.value })} style={{ width: 140 }} />
           <label className="field" style={{ minWidth: 220 }}>
-            Devis du fournisseur (PDF, optionnel)
+            {t('prd.quoteFileLabel')}
             <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
           </label>
-          <button type="submit" className="btn btn-primary">Enregistrer le devis</button>
+          <button type="submit" className="btn btn-primary">{t('prd.saveQuote')}</button>
         </form>
       )}
     </section>
@@ -498,6 +502,7 @@ function QuotesSection({ pr, guarded }) {
 }
 
 function PurchaseOrderSection({ po, canSend }) {
+  const { t } = useI18n();
   const [sending, setSending] = useState(false);
   const [needEmail, setNeedEmail] = useState(false);
   const [email, setEmail] = useState('');
@@ -509,12 +514,12 @@ function PurchaseOrderSection({ po, canSend }) {
     setResult(null);
     try {
       const res = await client.post(`/purchase-orders/${po.id}/send`, e ? { email: e } : {});
-      setResult({ ok: true, message: `Bon de commande envoyé à ${res.data.to}.` });
+      setResult({ ok: true, message: t('prd.poSentTo', { to: res.data.to }) });
       setNeedEmail(false);
     } catch (err) {
       // 400 = le fournisseur n'a pas d'email : on propose la saisie.
       if (err.response?.status === 400) setNeedEmail(true);
-      setResult({ ok: false, message: err.response?.data?.error || "Échec de l'envoi." });
+      setResult({ ok: false, message: err.response?.data?.error || t('prd.sendFailed') });
     } finally {
       setSending(false);
     }
@@ -522,23 +527,23 @@ function PurchaseOrderSection({ po, canSend }) {
 
   return (
     <section className="card">
-      <h2>Bon de commande</h2>
+      <h2>{t('prd.po')}</h2>
       <p><strong>{po.numero}</strong> — {po.montant} {po.devise}</p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/purchase-orders/${po.id}/pdf`)}>
-          Voir le PDF
+          {t('prd.viewPdf')}
         </button>
         {canSend && (
           <button className="btn btn-primary" disabled={sending} onClick={send}>
-            {sending ? 'Envoi…' : 'Envoyer au fournisseur'}
+            {sending ? t('prd.sending') : t('prd.sendToSupplier')}
           </button>
         )}
       </div>
       {needEmail && (
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input type="email" placeholder="email du fournisseur" value={email} onChange={e => setEmail(e.target.value)}
+          <input type="email" placeholder={t('prd.supplierEmail')} value={email} onChange={e => setEmail(e.target.value)}
             style={{ flex: '1 1 240px', maxWidth: 320 }} />
-          <button className="btn btn-primary btn-sm" disabled={sending || !email.trim()} onClick={send}>Envoyer</button>
+          <button className="btn btn-primary btn-sm" disabled={sending || !email.trim()} onClick={send}>{t('prd.send')}</button>
         </div>
       )}
       {result && (
@@ -552,6 +557,7 @@ function PurchaseOrderSection({ po, canSend }) {
 
 function ValidationSection({ pr, refresh, showToast }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(null); // 'validate' | 'reject' | null — désactive les boutons pendant l'appel
   const [msg, setMsg] = useState(null);   // { type: 'success' | 'error', text } — retour affiché SOUS les boutons
@@ -571,7 +577,7 @@ function ValidationSection({ pr, refresh, showToast }) {
   async function act(kind) {
     if (busy) return;
     const path = kind === 'reject' ? 'reject-step' : 'validate-step';
-    const successText = kind === 'reject' ? 'Demande refusée.' : 'Étape validée.';
+    const successText = kind === 'reject' ? t('prd.requestRejected') : t('prd.stepValidated');
     setBusy(kind);
     setMsg(null);
     try {
@@ -580,7 +586,7 @@ function ValidationSection({ pr, refresh, showToast }) {
       showToast(successText);
       await refresh(); // le statut avance : cette section peut alors disparaître (ce n'est plus notre tour)
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.error || 'Une erreur est survenue.' });
+      setMsg({ type: 'error', text: err.response?.data?.error || t('prd.genericError') });
     } finally {
       setBusy(null);
     }
@@ -588,19 +594,19 @@ function ValidationSection({ pr, refresh, showToast }) {
 
   return (
     <section className="card">
-      <h2>Validation</h2>
+      <h2>{t('prd.validation')}</h2>
       {canReject && (
-        <textarea placeholder="Commentaire (obligatoire en cas de refus)" value={comment} onChange={e => setComment(e.target.value)}
+        <textarea placeholder={t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
           disabled={!!busy}
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
-          {busy === 'validate' ? 'Validation…' : 'Valider'}
+          {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
         </button>
         {canReject && (
           <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
-            {busy === 'reject' ? 'Refus…' : 'Refuser'}
+            {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}
           </button>
         )}
       </div>
@@ -614,22 +620,23 @@ function ValidationSection({ pr, refresh, showToast }) {
 }
 
 function HistorySection({ prId }) {
+  const { t, lang } = useI18n();
   const [history, setHistory] = useState([]);
   useEffect(() => { client.get(`/purchase-requests/${prId}/history`).then(res => setHistory(res.data)); }, [prId]);
 
   return (
     <section className="card">
-      <h2>Historique</h2>
+      <h2>{t('prd.history')}</h2>
       <ul style={{ margin: 0, paddingLeft: 18 }}>
         {history.map(h => (
           <li key={h.id} style={{ fontSize: 13, marginBottom: 4 }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>{new Date(h.created_at).toLocaleString('fr-FR')}</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>{new Date(h.created_at).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR')}</span>
             {' — '}<strong>{h.action}</strong>
-            {h.user_nom && ` par ${h.user_prenom} ${h.user_nom}`}
+            {h.user_nom && ` ${t('prd.by')} ${h.user_prenom} ${h.user_nom}`}
             {h.details?.commentaire && ` : "${h.details.commentaire}"`}
           </li>
         ))}
-        {history.length === 0 && <li className="empty-row" style={{ listStyle: 'none', marginLeft: -18 }}>Aucun historique.</li>}
+        {history.length === 0 && <li className="empty-row" style={{ listStyle: 'none', marginLeft: -18 }}>{t('prd.noHistory')}</li>}
       </ul>
     </section>
   );
