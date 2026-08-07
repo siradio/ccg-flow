@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import LogistiqueSubnav from './LogistiqueSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Conakry par défaut quand aucune position n'est encore connue.
 const DEFAULT_CENTER = [9.5092, -13.7122];
@@ -19,14 +20,15 @@ const STATUT_COLOR = {
 };
 const colorFor = s => STATUT_COLOR[s] || '#2563eb';
 
-function fmtTime(ts) {
+function fmtTime(ts, lang) {
   if (!ts) return '';
   const d = new Date(ts);
-  return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function CartographiePage() {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const canView = hasSubModuleLevel(user, 'logistique.suivi');
   const canAdd = hasSubModuleLevel(user, 'logistique.suivi', 'ajout');
 
@@ -79,15 +81,15 @@ export default function CartographiePage() {
         radius: 8, color: '#fff', weight: 2, fillColor: colorFor(p.vehicle_statut), fillOpacity: 1,
       });
       m.bindPopup(
-        `<strong>${p.vehicle_immat || 'Véhicule'}</strong>${p.marque ? ' — ' + p.marque : ''}<br/>` +
-        `${p.vehicle_statut || ''}${p.speed != null ? ' · ' + Math.round(p.speed) + ' km/h' : ''}<br/>` +
-        `<small>${fmtTime(p.recorded_at)} · ${p.source === 'sat' ? 'SAT' : 'manuel'}</small>`
+        `<strong>${p.vehicle_immat || t('log.carto.vehicleFallback')}</strong>${p.marque ? ' — ' + p.marque : ''}<br/>` +
+        `${p.vehicle_statut ? t('log.vehStatut.' + p.vehicle_statut) : ''}${p.speed != null ? ' · ' + Math.round(p.speed) + ' km/h' : ''}<br/>` +
+        `<small>${fmtTime(p.recorded_at, lang)} · ${p.source === 'sat' ? t('log.carto.sat') : t('log.carto.manual')}</small>`
       );
       m.addTo(layer);
       pts.push([p.lat, p.lng]);
     });
     if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
-  }, [positions]);
+  }, [positions, lang]);
 
   // Marqueur temporaire du point en cours de saisie.
   const pendingMarkerRef = useRef(null);
@@ -101,12 +103,12 @@ export default function CartographiePage() {
     }
   }, [pending]);
 
-  if (!canView) return <div><LogistiqueSubnav /><p>Cet écran du module Logistique ne vous a pas été accordé.</p></div>;
+  if (!canView) return <div><LogistiqueSubnav /><p>{t('log.notGranted')}</p></div>;
 
   async function savePosition(e) {
     e.preventDefault();
-    if (!form.vehicle_id) { setError('Choisissez un véhicule.'); return; }
-    if (!pending) { setError('Cliquez sur la carte pour choisir le point.'); return; }
+    if (!form.vehicle_id) { setError(t('log.carto.chooseVehicleErr')); return; }
+    if (!pending) { setError(t('log.carto.clickErr')); return; }
     setError('');
     try {
       await client.post('/positions', {
@@ -115,7 +117,7 @@ export default function CartographiePage() {
       });
       setPending(null); setForm({ vehicle_id: '', speed: '' }); setPlacing(false);
       load();
-    } catch (err) { setError(err.response?.data?.error || 'Erreur.'); }
+    } catch (err) { setError(err.response?.data?.error || t('ref.error')); }
   }
 
   const vLabel = v => `${v.immatriculation}${v.marque ? ' — ' + v.marque : ''}`;
@@ -125,14 +127,14 @@ export default function CartographiePage() {
       <LogistiqueSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         <div>
-          <h1 className="page-title" style={{ margin: 0 }}>Cartographie</h1>
-          <p className="page-subtitle" style={{ margin: '4px 0 0' }}>Position du parc sur la carte. Les données GPS temps réel seront alimentées par le prestataire SAT (Phase 2).</p>
+          <h1 className="page-title" style={{ margin: 0 }}>{t('log.nav.cartographie')}</h1>
+          <p className="page-subtitle" style={{ margin: '4px 0 0' }}>{t('log.carto.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={load}>Actualiser</button>
+          <button className="btn btn-secondary" onClick={load}>{t('log.carto.refresh')}</button>
           {canAdd && (
             <button className={`btn ${placing ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacing(p => !p); setPending(null); setError(''); }}>
-              {placing ? 'Annuler la saisie' : '+ Position manuelle'}
+              {placing ? t('log.carto.cancelInput') : t('log.carto.manualPos')}
             </button>
           )}
         </div>
@@ -141,19 +143,19 @@ export default function CartographiePage() {
       {placing && canAdd && (
         <section className="card" style={{ marginBottom: 12 }}>
           <p style={{ margin: '0 0 10px', color: 'var(--color-text-muted)' }}>
-            Cliquez sur la carte pour placer le point{pending ? ` (${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)})` : '…'}
+            {t('log.carto.clickToPlace')}{pending ? ` (${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)})` : '…'}
           </p>
           <form onSubmit={savePosition} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label className="field" style={{ minWidth: 220 }}>Véhicule
+            <label className="field" style={{ minWidth: 220 }}>{t('log.f.vehicle_id')}
               <select value={form.vehicle_id} onChange={e => setForm(f => ({ ...f, vehicle_id: e.target.value }))} required>
-                <option value="" disabled>Choisir un véhicule</option>
+                <option value="" disabled>{t('log.chooseVehicle')}</option>
                 {vehicles.map(v => <option key={v.id} value={v.id}>{vLabel(v)}</option>)}
               </select>
             </label>
-            <label className="field" style={{ width: 130 }}>Vitesse (km/h)
-              <input type="number" min="0" value={form.speed} onChange={e => setForm(f => ({ ...f, speed: e.target.value }))} placeholder="optionnel" />
+            <label className="field" style={{ width: 130 }}>{t('log.carto.speed')}
+              <input type="number" min="0" value={form.speed} onChange={e => setForm(f => ({ ...f, speed: e.target.value }))} placeholder={t('log.optional')} />
             </label>
-            <button type="submit" className="btn btn-primary" disabled={!pending}>Enregistrer la position</button>
+            <button type="submit" className="btn btn-primary" disabled={!pending}>{t('log.carto.savePos')}</button>
           </form>
           {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
         </section>
@@ -164,28 +166,28 @@ export default function CartographiePage() {
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '10px 2px 0', fontSize: 12, color: 'var(--color-text-muted)' }}>
         {Object.entries(STATUT_COLOR).map(([s, c]) => (
           <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} /> {s}
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} /> {t('log.vehStatut.' + s)}
           </span>
         ))}
       </div>
 
       {positions.length === 0 && (
-        <p className="empty-row" style={{ marginTop: 12 }}>Aucune position enregistrée. Utilisez « + Position manuelle » ou attendez le branchement du traceur SAT.</p>
+        <p className="empty-row" style={{ marginTop: 12 }}>{t('log.carto.noPos')}</p>
       )}
       {positions.length > 0 && (
         <div className="card" style={{ padding: 0, marginTop: 12 }}>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Véhicule</th><th>Statut</th><th>Vitesse</th><th>Position</th><th>Source</th><th>Dernier point</th></tr></thead>
+              <thead><tr><th>{t('log.f.vehicle_id')}</th><th>{t('log.f.statut')}</th><th>{t('log.carto.speedShort')}</th><th>{t('log.carto.position')}</th><th>{t('log.carto.source')}</th><th>{t('log.carto.lastPoint')}</th></tr></thead>
               <tbody>
                 {positions.map(p => (
                   <tr key={p.vehicle_id}>
                     <td><strong>{p.vehicle_immat}</strong>{p.marque ? ` — ${p.marque}` : ''}</td>
-                    <td>{p.vehicle_statut}</td>
+                    <td>{p.vehicle_statut ? t('log.vehStatut.' + p.vehicle_statut) : ''}</td>
                     <td>{p.speed != null ? `${Math.round(p.speed)} km/h` : '—'}</td>
                     <td style={{ fontVariantNumeric: 'tabular-nums' }}>{Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}</td>
-                    <td>{p.source === 'sat' ? 'SAT' : 'Manuel'}</td>
-                    <td>{fmtTime(p.recorded_at)}</td>
+                    <td>{p.source === 'sat' ? t('log.carto.sat') : t('log.carto.manualCap')}</td>
+                    <td>{fmtTime(p.recorded_at, lang)}</td>
                   </tr>
                 ))}
               </tbody>
