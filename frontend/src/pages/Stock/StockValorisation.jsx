@@ -3,6 +3,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Refonte Stock (Lot 2) — Valorisation du stock (méthode par produit, CMP par défaut). Agrégation
 // par Business Unit et par catégorie à partir du solde valorisé (stock-actuel).
@@ -16,6 +17,7 @@ function groupSum(rows, keyFn) {
 
 export default function StockValorisation() {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const canView = hasSubModuleLevel(user, 'stock.valorisation') || hasSubModuleLevel(user, 'stock.consultation');
   const [rows, setRows] = useState([]);
 
@@ -24,26 +26,27 @@ export default function StockValorisation() {
   const total = useMemo(() => rows.reduce((s, r) => s + (Number(r.valeur_stock) || 0), 0), [rows]);
   const parBu = useMemo(() => groupSum(rows, r => r.bu_nom), [rows]);
   const parCat = useMemo(() => groupSum(rows, r => r.categorie), [rows]);
-  const parType = useMemo(() => groupSum(rows, r => ({ produit_fini: 'Produits finis', matiere_premiere: 'Matières premières', consommable: 'Consommables' }[r.type_article] || 'Autre')), [rows]);
+  // Libellés de type traduits (re-groupe si la langue change).
+  const parType = useMemo(() => groupSum(rows, r => (['produit_fini', 'matiere_premiere', 'consommable'].includes(r.type_article) ? t('type.' + r.type_article) : t('type.autre'))), [rows, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!canView) return <div><StockSectionNav /><p>La valorisation ne vous a pas été accordée.</p></div>;
+  if (!canView) return <div><StockSectionNav /><p>{t('val.notAllowed')}</p></div>;
 
   return (
     <div>
       <StockSectionNav />
-      <h1 className="page-title" style={{ margin: '0 0 4px' }}>Valorisation du stock</h1>
-      <p className="page-subtitle" style={{ margin: '0 0 12px' }}>Valeur du stock selon la méthode configurée par produit (CMP par défaut).</p>
+      <h1 className="page-title" style={{ margin: '0 0 4px' }}>{t('val.title')}</h1>
+      <p className="page-subtitle" style={{ margin: '0 0 12px' }}>{t('val.subtitle')}</p>
 
       <div className="card" style={{ padding: '12px 18px', marginBottom: 16, display: 'inline-block' }}>
-        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Valeur totale du stock (GNF)</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('val.totalValue')}</div>
         <div style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</div>
       </div>
 
-      {rows.length === 0 && <p className="empty-row">Aucune donnée de stock à valoriser.</p>}
+      {rows.length === 0 && <p className="empty-row">{t('val.empty')}</p>}
 
       {parBu.length > 0 && (
         <section className="card" style={{ marginBottom: 16 }}>
-          <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>Valeur par Business Unit</h2>
+          <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{t('val.byBu')}</h2>
           <div style={{ width: '100%', height: 240 }}>
             <ResponsiveContainer>
               <BarChart data={parBu.map(x => ({ bu: x.k, valeur: x.v }))} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
@@ -58,12 +61,12 @@ export default function StockValorisation() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-        {[['Par type d\'article', parType], ['Par catégorie', parCat]].map(([title, data]) => (
-          <section className="card" key={title}>
-            <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{title}</h2>
+        {[[t('val.byType'), t('val.type'), parType], [t('val.byCat'), t('val.cat'), parCat]].map(([sectionTitle, colHeader, data]) => (
+          <section className="card" key={sectionTitle}>
+            <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{sectionTitle}</h2>
             {data.length === 0 ? <p className="empty-row" style={{ margin: 0 }}>—</p> : (
               <div className="table-wrap"><table>
-                <thead><tr><th>{title.replace('Par ', '')}</th><th className="num">Valeur (GNF)</th><th className="num">%</th></tr></thead>
+                <thead><tr><th>{colHeader}</th><th className="num">{t('val.value')}</th><th className="num">%</th></tr></thead>
                 <tbody>{data.map(d => (
                   <tr key={d.k}><td>{d.k}</td>
                     <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(d.v)}</td>
