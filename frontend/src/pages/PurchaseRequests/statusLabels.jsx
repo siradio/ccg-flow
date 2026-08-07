@@ -31,11 +31,14 @@ export const STATUS_COLORS = {
   bon_commande_genere: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
 };
 
+import { useI18n } from '../../i18n/I18nContext';
+
 export function StatusBadge({ status }) {
+  const { t } = useI18n();
   const c = STATUS_COLORS[status] || STATUS_COLORS.brouillon;
   return (
     <span className="badge" style={{ background: c.bg, color: c.fg }}>
-      {STATUS_LABELS[status] || status}
+      {t('pstatus.' + status)}
     </span>
   );
 }

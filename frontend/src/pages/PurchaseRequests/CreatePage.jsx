@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
 import WorkflowTimeline from '../../components/WorkflowTimeline';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Statut fictif "rien n'a encore démarré" : sert uniquement à faire afficher WorkflowTimeline en
 // mode aperçu (toutes les étapes "à venir") avant même qu'une demande existe.
@@ -10,6 +11,7 @@ const PREVIEW_PR = { status: 'brouillon', approvals: [] };
 
 export default function CreatePage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
@@ -62,7 +64,7 @@ export default function CreatePage() {
       }
       navigate(`/purchase-requests/${res.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de la création.');
+      setError(err.response?.data?.error || t('prc.createError'));
     } finally {
       setSaving(false);
     }
@@ -70,11 +72,9 @@ export default function CreatePage() {
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 4 }}>Nouvelle demande d'achat</h1>
+      <h1 className="page-title" style={{ marginBottom: 4 }}>{t('prc.title')}</h1>
       <p className="page-subtitle" style={{ marginBottom: 20, maxWidth: 500 }}>
-        Une fois soumise, votre demande doit d'abord être validée comme{' '}
-        <strong>expression de besoin</strong>, avant que le service achat ne consulte des
-        fournisseurs. Le circuit complet :
+        {t('prc.subtitlePre')}<strong>{t('prc.needsStatement')}</strong>{t('prc.subtitlePost')}
       </p>
 
       {steps.length > 0 && (
@@ -86,40 +86,40 @@ export default function CreatePage() {
       <div className="card" style={{ maxWidth: 500 }}>
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <label className="field">
-            Entité
+            {t('prc.entity')}
             <select value={form.entityId} onChange={e => setForm({ ...form, entityId: e.target.value, businessUnitId: '' })} required>
-              <option value="" disabled>Sélectionner…</option>
+              <option value="" disabled>{t('prc.select')}</option>
               {entities.map(e => <option key={e.id} value={e.id}>{e.code}</option>)}
             </select>
           </label>
           {isSoguipal && (
             <label className="field">
-              Business Unit
+              {t('stockreleve.bu')}
               <select value={form.businessUnitId} onChange={e => setForm({ ...form, businessUnitId: e.target.value })}>
-                <option value="">Toutes les BU</option>
+                <option value="">{t('cockpit.allBu')}</option>
                 {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </label>
           )}
           <label className="field">
-            Objet
+            {t('prc.subject')}
             <input value={form.objet} onChange={e => setForm({ ...form, objet: e.target.value })} required />
           </label>
           <label className="field">
-            Justification
+            {t('prc.justification')}
             <textarea value={form.justification} onChange={e => setForm({ ...form, justification: e.target.value })} style={{ minHeight: 80 }} />
           </label>
           <label className="field">
-            Proforma (optionnel)
+            {t('prc.proforma')}
             <input type="file" accept="application/pdf,image/*"
               onChange={e => setProforma(e.target.files[0] || null)} />
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-              Si vous disposez déjà d'un proforma, joignez-le dès maintenant ; il sera visible sur la demande.
+              {t('prc.proformaHint')}
             </span>
           </label>
           {error && <div className="alert alert-danger">{error}</div>}
           <button type="submit" disabled={saving} className="btn btn-primary" style={{ alignSelf: 'start' }}>
-            {saving ? 'Création…' : 'Créer le brouillon'}
+            {saving ? t('prc.creating') : t('prc.createDraft')}
           </button>
         </form>
       </div>
