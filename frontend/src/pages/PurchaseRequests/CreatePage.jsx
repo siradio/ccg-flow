@@ -45,13 +45,13 @@ export default function CreatePage() {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
   }, []);
 
-  // Les articles proposés dépendent de l'entité choisie (référentiel produits scopé par entité).
-  // Changer d'entité recharge la liste et repart sur une ligne vierge (les anciens choix ne valent plus).
+  // Catalogue d'articles proposé à la sélection : TOUT le référentiel produits (toutes entités). Un
+  // achat peut porter sur n'importe quel article connu, et le référentiel produits scopé par entité
+  // est souvent vide côté achats — le filtrer par entité rendait la liste quasi vide. Le reste des
+  // articles se saisit en « Article libre ».
   useEffect(() => {
-    if (!form.entityId) { setProducts([]); return; }
-    client.get('/products', { params: { entity_id: form.entityId } }).then(res => setProducts(res.data)).catch(() => setProducts([]));
-    setLines([emptyLine()]);
-  }, [form.entityId]);
+    client.get('/products').then(res => setProducts(res.data)).catch(() => setProducts([]));
+  }, []);
 
   const selectedEntity = entities.find(e => String(e.id) === String(form.entityId));
   const isSoguipal = selectedEntity?.code === 'SOGUIPAL';
