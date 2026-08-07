@@ -36,7 +36,7 @@ function Segmented({ tab, setTab }) {
 
 export default function ProductionReleve() {
   const { user } = useAuth();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const canView = hasSubModuleLevel(user, 'production.releve') || hasSubModuleLevel(user, 'production.suivi');
   const canSaisir = hasSubModuleLevel(user, 'production.releve', 'ajout');
   const canSuivi = hasSubModuleLevel(user, 'production.suivi');
@@ -48,6 +48,7 @@ export default function ProductionReleve() {
   const [date, setDate] = useState(today());
   const [grid, setGrid] = useState([]);
   const [edits, setEdits] = useState({});
+  const [lastEntry, setLastEntry] = useState(null); // dernier relevé de la BU (toutes dates) : { date, saisi_par, saisi_le }
   const [msg, setMsg] = useState(null); // { type: 'success' | 'error', text }
   const [saving, setSaving] = useState(false);
   const [period, setPeriod] = useState({ from: monthStart(), to: today(), bu: '' });
@@ -68,6 +69,12 @@ export default function ProductionReleve() {
     }).catch(() => {});
   }
   useEffect(() => { if (canView && tab === 'saisie') loadGrid(); /* eslint-disable-next-line */ }, [canView, tab, buId, date]);
+  // Dernier relevé enregistré pour la BU (indépendant de la date choisie) → « état du dernier relevé ».
+  function loadLastEntry() {
+    if (!buId) { setLastEntry(null); return; }
+    client.get(`/production/last-entry?business_unit_id=${buId}`).then(r => setLastEntry(r.data)).catch(() => setLastEntry(null));
+  }
+  useEffect(() => { if (canView) loadLastEntry(); /* eslint-disable-next-line */ }, [canView, buId]);
   useEffect(() => {
     if (!canSuivi || tab !== 'suivi') return;
     const qs = `date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}`;
@@ -90,6 +97,7 @@ export default function ProductionReleve() {
       const { data } = await client.put('/production/grid', { business_unit_id: Number(buId), date, lines });
       setMsg({ type: 'success', text: t('prodrel.saved', { n: data.saved }) });
       loadGrid();
+      loadLastEntry();
     } catch (e) {
       setMsg({ type: 'error', text: t('stockreleve.saveError', { err: e.response?.data?.error || t('stockreleve.serverError') }) });
     } finally {
@@ -99,8 +107,6 @@ export default function ProductionReleve() {
 
   const nbSaisis = Object.values(edits).filter(v => v.quantite !== '' && v.quantite != null).length;
   const totalJour = Object.values(edits).reduce((s, v) => s + (Number(v.quantite) || 0), 0);
-  // Auteur du dernier relevé de production enregistré (BU/date affichée) : ligne au updated_at le plus récent.
-  const lastSaved = grid.filter(r => r.saisi_le && r.saisi_par).sort((a, b) => new Date(b.saisi_le) - new Date(a.saisi_le))[0] || null;
   const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '' }));
   const totalPeriode = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
   const fmtBucket = b => {
@@ -133,11 +139,11 @@ export default function ProductionReleve() {
               {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}<br /><strong>{t('prodrel.totalDay', { v: fmt(totalJour) })}</strong>
             </div>
           </div>
-          {/* Auteur du dernier relevé de production de cette BU/date, bien visible (ou message si aucun) */}
+          {/* État du dernier relevé de production de la BU (toutes dates), bien visible (ou message si aucun) */}
           <div style={{ marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {lastSaved ? (
+            {lastEntry && lastEntry.date ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: 'var(--status-blue-bg, rgba(37,99,235,0.1))', color: 'var(--status-blue-fg, #1d4ed8)', fontWeight: 500 }}>
-                <span aria-hidden>👤</span>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}
+                <span aria-hidden>👤</span>{t('stockreleve.lastBy', { name: lastEntry.saisi_par || '—', date: d10(lastEntry.date) })}
               </span>
             ) : (
               <span style={{ color: 'var(--color-text-muted)' }}>{t('stockreleve.noReadingYet')}</span>

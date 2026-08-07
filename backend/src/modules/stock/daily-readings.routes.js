@@ -40,6 +40,27 @@ router.get('/grid', requireSubModule('stock.releve_jour'), async (req, res, next
   } catch (e) { next(e); }
 });
 
+// Dernier relevé enregistré pour une BU, TOUTES dates confondues (date + auteur) — pour afficher
+// « l'état du dernier relevé » sur l'écran de saisie même si la date choisie n'a rien encore.
+router.get('/last-entry', requireSubModule('stock.releve_jour'), async (req, res, next) => {
+  try {
+    const buId = Number(req.query.business_unit_id);
+    if (!buId) return res.status(400).json({ error: 'business_unit_id requis.' });
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null && !visible.includes(buId)) return res.json(null);
+    const row = await one(
+      `SELECT se.date_stock AS date, se.updated_at AS saisi_le,
+              NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par
+       FROM stock_entries se
+       JOIN products p ON p.id = se.product_id
+       LEFT JOIN users u ON u.id = se.updated_by
+       WHERE p.business_unit_id = $1
+       ORDER BY se.date_stock DESC, se.updated_at DESC NULLS LAST
+       LIMIT 1`, [buId]);
+    res.json(row || null);
+  } catch (e) { next(e); }
+});
+
 // Enregistrement groupé des relevés du jour (upsert par produit).
 router.put('/grid', requireCreate, async (req, res, next) => {
   try {

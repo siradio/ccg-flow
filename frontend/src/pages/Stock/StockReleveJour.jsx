@@ -41,7 +41,7 @@ function Segmented({ tab, setTab }) {
 
 export default function StockReleveJour() {
   const { user } = useAuth();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const canView = hasSubModuleLevel(user, 'stock.releve_jour');
   const canSaisir = hasSubModuleLevel(user, 'stock.releve_jour', 'ajout');
 
@@ -52,6 +52,7 @@ export default function StockReleveJour() {
   const [date, setDate] = useState(today());
   const [grid, setGrid] = useState([]);
   const [edits, setEdits] = useState({});
+  const [lastEntry, setLastEntry] = useState(null); // dernier relevé de la BU (toutes dates) : { date, saisi_par, saisi_le }
   const [msg, setMsg] = useState(null); // { type: 'success' | 'error', text }
   const [saving, setSaving] = useState(false);
   const [suiviDate, setSuiviDate] = useState(today());
@@ -75,6 +76,12 @@ export default function StockReleveJour() {
     }).catch(() => {});
   }
   useEffect(() => { if (canView && tab === 'saisie') loadGrid(); /* eslint-disable-next-line */ }, [canView, tab, buId, date]);
+  // Dernier relevé enregistré pour la BU (indépendant de la date choisie) → « état du dernier relevé ».
+  function loadLastEntry() {
+    if (!buId) { setLastEntry(null); return; }
+    client.get(`/stock-releve/last-entry?business_unit_id=${buId}`).then(r => setLastEntry(r.data)).catch(() => setLastEntry(null));
+  }
+  useEffect(() => { if (canView) loadLastEntry(); /* eslint-disable-next-line */ }, [canView, buId]);
   useEffect(() => {
     if (!(canView && tab === 'suivi')) return;
     const qs = `date=${suiviDate}${suiviBu ? `&business_unit_id=${suiviBu}` : ''}`;
@@ -101,11 +108,6 @@ export default function StockReleveJour() {
     return { ...r, releve: q === '' || q == null ? '' : Number(q), ecart: q === '' || q == null ? '' : Number(q) - Number(r.theorique) };
   }), [grid, edits]);
 
-  // Auteur du dernier relevé enregistré pour la BU/date affichée : ligne du grid au updated_at le
-  // plus récent (les lignes sans relevé n'ont ni saisi_par ni saisi_le).
-  const lastSaved = useMemo(() => grid
-    .filter(r => r.saisi_le && r.saisi_par)
-    .sort((a, b) => new Date(b.saisi_le) - new Date(a.saisi_le))[0] || null, [grid]);
 
   const fmtBucket = b => {
     const s = String(b).slice(0, 10);
@@ -125,6 +127,7 @@ export default function StockReleveJour() {
       const { data } = await client.put('/stock-releve/grid', { business_unit_id: Number(buId), date, lines });
       setMsg({ type: 'success', text: t('stockreleve.saved', { n: data.saved }) });
       loadGrid();
+      loadLastEntry();
     } catch (e) {
       setMsg({ type: 'error', text: t('stockreleve.saveError', { err: e.response?.data?.error || t('stockreleve.serverError') }) });
     } finally {
@@ -158,11 +161,11 @@ export default function StockReleveJour() {
               {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}
             </div>
           </div>
-          {/* Auteur du dernier relevé de cette BU/date, bien visible (ou message si aucun) */}
+          {/* État du dernier relevé de la BU (toutes dates), bien visible (ou message si aucun) */}
           <div style={{ marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {lastSaved ? (
+            {lastEntry && lastEntry.date ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: 'var(--status-blue-bg, rgba(37,99,235,0.1))', color: 'var(--status-blue-fg, #1d4ed8)', fontWeight: 500 }}>
-                <span aria-hidden>👤</span>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}
+                <span aria-hidden>👤</span>{t('stockreleve.lastBy', { name: lastEntry.saisi_par || '—', date: String(lastEntry.date).slice(0, 10).split('-').reverse().join('/') })}
               </span>
             ) : (
               <span style={{ color: 'var(--color-text-muted)' }}>{t('stockreleve.noReadingYet')}</span>

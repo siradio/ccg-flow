@@ -1,5 +1,5 @@
 const express = require('express');
-const { all, run } = require('../../db');
+const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule, requireSubModuleWrite, canWriteBusinessUnit, visibleBusinessUnitIds } = require('../../middleware/permissions');
 
@@ -30,6 +30,27 @@ router.get('/grid', requireSubModule('production.releve'), async (req, res, next
        LEFT JOIN users u ON u.id = pe.updated_by
        WHERE p.business_unit_id = $1 AND p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
        ORDER BY p.designation`, [buId, date]));
+  } catch (e) { next(e); }
+});
+
+// Dernier relevé de production enregistré pour une BU, TOUTES dates confondues (date + auteur) —
+// pour afficher « l'état du dernier relevé » sur l'écran de saisie même si la date choisie est vide.
+router.get('/last-entry', requireSubModule('production.releve'), async (req, res, next) => {
+  try {
+    const buId = Number(req.query.business_unit_id);
+    if (!buId) return res.status(400).json({ error: 'business_unit_id requis.' });
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null && !visible.includes(buId)) return res.json(null);
+    const row = await one(
+      `SELECT pe.date_production AS date, pe.updated_at AS saisi_le,
+              NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par
+       FROM production_entries pe
+       JOIN products p ON p.id = pe.product_id
+       LEFT JOIN users u ON u.id = pe.updated_by
+       WHERE p.business_unit_id = $1
+       ORDER BY pe.date_production DESC, pe.updated_at DESC NULLS LAST
+       LIMIT 1`, [buId]);
+    res.json(row || null);
   } catch (e) { next(e); }
 });
 

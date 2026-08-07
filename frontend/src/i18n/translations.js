@@ -186,7 +186,7 @@ export const translations = {
     'stockreleve.th.ecart': 'Écart',
     'stockreleve.th.by': 'Par',
     'stockreleve.lastBy': 'Dernier relevé enregistré par {name}, le {date}',
-    'stockreleve.noReadingYet': 'Aucun relevé encore enregistré pour cette BU et cette date.',
+    'stockreleve.noReadingYet': 'Aucun relevé encore enregistré pour cette BU.',
     // ── Stock : filtres communs & statuts ──
     'stockcommon.bu': 'Business Unit',
     'stockcommon.all': 'Toutes',
@@ -1563,7 +1563,7 @@ export const translations = {
     'stockreleve.th.ecart': 'Variance',
     'stockreleve.th.by': 'By',
     'stockreleve.lastBy': 'Last reading saved by {name}, on {date}',
-    'stockreleve.noReadingYet': 'No reading recorded yet for this BU and date.',
+    'stockreleve.noReadingYet': 'No reading recorded yet for this BU.',
     // ── Stock: common filters & statuses ──
     'stockcommon.bu': 'Business Unit',
     'stockcommon.all': 'All',
