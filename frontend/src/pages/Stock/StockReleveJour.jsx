@@ -156,8 +156,17 @@ export default function StockReleveJour() {
             <label className="field">{t('stockreleve.date')}<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'right' }}>
               {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}
-              {lastSaved && <><br /><span style={{ fontSize: 12 }}>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}</span></>}
             </div>
+          </div>
+          {/* Auteur du dernier relevé de cette BU/date, bien visible (ou message si aucun) */}
+          <div style={{ marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {lastSaved ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: 'var(--status-blue-bg, rgba(37,99,235,0.1))', color: 'var(--status-blue-fg, #1d4ed8)', fontWeight: 500 }}>
+                <span aria-hidden>👤</span>{t('stockreleve.lastBy', { name: lastSaved.saisi_par, date: new Date(lastSaved.saisi_le).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') })}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('stockreleve.noReadingYet')}</span>
+            )}
           </div>
           {msg && <div className={`alert ${msg.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
           {grid.length === 0 && <p className="empty-row">{t('stockreleve.noProduct')}</p>}
