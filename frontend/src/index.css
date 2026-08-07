@@ -875,6 +875,28 @@ a.kpi-tile:hover {
   fill: rgba(59, 106, 219, 0.14);
 }
 
+/* Réseau « CCG Link » : nœuds reliés en arrière-plan de la connexion. */
+.login-page-art .net-line {
+  stroke: rgba(255, 255, 255, 0.11);
+  stroke-width: 1.2;
+}
+.login-page-art .net-node {
+  fill: rgba(140, 180, 255, 0.65);
+}
+.login-page-art .net-node--hub {
+  fill: rgba(170, 200, 255, 0.95);
+}
+.login-page-art .net-glow {
+  fill: rgba(59, 106, 219, 0.30);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .login-page-art .net-glow { animation: netPulse 4.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+}
+@keyframes netPulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.9); }
+  50%      { opacity: 0.85; transform: scale(1.15); }
+}
+
 .login-watermark {
   font-family: var(--font-sans);
   font-size: 150px;

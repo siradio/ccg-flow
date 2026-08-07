@@ -75,13 +75,55 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      {/* Arrière-plan « CCG Link » : un réseau de nœuds reliés, illustrant la connexion / le lien. */}
       <svg className="login-page-art" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <path d="M-100,560 C250,460 350,660 650,540 C950,420 1000,600 1300,500" />
-        <path d="M-100,650 C250,560 400,720 700,620 C1000,520 1050,680 1300,600" />
-        <path d="M-100,460 C300,380 380,540 680,440 C980,340 1020,480 1300,400" />
-        <circle cx="1080" cy="160" r="220" />
-        <circle cx="120" cy="120" r="140" />
-        <text x="850" y="740" textAnchor="middle" className="login-watermark" transform="rotate(-8 850 740)">CCG</text>
+        {/* halos d'ambiance */}
+        <circle cx="1080" cy="160" r="240" />
+        <circle cx="120" cy="120" r="150" />
+        {/* liens entre les nœuds */}
+        <g>
+          <line className="net-line" x1="120" y1="120" x2="300" y2="240" />
+          <line className="net-line" x1="300" y1="240" x2="90" y2="360" />
+          <line className="net-line" x1="90" y1="360" x2="240" y2="520" />
+          <line className="net-line" x1="240" y1="520" x2="140" y2="680" />
+          <line className="net-line" x1="140" y1="680" x2="420" y2="700" />
+          <line className="net-line" x1="120" y1="120" x2="90" y2="360" />
+          <line className="net-line" x1="120" y1="120" x2="600" y2="120" />
+          <line className="net-line" x1="300" y1="240" x2="600" y2="120" />
+          <line className="net-line" x1="240" y1="520" x2="420" y2="700" />
+          <line className="net-line" x1="600" y1="120" x2="1080" y2="160" />
+          <line className="net-line" x1="600" y1="120" x2="900" y2="280" />
+          <line className="net-line" x1="1080" y1="160" x2="900" y2="280" />
+          <line className="net-line" x1="1080" y1="160" x2="1120" y2="380" />
+          <line className="net-line" x1="900" y1="280" x2="1120" y2="380" />
+          <line className="net-line" x1="1120" y1="380" x2="960" y2="560" />
+          <line className="net-line" x1="960" y1="560" x2="1100" y2="660" />
+          <line className="net-line" x1="1100" y1="660" x2="780" y2="700" />
+          <line className="net-line" x1="960" y1="560" x2="780" y2="700" />
+          <line className="net-line" x1="900" y1="280" x2="960" y2="560" />
+          <line className="net-line" x1="780" y1="700" x2="600" y2="760" />
+          <line className="net-line" x1="600" y1="760" x2="420" y2="700" />
+        </g>
+        {/* halos des nœuds principaux */}
+        <circle className="net-glow" cx="120" cy="120" r="30" />
+        <circle className="net-glow" cx="600" cy="120" r="30" style={{ animationDelay: '1.5s' }} />
+        <circle className="net-glow" cx="1080" cy="160" r="30" style={{ animationDelay: '2.8s' }} />
+        {/* nœuds */}
+        <circle className="net-node net-node--hub" cx="120" cy="120" r="8" />
+        <circle className="net-node net-node--hub" cx="600" cy="120" r="8" />
+        <circle className="net-node net-node--hub" cx="1080" cy="160" r="8" />
+        <circle className="net-node" cx="300" cy="240" r="5" />
+        <circle className="net-node" cx="90" cy="360" r="5" />
+        <circle className="net-node" cx="240" cy="520" r="5" />
+        <circle className="net-node" cx="140" cy="680" r="5" />
+        <circle className="net-node" cx="420" cy="700" r="5" />
+        <circle className="net-node" cx="900" cy="280" r="5" />
+        <circle className="net-node" cx="1120" cy="380" r="5" />
+        <circle className="net-node" cx="960" cy="560" r="5" />
+        <circle className="net-node" cx="1100" cy="660" r="5" />
+        <circle className="net-node" cx="780" cy="700" r="5" />
+        <circle className="net-node" cx="600" cy="760" r="5" />
+        <text x="860" y="745" textAnchor="middle" className="login-watermark login-watermark-sm" transform="rotate(-8 860 745)">CCG</text>
       </svg>
       <div style={{ position: 'absolute', top: 14, right: 16, zIndex: 5 }}><LanguageSwitcher /></div>
       <div className="login-shell">
