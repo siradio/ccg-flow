@@ -32,6 +32,7 @@ export const translations = {
     'common.cancel': 'Annuler',
     'common.edit': 'Éditer',
     'common.delete': 'Supprimer',
+    'common.loading': 'Chargement…',
     // Apparence (thème)
     'theme.label': 'Apparence',
     'theme.light': 'Clair',
@@ -1408,6 +1409,7 @@ export const translations = {
     'common.cancel': 'Cancel',
     'common.edit': 'Edit',
     'common.delete': 'Delete',
+    'common.loading': 'Loading…',
     'theme.label': 'Appearance',
     'theme.light': 'Light',
     'theme.dark': 'Dark',
