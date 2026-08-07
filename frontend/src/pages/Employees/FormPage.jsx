@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useI18n } from '../../i18n/I18nContext';
 
 const EMPTY_FORM = {
   matricule: '', nom: '', prenom: '', poste: '', departement: '',
@@ -15,6 +16,7 @@ export default function FormPage() {
   const isNew = !id;
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { t } = useI18n();
 
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
@@ -81,89 +83,89 @@ export default function FormPage() {
         navigate('/employees');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de l\'enregistrement.');
+      setError(err.response?.data?.error || t('emp.saveError'));
     } finally {
       setSaving(false);
     }
   }
 
   async function onDelete() {
-    if (!(await confirm('Supprimer définitivement cet employé ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
+    if (!(await confirm(t('emp.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
     await client.delete(`/employees/${id}`);
     navigate('/employees');
   }
 
-  if (!loaded) return <p>Chargement…</p>;
+  if (!loaded) return <p>{t('prd.loading')}</p>;
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>{isNew ? 'Nouvel employé' : `${form.prenom} ${form.nom}`}</h1>
+      <h1 className="page-title" style={{ marginBottom: 20 }}>{isNew ? t('emp.newEmployeeTitle') : `${form.prenom} ${form.nom}`}</h1>
       <div className="card" style={{ maxWidth: 640 }}>
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <label className="field">Matricule
+            <label className="field">{t('emp.th.matricule')}
               <input value={form.matricule} onChange={e => set('matricule', e.target.value)} />
             </label>
-            <label className="field">Statut
+            <label className="field">{t('emp.th.statut')}
               <select value={form.statut} onChange={e => set('statut', e.target.value)}>
-                <option value="actif">Actif</option>
-                <option value="inactif">Inactif</option>
-                <option value="sorti">Sorti</option>
+                <option value="actif">{t('emp.statut.actif')}</option>
+                <option value="inactif">{t('emp.statut.inactif')}</option>
+                <option value="sorti">{t('emp.statut.sorti')}</option>
               </select>
             </label>
-            <label className="field">Prénom
+            <label className="field">{t('login.firstName')}
               <input value={form.prenom} onChange={e => set('prenom', e.target.value)} required />
             </label>
-            <label className="field">Nom
+            <label className="field">{t('login.lastName')}
               <input value={form.nom} onChange={e => set('nom', e.target.value)} required />
             </label>
-            <label className="field">Poste
+            <label className="field">{t('emp.th.poste')}
               <input value={form.poste} onChange={e => set('poste', e.target.value)} />
             </label>
-            <label className="field">Département
+            <label className="field">{t('emp.th.departement')}
               <input value={form.departement} onChange={e => set('departement', e.target.value)} />
             </label>
-            <label className="field">Entité
+            <label className="field">{t('emp.th.entity')}
               <select value={form.entity_id} onChange={e => set('entity_id', e.target.value)} required>
-                <option value="" disabled>Sélectionner…</option>
+                <option value="" disabled>{t('prc.select')}</option>
                 {entities.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
               </select>
             </label>
-            <label className="field">Business Unit
+            <label className="field">{t('stockreleve.bu')}
               <select value={form.business_unit_id} onChange={e => set('business_unit_id', e.target.value)}>
                 <option value="">—</option>
                 {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </label>
-            <label className="field">Site
+            <label className="field">{t('emp.th.site')}
               <select value={form.site_id} onChange={e => set('site_id', e.target.value)}>
                 <option value="">—</option>
                 {sitesForEntity.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
             </label>
-            <label className="field">Manager
+            <label className="field">{t('emp.manager')}
               <input value={form.manager} onChange={e => set('manager', e.target.value)} />
             </label>
-            <label className="field">Date d'embauche
+            <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
             </label>
-            <label className="field">Type de contrat
+            <label className="field">{t('emp.contractType')}
               <select value={form.type_contrat} onChange={e => set('type_contrat', e.target.value)}>
                 <option value="">—</option>
-                <option value="CDI">CDI</option>
-                <option value="CDD">CDD</option>
-                <option value="Stage">Stage</option>
-                <option value="Consultant">Consultant</option>
-                <option value="Journalier">Journalier</option>
+                <option value="CDI">{t('emp.contract.CDI')}</option>
+                <option value="CDD">{t('emp.contract.CDD')}</option>
+                <option value="Stage">{t('emp.contract.Stage')}</option>
+                <option value="Consultant">{t('emp.contract.Consultant')}</option>
+                <option value="Journalier">{t('emp.contract.Journalier')}</option>
               </select>
             </label>
-            <label className="field">Salaire mensuel (GNF)
+            <label className="field">{t('emp.monthlySalary')}
               <input type="number" value={form.salaire_mensuel} onChange={e => set('salaire_mensuel', e.target.value)} />
             </label>
-            <label className="field">Téléphone
+            <label className="field">{t('login.phone')}
               <input value={form.telephone} onChange={e => set('telephone', e.target.value)} />
             </label>
-            <label className="field">Email
+            <label className="field">{t('login.email')}
               <input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
             </label>
           </div>
@@ -172,9 +174,9 @@ export default function FormPage() {
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="submit" disabled={saving} className="btn btn-primary">
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
-            {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">Supprimer</button>}
+            {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">{t('common.delete')}</button>}
           </div>
         </form>
       </div>

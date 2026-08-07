@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import { useI18n } from '../i18n/I18nContext';
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "à l'instant";
-  if (mins < 60) return `il y a ${mins} min`;
+  if (mins < 1) return t('notif.justNow');
+  if (mins < 60) return t('notif.minAgo', { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `il y a ${hours} h`;
+  if (hours < 24) return t('notif.hoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  return `il y a ${days} j`;
+  return t('notif.daysAgo', { n: days });
 }
 
 function BellIcon() {
@@ -23,6 +24,7 @@ function BellIcon() {
 }
 
 export default function NotificationBell() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const wrapRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -66,17 +68,17 @@ export default function NotificationBell() {
 
   return (
     <div className="notif-bell-wrap" ref={wrapRef}>
-      <button className="notif-bell-btn" onClick={toggleOpen} aria-label="Notifications" type="button">
+      <button className="notif-bell-btn" onClick={toggleOpen} aria-label={t('notif.title')} type="button">
         <BellIcon />
         {unreadCount > 0 && <span className="notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
       {open && (
         <div className="notif-dropdown">
-          <div className="notif-dropdown-header">Notifications</div>
+          <div className="notif-dropdown-header">{t('notif.title')}</div>
           {notifications === null ? (
-            <div className="notif-empty">Chargement…</div>
+            <div className="notif-empty">{t('prd.loading')}</div>
           ) : notifications.length === 0 ? (
-            <div className="notif-empty">Aucune notification.</div>
+            <div className="notif-empty">{t('notif.empty')}</div>
           ) : (
             notifications.map(n => (
               <button
@@ -86,7 +88,7 @@ export default function NotificationBell() {
                 onClick={() => handleClick(n)}
               >
                 <div className="notif-item-message">{n.message}</div>
-                <div className="notif-item-meta">{timeAgo(n.created_at)}</div>
+                <div className="notif-item-meta">{timeAgo(n.created_at, t)}</div>
               </button>
             ))
           )}

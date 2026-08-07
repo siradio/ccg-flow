@@ -6,6 +6,7 @@ import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useI18n } from '../../i18n/I18nContext';
 
 const DEVISES = ['GNF', 'USD', 'EUR'];
 
@@ -15,6 +16,8 @@ function today() {
 
 export default function HistoryPage() {
   const confirm = useConfirm();
+  const { t, lang } = useI18n();
+  const loc = lang === 'en' ? 'en-US' : 'fr-FR';
   const { user } = useAuth();
   const canAdd = hasSubModuleLevel(user, 'referentiels.prix', 'ajout');
   const canEdit = hasSubModuleLevel(user, 'referentiels.prix', 'edition');
@@ -62,7 +65,7 @@ export default function HistoryPage() {
     if (filters.product_id) params.product_id = filters.product_id;
     client.get('/prices/history', { params })
       .then(res => setEntries(res.data))
-      .catch(err => setError(err.response?.data?.error || 'Erreur de chargement.'))
+      .catch(err => setError(err.response?.data?.error || t('prix.loadError')))
       .finally(() => setLoading(false));
   }
   useEffect(load, [filters]);
@@ -103,7 +106,7 @@ export default function HistoryPage() {
       setSavedAt(new Date());
       load();
     } catch (err) {
-      setFormError(err.response?.data?.error || "Erreur lors de l'enregistrement.");
+      setFormError(err.response?.data?.error || t('prix.saveError'));
     } finally {
       setSaving(false);
     }
@@ -131,7 +134,7 @@ export default function HistoryPage() {
   }
 
   async function deleteEntry(id) {
-    if (!(await confirm('Supprimer cette entrée de prix ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
+    if (!(await confirm(t('prix.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
     await client.delete(`/prices/${id}`);
     load();
   }
@@ -139,36 +142,36 @@ export default function HistoryPage() {
   return (
     <div>
       <ReferentialsSubnav />
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Prix</h1>
+      <h1 className="page-title" style={{ marginBottom: 20 }}>{t('refx.nav.prices')}</h1>
       <PricesSubnav />
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <label className="field" style={{ minWidth: 140 }}>
-          Du
+          {t('mvt.from')}
           <input type="date" value={filters.date_from} onChange={e => setFilter('date_from', e.target.value)} />
         </label>
         <label className="field" style={{ minWidth: 140 }}>
-          Au
+          {t('mvt.to')}
           <input type="date" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)} />
         </label>
         <label className="field" style={{ minWidth: 170 }}>
-          Business Unit
+          {t('stockreleve.bu')}
           <select value={filters.business_unit_id} onChange={e => setFilter('business_unit_id', e.target.value)}>
-            <option value="">Toutes les BU</option>
+            <option value="">{t('cockpit.allBu')}</option>
             {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
           </select>
         </label>
         <label className="field" style={{ minWidth: 170 }}>
-          Catégorie
+          {t('val.cat')}
           <select value={filters.category_id} onChange={e => setFilter('category_id', e.target.value)}>
-            <option value="">Toutes catégories</option>
+            <option value="">{t('prix.allCategories')}</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
           </select>
         </label>
         <label className="field" style={{ minWidth: 200 }}>
-          Produit
+          {t('cockpit.th.product')}
           <select value={filters.product_id} onChange={e => setFilter('product_id', e.target.value)} disabled={!filters.business_unit_id}>
-            <option value="">Tous les produits</option>
+            <option value="">{t('prix.allProducts')}</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
           </select>
         </label>
@@ -179,33 +182,33 @@ export default function HistoryPage() {
       <div className="card" style={{ padding: 0, marginBottom: 20 }}>
         <div className="table-wrap">
           {loading ? <Loading /> : entries.length === 0 ? (
-            <EmptyState title="Aucun changement de prix ne correspond à ces filtres." />
+            <EmptyState title={t('prix.noChanges')} />
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Date d'effet</th>
-                  <th>Produit</th>
-                  <th>Business Unit</th>
-                  <th>Prix</th>
-                  <th>Commentaire</th>
-                  <th>Auteur</th>
+                  <th>{t('prix.th.effectiveDate')}</th>
+                  <th>{t('cockpit.th.product')}</th>
+                  <th>{t('stockreleve.bu')}</th>
+                  <th>{t('prix.th.price')}</th>
+                  <th>{t('fields.comment')}</th>
+                  <th>{t('prix.th.author')}</th>
                   {canEdit && <th />}
                 </tr>
               </thead>
               <tbody>
                 {entries.map(e => (
                   <tr key={e.id}>
-                    <td>{new Date(e.date_effet).toLocaleDateString('fr-FR')}</td>
+                    <td>{new Date(e.date_effet).toLocaleDateString(loc)}</td>
                     <td>{e.product_designation}{e.product_code ? ` (${e.product_code})` : ''}</td>
                     <td>{e.business_unit_nom || '—'}</td>
-                    <td>{Number(e.prix).toLocaleString('fr-FR')} {e.devise}</td>
+                    <td>{Number(e.prix).toLocaleString(loc)} {e.devise}</td>
                     <td>{e.commentaire || '—'}</td>
                     <td>{e.created_by_prenom} {e.created_by_nom}</td>
                     {canEdit && (
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        <button onClick={() => startEdit(e)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>
-                        <button onClick={() => deleteEntry(e.id)} className="btn btn-danger btn-sm">Supprimer</button>
+                        <button onClick={() => startEdit(e)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{t('common.edit')}</button>
+                        <button onClick={() => deleteEntry(e.id)} className="btn btn-danger btn-sm">{t('common.delete')}</button>
                       </td>
                     )}
                   </tr>
@@ -218,46 +221,46 @@ export default function HistoryPage() {
 
       {canAdd && (
       <div className="card">
-        <h2>{editingId ? 'Modifier ce prix' : 'Enregistrer un nouveau prix'}</h2>
+        <h2>{editingId ? t('prix.editPrice') : t('prix.newPrice')}</h2>
         <form onSubmit={submitPrice} className="form-inline">
           <label className="field" style={{ minWidth: 170 }}>
-            Business Unit
+            {t('stockreleve.bu')}
             <select value={form.business_unit_id} onChange={e => setForm(f => ({ ...f, business_unit_id: e.target.value, product_id: '' }))} disabled={!!editingId}>
-              <option value="">Sélectionner…</option>
+              <option value="">{t('prc.select')}</option>
               {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
             </select>
           </label>
           <label className="field" style={{ minWidth: 220 }}>
-            Produit
+            {t('cockpit.th.product')}
             <select required value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))} disabled={!form.business_unit_id || !!editingId}>
-              <option value="">Sélectionner…</option>
+              <option value="">{t('prc.select')}</option>
               {formProducts.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
             </select>
           </label>
           <label className="field" style={{ minWidth: 120 }}>
-            Prix
+            {t('prix.th.price')}
             <input type="number" required value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))} />
           </label>
           <label className="field" style={{ minWidth: 90 }}>
-            Devise
+            {t('prd.currency')}
             <select value={form.devise} onChange={e => setForm(f => ({ ...f, devise: e.target.value }))}>
               {DEVISES.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </label>
           <label className="field" style={{ minWidth: 150 }}>
-            Date d'effet
+            {t('prix.th.effectiveDate')}
             <input type="date" required max={today()} value={form.date_effet} onChange={e => setForm(f => ({ ...f, date_effet: e.target.value }))} />
           </label>
           <label className="field" style={{ minWidth: 200 }}>
-            Commentaire
+            {t('fields.comment')}
             <input value={form.commentaire} onChange={e => setForm(f => ({ ...f, commentaire: e.target.value }))} />
           </label>
           <button type="submit" className="btn btn-primary" disabled={saving || !form.product_id || form.prix === ''}>
-            {saving ? '…' : editingId ? 'Enregistrer les modifications' : 'Enregistrer'}
+            {saving ? '…' : editingId ? t('prix.saveChanges') : t('common.save')}
           </button>
-          {editingId && <button type="button" onClick={cancelEdit} className="btn btn-secondary">Annuler</button>}
+          {editingId && <button type="button" onClick={cancelEdit} className="btn btn-secondary">{t('common.cancel')}</button>}
           {formError && <div className="alert alert-danger" style={{ width: '100%' }}>{formError}</div>}
-          {savedAt && <div className="alert alert-success" style={{ width: '100%' }}>Prix enregistré ✓</div>}
+          {savedAt && <div className="alert alert-success" style={{ width: '100%' }}>{t('prix.saved')}</div>}
         </form>
       </div>
       )}

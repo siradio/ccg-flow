@@ -7,12 +7,13 @@ import PricesSubnav from './PricesSubnav';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
+import { useI18n } from '../../i18n/I18nContext';
 
 const PERIODS = [
-  { key: '90', label: '3 mois' },
-  { key: '365', label: '12 mois' },
-  { key: 'all', label: 'Tout' },
-  { key: 'custom', label: 'Personnalisé' },
+  { key: '90', labelKey: 'prix.period.3m' },
+  { key: '365', labelKey: 'prix.period.12m' },
+  { key: 'all', labelKey: 'prix.period.all' },
+  { key: 'custom', labelKey: 'prix.period.custom' },
 ];
 
 function today() {
@@ -31,6 +32,8 @@ function formatTick(dateStr) {
 }
 
 export default function ChartPage() {
+  const { t, lang } = useI18n();
+  const loc = lang === 'en' ? 'en-US' : 'fr-FR';
   const [period, setPeriod] = useState('365');
   const [customFrom, setCustomFrom] = useState(daysAgo(365));
   const [customTo, setCustomTo] = useState(today());
@@ -76,23 +79,23 @@ export default function ChartPage() {
   return (
     <div>
       <ReferentialsSubnav />
-      <h1 className="page-title" style={{ marginBottom: 20 }}>Prix</h1>
+      <h1 className="page-title" style={{ marginBottom: 20 }}>{t('refx.nav.prices')}</h1>
       <PricesSubnav />
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         {PERIODS.map(p => (
           <button key={p.key} className={period === p.key ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'} onClick={() => setPeriod(p.key)}>
-            {p.label}
+            {t(p.labelKey)}
           </button>
         ))}
         {period === 'custom' && (
           <>
             <label className="field" style={{ minWidth: 140 }}>
-              Du
+              {t('mvt.from')}
               <input type="date" value={customFrom} max={customTo} onChange={e => setCustomFrom(e.target.value)} />
             </label>
             <label className="field" style={{ minWidth: 140 }}>
-              Au
+              {t('mvt.to')}
               <input type="date" value={customTo} max={today()} onChange={e => setCustomTo(e.target.value)} />
             </label>
           </>
@@ -101,36 +104,36 @@ export default function ChartPage() {
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <label className="field" style={{ minWidth: 200 }}>
-          Business Unit
+          {t('stockreleve.bu')}
           <select value={businessUnitId} onChange={e => setBusinessUnitId(e.target.value)}>
-            <option value="">Sélectionner…</option>
+            <option value="">{t('prc.select')}</option>
             {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
           </select>
         </label>
         <label className="field" style={{ minWidth: 240 }}>
-          Produit
+          {t('cockpit.th.product')}
           <select value={productId} onChange={e => setProductId(e.target.value)} disabled={!businessUnitId}>
-            <option value="">Sélectionner…</option>
+            <option value="">{t('prc.select')}</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
           </select>
         </label>
       </div>
 
       <section className="card">
-        <h2>{selectedProduct ? `Évolution du prix — ${selectedProduct.designation}` : 'Évolution du prix'}</h2>
+        <h2>{selectedProduct ? t('prix.priceEvolutionOf', { name: selectedProduct.designation }) : t('prix.priceEvolution')}</h2>
         {!productId ? (
-          <EmptyState title="Choisissez un produit pour afficher l'évolution de son prix." />
+          <EmptyState title={t('prix.chooseProduct')} />
         ) : loading ? <Loading /> : series.length === 0 ? (
-          <EmptyState title="Aucun prix enregistré pour ce produit sur cette période." />
+          <EmptyState title={t('prix.noPriceInPeriod')} />
         ) : (
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={series}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" tickFormatter={formatTick} />
               <YAxis />
-              <Tooltip labelFormatter={formatTick} formatter={v => `${Number(v).toLocaleString('fr-FR')} ${devise || ''}`} />
+              <Tooltip labelFormatter={formatTick} formatter={v => `${Number(v).toLocaleString(loc)} ${devise || ''}`} />
               <Legend />
-              <Line type="stepAfter" name={`Prix (${devise || ''})`} dataKey="prix" stroke="#2454e0" connectNulls dot={{ r: 3 }} activeDot={{ r: 6 }} />
+              <Line type="stepAfter" name={t('prix.priceWithCurrency', { devise: devise || '' })} dataKey="prix" stroke="#2454e0" connectNulls dot={{ r: 3 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         )}

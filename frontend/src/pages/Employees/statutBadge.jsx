@@ -1,4 +1,4 @@
-export const STATUT_LABELS = { actif: 'Actif', inactif: 'Inactif', sorti: 'Sorti' };
+import { useI18n } from '../../i18n/I18nContext';
 
 const STATUT_COLORS = {
   actif: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
@@ -7,10 +7,12 @@ const STATUT_COLORS = {
 };
 
 export function StatutBadge({ statut }) {
+  const { t } = useI18n();
   const c = STATUT_COLORS[statut] || STATUT_COLORS.inactif;
+  const knownStatuts = ['actif', 'inactif', 'sorti'];
   return (
     <span className="badge" style={{ background: c.bg, color: c.fg }}>
-      {STATUT_LABELS[statut] || statut}
+      {knownStatuts.includes(statut) ? t('emp.statut.' + statut) : statut}
     </span>
   );
 }

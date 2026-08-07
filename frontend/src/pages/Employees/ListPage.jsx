@@ -4,8 +4,10 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { StatutBadge } from './statutBadge.jsx';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 export default function ListPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const canWrite = hasSubModuleLevel(user, 'rh', 'ajout');
   const [employees, setEmployees] = useState([]);
@@ -41,32 +43,32 @@ export default function ListPage() {
       <ReferentialsSubnav />
       <div className="page-header">
         <div>
-          <h1 className="page-title">Employés</h1>
-          <p className="page-subtitle">{employees.length} employé(s){loading ? '…' : ''}</p>
+          <h1 className="page-title">{t('refx.nav.employees')}</h1>
+          <p className="page-subtitle">{t('emp.count', { n: employees.length })}{loading ? '…' : ''}</p>
         </div>
-        {canWrite && <Link to="/employees/new" className="btn btn-primary">+ Nouvel employé</Link>}
+        {canWrite && <Link to="/employees/new" className="btn btn-primary">{t('emp.newEmployee')}</Link>}
       </div>
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <input
-          placeholder="Rechercher (nom, matricule, poste)…"
+          placeholder={t('emp.searchPlaceholder')}
           value={filters.q}
           onChange={e => setFilter('q', e.target.value)}
           style={{ minWidth: 260 }}
         />
         <select value={filters.entity_id} onChange={e => setFilter('entity_id', e.target.value)}>
-          <option value="">Toutes les entités</option>
+          <option value="">{t('emp.allEntities')}</option>
           {entities.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
         </select>
         <select value={filters.business_unit_id} onChange={e => setFilter('business_unit_id', e.target.value)}>
-          <option value="">Toutes les BU</option>
+          <option value="">{t('cockpit.allBu')}</option>
           {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
         </select>
         <select value={filters.statut} onChange={e => setFilter('statut', e.target.value)}>
-          <option value="">Tous statuts</option>
-          <option value="actif">Actif</option>
-          <option value="inactif">Inactif</option>
-          <option value="sorti">Sorti</option>
+          <option value="">{t('emp.allStatuses')}</option>
+          <option value="actif">{t('emp.statut.actif')}</option>
+          <option value="inactif">{t('emp.statut.inactif')}</option>
+          <option value="sorti">{t('emp.statut.sorti')}</option>
         </select>
       </div>
 
@@ -75,15 +77,15 @@ export default function ListPage() {
           <table>
             <thead>
               <tr>
-                <th>Matricule</th>
-                <th>Nom</th>
-                <th>Poste</th>
-                <th>Département</th>
-                <th>Entité</th>
-                <th>Business Unit</th>
-                <th>Site</th>
-                <th>Statut</th>
-                <th>Ancienneté</th>
+                <th>{t('emp.th.matricule')}</th>
+                <th>{t('refx.f.nom')}</th>
+                <th>{t('emp.th.poste')}</th>
+                <th>{t('emp.th.departement')}</th>
+                <th>{t('emp.th.entity')}</th>
+                <th>{t('stockreleve.bu')}</th>
+                <th>{t('emp.th.site')}</th>
+                <th>{t('emp.th.statut')}</th>
+                <th>{t('emp.th.seniority')}</th>
                 {canWrite && <th />}
               </tr>
             </thead>
@@ -98,12 +100,12 @@ export default function ListPage() {
                   <td>{emp.business_unit_nom || '—'}</td>
                   <td>{emp.site_nom || '—'}</td>
                   <td><StatutBadge statut={emp.statut} /></td>
-                  <td>{emp.anciennete_annees != null ? `${emp.anciennete_annees} an(s)` : '—'}</td>
-                  {canWrite && <td><Link to={`/employees/${emp.id}`} className="btn btn-secondary btn-sm">Éditer</Link></td>}
+                  <td>{emp.anciennete_annees != null ? t('emp.years', { n: emp.anciennete_annees }) : '—'}</td>
+                  {canWrite && <td><Link to={`/employees/${emp.id}`} className="btn btn-secondary btn-sm">{t('common.edit')}</Link></td>}
                 </tr>
               ))}
               {!loading && employees.length === 0 && (
-                <tr><td className="empty-row" colSpan={canWrite ? 10 : 9}>Aucun employé ne correspond à ces filtres.</td></tr>
+                <tr><td className="empty-row" colSpan={canWrite ? 10 : 9}>{t('emp.noneFiltered')}</td></tr>
               )}
             </tbody>
           </table>

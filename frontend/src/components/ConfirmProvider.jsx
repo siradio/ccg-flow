@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 
 const ConfirmContext = createContext(null);
 
 // Remplace window.confirm() par une modale cohérente avec le reste de l'appli (thème clair/sombre,
 // boutons .btn) — une seule à la fois, comme window.confirm(), donc pas de file d'attente à gérer.
 export function ConfirmProvider({ children }) {
+  const { t } = useI18n();
   const [state, setState] = useState(null); // { message, title, confirmLabel, cancelLabel, danger }
   const resolveRef = useRef(null);
 
@@ -14,12 +16,12 @@ export function ConfirmProvider({ children }) {
       setState({
         message,
         title: options.title || null,
-        confirmLabel: options.confirmLabel || 'Confirmer',
-        cancelLabel: options.cancelLabel || 'Annuler',
+        confirmLabel: options.confirmLabel || t('confirm.confirm'),
+        cancelLabel: options.cancelLabel || t('common.cancel'),
         danger: options.danger || false,
       });
     });
-  }, []);
+  }, [t]);
 
   const respond = useCallback(ok => {
     resolveRef.current?.(ok);
