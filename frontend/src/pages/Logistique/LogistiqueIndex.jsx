@@ -4,6 +4,15 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ReferentialPage from '../Referentials/ReferentialPage';
 import LogistiqueSubnav from './LogistiqueSubnav';
+import { useI18n } from '../../i18n/I18nContext';
+
+// Espace de noms i18n des options de select par (type de config, champ) — le champ `statut` existe
+// sur deux configs avec des jeux d'options différents, d'où la désambiguïsation par type.
+const OPT_NS = {
+  vehicules: { statut: 'log.vehStatut' },
+  missions: { statut: 'log.missionStatut' },
+  conducteurs: { type_conducteur: 'log.condType' },
+};
 
 // Module Logistique. Réutilise la page CRUD générique des référentiels (mêmes composants, mêmes
 // permissions par sous-module), sous une sous-navigation propre au module.
@@ -79,6 +88,7 @@ const CONFIGS = {
 export default function LogistiqueIndex() {
   const { type } = useParams();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [entities, setEntities] = useState([]);
   const [sites, setSites] = useState([]);
@@ -107,14 +117,25 @@ export default function LogistiqueIndex() {
   const config = CONFIGS[type];
   if (!config) return <Navigate to="/logistique/vehicules" replace />;
   if (!hasSubModuleLevel(user, config.subModuleKey)) {
-    return <p>Cet écran du module Logistique ne vous a pas été accordé.</p>;
+    return <p>{t('log.notGranted')}</p>;
   }
+
+  // Traduction à la volée : titre + libellés de champ (via `log.f.<key>`) + libellés d'options de
+  // select (via OPT_NS). Les valeurs stockées restent inchangées ; seule leur restitution est traduite.
+  const tFields = config.fields.map(f => {
+    const ns = OPT_NS[type]?.[f.key];
+    return {
+      ...f,
+      label: t(`log.f.${f.key}`),
+      ...(ns && f.options ? { optionLabels: Object.fromEntries(f.options.map(o => [o, t(`${ns}.${o}`)])) } : {}),
+    };
+  });
 
   return (
     <div>
       <LogistiqueSubnav />
       <ReferentialPage
-        key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
+        key={type} title={t(`log.title.${type}`)} endpoint={config.endpoint} fields={tFields}
         filters={config.filters || []}
         entities={entities} sites={sites}
         lists={{ vehicleTypes, entities, sites, employees: chauffeurs, vehicles, drivers, commerciaux }}

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useI18n } from '../../i18n/I18nContext';
+
+// Libellé d'un champ : traduit si le champ porte une `labelKey`, sinon libellé brut (français) —
+// laisse les référentiels non encore internationalisés fonctionner tels quels.
+const fieldLabel = (f, t) => (f.labelKey ? t(f.labelKey) : f.label);
+// Libellé affiché d'une option de select : `optionLabels` mappe valeur→libellé traduit ; la valeur
+// stockée reste inchangée (français), seul l'affichage change.
+const optLabel = (f, o) => (f.optionLabels && f.optionLabels[o] != null ? f.optionLabels[o] : o);
 
 // Page CRUD générique pour un référentiel "simple" (une table, champs plats + éventuels entity_ids).
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
@@ -8,6 +16,7 @@ import { useConfirm } from '../../components/ConfirmProvider.jsx';
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
 export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false }) {
   const confirm = useConfirm();
+  const { t } = useI18n();
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(() => emptyForm(fields, entities));
   const [editingId, setEditingId] = useState(null);
@@ -74,16 +83,16 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       setForm(emptyForm(fields, entities));
       setEditingId(null);
       load();
-      setNotice(wasEdit ? '✓ Modifications enregistrées.' : '✓ Élément ajouté.');
+      setNotice(wasEdit ? t('ref.saved') : t('ref.added'));
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur.');
+      setError(err.response?.data?.error || t('ref.error'));
     } finally {
       setSaving(false);
     }
   }
 
   async function onDelete(id) {
-    if (!(await confirm('Supprimer cet élément ?', { danger: true, confirmLabel: 'Supprimer' }))) return;
+    if (!(await confirm(t('ref.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
     await client.delete(`${endpoint}/${id}`);
     load();
   }
@@ -110,7 +119,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
         <div className="form-inline" style={{ marginBottom: 16 }}>
           <input
             type="search"
-            placeholder="Rechercher…"
+            placeholder={`${t('common.search')}…`}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ minWidth: 200 }}
@@ -121,14 +130,14 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
               value={filterValues[f.key] ?? ''}
               onChange={e => setFilterValues(fv => ({ ...fv, [f.key]: e.target.value }))}
             >
-              <option value="">{f.label} : tous</option>
-              {filterOptions(f, items, entities, sites, lists).map(o => (
+              <option value="">{fieldLabel(f, t)} : {t('ref.all')}</option>
+              {filterOptions(f, items, entities, sites, lists, t).map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           ))}
           {hasActiveFilter && (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>Réinitialiser</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>{t('ref.reset')}</button>
           )}
           <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
             {visibleItems.length} / {items.length}
@@ -141,26 +150,26 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
           <table>
             <thead>
               <tr>
-                {fields.map(f => <th key={f.key}>{f.label}</th>)}
+                {fields.map(f => <th key={f.key}>{fieldLabel(f, t)}</th>)}
                 {(canEdit || (canAdd && duplicable)) && <th className="sticky-col" />}
               </tr>
             </thead>
             <tbody>
               {visibleItems.map(item => (
                 <tr key={item.id}>
-                  {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint)}</td>)}
+                  {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint, t)}</td>)}
                   {(canEdit || (canAdd && duplicable)) && (
                     <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
-                      {canAdd && duplicable && <button onClick={() => startDuplicate(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Dupliquer</button>}
-                      {canEdit && <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>Éditer</button>}
-                      {canEdit && <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">Supprimer</button>}
+                      {canAdd && duplicable && <button onClick={() => startDuplicate(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{t('ref.duplicate')}</button>}
+                      {canEdit && <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{t('common.edit')}</button>}
+                      {canEdit && <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">{t('common.delete')}</button>}
                     </td>
                   )}
                 </tr>
               ))}
               {visibleItems.length === 0 && (
                 <tr><td className="empty-row" colSpan={fields.length + 1}>
-                  {items.length === 0 ? 'Aucun élément.' : 'Aucun élément ne correspond aux filtres.'}
+                  {items.length === 0 ? t('ref.empty') : t('ref.emptyFiltered')}
                 </td></tr>
               )}
             </tbody>
@@ -170,7 +179,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
       {showForm && (
         <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
-          <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? 'Modifier' : 'Ajouter'}</strong>
+          <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? t('ref.modify') : t('common.add')}</strong>
           {fields.filter(f => fieldVisible(f, form)).map(f => {
             if (f.type === 'photo') {
               return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
@@ -185,14 +194,14 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
             return (
               <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
-                {f.label}{f.required ? ' *' : ''}
+                {fieldLabel(f, t)}{f.required ? ' *' : ''}
                 {input}
               </label>
             );
           })}
           {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
-          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : (editingId ? 'Enregistrer' : 'Ajouter')}</button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); setNotice(''); }} className="btn btn-secondary">Annuler</button>}
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('common.saving') : (editingId ? t('common.save') : t('common.add'))}</button>
+          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); setNotice(''); }} className="btn btn-secondary">{t('common.cancel')}</button>}
           {notice && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success, #15803d)', alignSelf: 'center' }}>{notice}</span>}
         </form>
       )}
@@ -266,25 +275,26 @@ function matchesFilter(field, item, selected) {
 // référence chargées, options figées pour un select, sinon les valeurs distinctes présentes dans
 // les items (utile pour un champ texte libre comme la catégorie d'une machine ou le pays d'un
 // fournisseur).
-function filterOptions(field, items, entities, sites, lists = {}) {
+function filterOptions(field, items, entities, sites, lists = {}, t = (k) => k) {
   if (field.type === 'entitySelect' || field.type === 'multiEntity') {
     return entities.map(e => ({ value: e.id, label: e.code || e.nom }));
   }
   if (field.type === 'siteSelect') return sites.map(s => ({ value: s.id, label: s.nom }));
   if (field.type === 'fkSelect') return (lists[field.listKey] || []).map(o => ({ value: o.id, label: o.nom }));
-  if (field.type === 'select') return field.options.map(o => ({ value: o, label: o }));
-  if (field.type === 'checkbox') return [{ value: 'true', label: 'Oui' }, { value: 'false', label: 'Non' }];
+  if (field.type === 'select') return field.options.map(o => ({ value: o, label: optLabel(field, o) }));
+  if (field.type === 'checkbox') return [{ value: 'true', label: t('ref.yes') }, { value: 'false', label: t('ref.no') }];
   const seen = [...new Set(items.map(i => i[field.key]).filter(v => v !== null && v !== undefined && v !== ''))];
   return seen.sort((a, b) => String(a).localeCompare(String(b))).map(v => ({ value: v, label: String(v) }));
 }
 
-function renderValue(field, item, entities, sites, lists = {}, endpoint = '') {
+function renderValue(field, item, entities, sites, lists = {}, endpoint = '', t = (k) => k) {
   const value = item[field.key];
   if (field.type === 'entitySelect') return entities.find(e => e.id === value)?.nom || value;
   if (field.type === 'siteSelect') return sites.find(s => s.id === value)?.nom || value;
   if (field.type === 'fkSelect') return (lists[field.listKey] || []).find(o => o.id === value)?.nom || (value ? value : '—');
   if (field.type === 'multiEntity') return (item.entity_ids || []).map(id => entities.find(e => e.id === id)?.code).filter(Boolean).join(', ');
-  if (field.type === 'checkbox') return value ? 'Oui' : 'Non';
+  if (field.type === 'select') return value ? optLabel(field, value) : value;
+  if (field.type === 'checkbox') return value ? t('ref.yes') : t('ref.no');
   // Affichage localisé JJ/MM/AAAA depuis la portion date (sans reparser en Date → pas de décalage TZ).
   if (field.type === 'date') return value ? String(value).slice(0, 10).split('-').reverse().join('/') : '—';
   if (field.type === 'photo') {
@@ -315,6 +325,7 @@ function AuthImage({ src, alt, style, refreshKey }) {
 // Contrôle photo (référentiel machines) : upload / remplacement / suppression via l'endpoint dédié
 // multipart. L'upload cible /:id/photo, donc n'est possible qu'en édition d'une machine existante.
 function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [key, setKey] = useState(0);
@@ -322,7 +333,7 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
   if (!editingId) {
     return (
       <span style={{ fontSize: 12, color: 'var(--color-text-muted)', width: '100%' }}>
-        Photo : enregistrez d'abord la fiche, puis rouvrez « Éditer » pour en ajouter une.
+        {t('ref.photoSaveFirst')}
       </span>
     );
   }
@@ -336,7 +347,7 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
       await client.put(`${endpoint}/${editingId}/photo`, fd);
       setKey(k => k + 1);
       if (onChanged) onChanged();
-    } catch (e) { setErr(e.response?.data?.error || 'Échec du téléversement.'); }
+    } catch (e) { setErr(e.response?.data?.error || t('ref.uploadFailed')); }
     finally { setBusy(false); }
   }
 
@@ -346,7 +357,7 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
       await client.delete(`${endpoint}/${editingId}/photo`);
       setKey(k => k + 1);
       if (onChanged) onChanged();
-    } catch (e) { setErr(e.response?.data?.error || 'Échec de la suppression.'); }
+    } catch (e) { setErr(e.response?.data?.error || t('ref.deleteFailed')); }
     finally { setBusy(false); }
   }
 
@@ -357,21 +368,23 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
           style={{ height: 48, borderRadius: 6, border: '1px solid var(--color-border)' }} />
       )}
       <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
-        {busy ? '…' : (hasPhoto ? 'Remplacer la photo' : 'Ajouter une photo')}
+        {busy ? '…' : (hasPhoto ? t('ref.replacePhoto') : t('ref.addPhoto'))}
         <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
           onChange={e => upload(e.target.files?.[0])} />
       </label>
-      {hasPhoto && <button type="button" className="btn btn-danger btn-sm" onClick={remove} disabled={busy}>Retirer</button>}
+      {hasPhoto && <button type="button" className="btn btn-danger btn-sm" onClick={remove} disabled={busy}>{t('ref.removePhoto')}</button>}
       {err && <span style={{ color: 'var(--color-danger, #dc2626)', fontSize: 12 }}>{err}</span>}
     </span>
   );
 }
 
 export function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
+  const { t } = useI18n();
+  const label = fieldLabel(field, t);
   if (field.type === 'entitySelect') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(Number(e.target.value))}>
-        <option value="" disabled>{field.label}…</option>
+        <option value="" disabled>{label}…</option>
         {entities.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
       </select>
     );
@@ -379,7 +392,7 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
   if (field.type === 'siteSelect') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(Number(e.target.value))}>
-        <option value="" disabled>{field.label}…</option>
+        <option value="" disabled>{label}…</option>
         {sites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
       </select>
     );
@@ -387,7 +400,7 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
   if (field.type === 'fkSelect') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(e.target.value ? Number(e.target.value) : null)}>
-        <option value="">{field.required ? `${field.label}…` : '—'}</option>
+        <option value="">{field.required ? `${label}…` : '—'}</option>
         {(lists[field.listKey] || []).map(o => <option key={o.id} value={o.id}>{o.nom}</option>)}
       </select>
     );
@@ -408,22 +421,22 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
   if (field.type === 'select') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(e.target.value)}>
-        <option value="" disabled>{field.label}…</option>
-        {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+        <option value="" disabled>{label}…</option>
+        {field.options.map(o => <option key={o} value={o}>{optLabel(field, o)}</option>)}
       </select>
     );
   }
   if (field.type === 'checkbox') {
-    return <label style={{ fontSize: 13 }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} /> {field.label}</label>;
+    return <label style={{ fontSize: 13 }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} /> {label}</label>;
   }
   if (field.type === 'textarea') {
     return (
-      <textarea placeholder={field.label} required={field.required} rows={2} style={{ minWidth: 220 }}
+      <textarea placeholder={label} required={field.required} rows={2} style={{ minWidth: 220 }}
         value={value || ''} onChange={e => onChange(e.target.value)} />
     );
   }
   return (
-    <input placeholder={field.label} required={field.required} type={field.type || 'text'} value={value || ''}
+    <input placeholder={label} required={field.required} type={field.type || 'text'} value={value || ''}
       onChange={e => onChange(e.target.value)} />
   );
 }
