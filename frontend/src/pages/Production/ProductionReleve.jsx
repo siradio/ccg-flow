@@ -57,7 +57,7 @@ export default function ProductionReleve() {
   const [evoProduct, setEvoProduct] = useState('');
   const [evo, setEvo] = useState([]);
 
-  useEffect(() => { if (canView) client.get('/business-units').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
+  useEffect(() => { if (canView) client.get('/business-units/mine').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
 
   function loadGrid() {
     if (!buId || !date) return;
