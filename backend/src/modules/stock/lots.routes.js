@@ -39,10 +39,14 @@ router.get('/available', requireSubModule('stock.consultation'), async (req, res
   try {
     if (!req.query.product_id) return res.status(400).json({ error: 'product_id requis.' });
     const p = [Number(req.query.product_id)];
+    // Cloisonnement BU : un utilisateur restreint ne voit que les lots des produits de ses BU.
+    let buClause = '';
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null) { if (!visible.length) return res.json([]); p.push(visible); buClause = `AND p.business_unit_id = ANY($${p.length})`; }
     let locClause = '';
     if (req.query.location_id) { p.push(Number(req.query.location_id)); locClause = `AND l.location_id = $${p.length}`; }
     res.json(await all(
-      `${SELECT} WHERE l.product_id = $1 ${locClause} AND COALESCE(b.quantite_restante,0) > 0
+      `${SELECT} WHERE l.product_id = $1 ${buClause} ${locClause} AND COALESCE(b.quantite_restante,0) > 0
        ORDER BY l.date_peremption NULLS LAST, l.id`, p));
   } catch (e) { next(e); }
 });

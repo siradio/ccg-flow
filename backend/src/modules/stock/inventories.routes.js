@@ -42,6 +42,9 @@ router.get('/:id', requireSubModule('stock.inventaires'), async (req, res, next)
   try {
     const i = await one(`${HEADER} WHERE i.id = $1`, [Number(req.params.id)]);
     if (!i) return res.status(404).json({ error: 'Inventaire introuvable.' });
+    // Cloisonnement BU : un utilisateur restreint ne peut pas lire un inventaire d'une autre BU.
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null && !visible.includes(Number(i.business_unit_id))) return res.status(404).json({ error: 'Inventaire introuvable.' });
     const lines = await all(
       `SELECT l.*, p.code AS product_code, p.designation, p.unite,
               COALESCE(l.stock_physique,0) - l.stock_theorique AS ecart

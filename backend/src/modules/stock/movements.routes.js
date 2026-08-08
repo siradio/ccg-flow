@@ -52,6 +52,10 @@ router.get('/:id', requireSubModule('stock.consultation'), async (req, res, next
        LEFT JOIN users u ON u.id = m.created_by LEFT JOIN users v ON v.id = m.validated_by
        WHERE m.id = $1`, [Number(req.params.id)]);
     if (!m) return res.status(404).json({ error: 'Mouvement introuvable.' });
+    // Cloisonnement BU : un utilisateur restreint ne peut pas lire un mouvement d'une autre BU
+    // (404 plutôt que 403 pour ne pas révéler l'existence de l'enregistrement).
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null && !visible.includes(Number(m.business_unit_id))) return res.status(404).json({ error: 'Mouvement introuvable.' });
     const lines = await all(
       `SELECT l.id, l.product_id, l.quantite, l.prix_unitaire, l.valeur, p.code AS product_code, p.designation, p.unite
        FROM stock_ledger_lines l JOIN products p ON p.id = l.product_id WHERE l.movement_id = $1 ORDER BY l.id`, [m.id]);

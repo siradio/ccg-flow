@@ -51,6 +51,11 @@ router.get('/:id', requireSubModule('stock.transferts'), async (req, res, next) 
   try {
     const t = await one(`${HEADER} WHERE t.id = $1`, [Number(req.params.id)]);
     if (!t) return res.status(404).json({ error: 'Transfert introuvable.' });
+    // Cloisonnement BU : visible si la BU source OU destination est dans le périmètre de l'utilisateur.
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null && !(visible.includes(Number(t.business_unit_source)) || visible.includes(Number(t.business_unit_dest)))) {
+      return res.status(404).json({ error: 'Transfert introuvable.' });
+    }
     const lines = await all(
       `SELECT l.*, p.code AS product_code, p.designation, p.unite FROM stock_transfer_lines l
        JOIN products p ON p.id = l.product_id WHERE l.transfer_id = $1 ORDER BY l.id`, [t.id]);
