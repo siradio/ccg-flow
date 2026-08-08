@@ -53,7 +53,7 @@ export default function StockLots() {
   }
   useEffect(() => {
     if (!canView) return;
-    client.get('/business-units').then(r => setBus(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {});
     client.get('/products').then(r => setProducts(r.data)).catch(() => {});
     client.get('/stock-locations').then(r => setLocations(r.data.filter(l => l.actif))).catch(() => {});
     if (admin) client.get('/stock-lots/alert-config').then(r => setCfg(r.data)).catch(() => {});

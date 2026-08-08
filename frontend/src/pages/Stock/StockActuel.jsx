@@ -41,7 +41,7 @@ export default function StockActuel() {
     if (filters.business_unit_id) qs.push('business_unit_id=' + filters.business_unit_id);
     client.get('/stock-actuel' + (qs.length ? '?' + qs.join('&') : '')).then(r => setRows(r.data)).catch(() => {});
   }
-  useEffect(() => { if (canView) client.get('/business-units').then(r => setBus(r.data)).catch(() => {}); }, [canView]);
+  useEffect(() => { if (canView) client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {}); }, [canView]);
   useEffect(() => { if (canView) load(); /* eslint-disable-next-line */ }, [canView, filters.business_unit_id]);
 
   const filtered = useMemo(() => rows.filter(r =>

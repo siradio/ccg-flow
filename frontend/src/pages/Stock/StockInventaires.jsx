@@ -32,7 +32,7 @@ export default function StockInventaires() {
   useEffect(() => {
     if (!canView) return;
     load();
-    client.get('/business-units').then(r => setBus(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {});
     client.get('/stock-locations').then(r => setLocations(r.data.filter(l => l.actif))).catch(() => {});
   }, [canView]);
   if (!canView) return <div><StockSectionNav /><p>{t('inv.notAllowed')}</p></div>;

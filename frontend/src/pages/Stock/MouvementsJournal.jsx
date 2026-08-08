@@ -37,7 +37,7 @@ export default function MouvementsJournal() {
   }
   useEffect(() => {
     if (!canView) return;
-    client.get('/business-units').then(r => setBus(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {});
     client.get('/stock-movement-types').then(r => setTypes(r.data)).catch(() => {});
   }, [canView]);
   useEffect(() => { if (canView) load(); /* eslint-disable-next-line */ }, [canView, filters]);
