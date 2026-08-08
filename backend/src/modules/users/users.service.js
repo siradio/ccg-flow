@@ -25,12 +25,22 @@ async function loadUserWithRoles(userId) {
      WHERE uer.user_id = $1`,
     [userId]
   );
-  const buRows = await all('SELECT business_unit_id FROM user_business_unit_access WHERE user_id = $1', [userId]);
+  const buRows = await all(
+    `SELECT uba.id, uba.business_unit_id, bu.nom AS business_unit_nom
+     FROM user_business_unit_access uba
+     JOIN business_units bu ON bu.id = uba.business_unit_id
+     WHERE uba.user_id = $1
+     ORDER BY bu.nom`,
+    [userId]
+  );
   const subModuleRows = await all('SELECT sub_module_key, niveau FROM user_sub_module_access WHERE user_id = $1', [userId]);
   return {
     ...user,
     roles,
+    // Ids simples : consommé par le contrôle d'accès (visibleBusinessUnitIds/canWriteBusinessUnit).
     businessUnits: buRows.map(b => b.business_unit_id),
+    // Objets détaillés (id d'octroi + nom) : pour l'affichage/retrait dans la fiche admin.
+    businessUnitAccess: buRows,
     subModules: subModuleRows,
   };
 }

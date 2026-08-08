@@ -390,13 +390,13 @@ export default function DetailPage() {
       <div className="card">
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>{t('adm.users.buAccess')}</div>
         <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {u.businessUnits.map(b => (
+          {(u.businessUnitAccess || []).map(b => (
             <span key={b.id} className="badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)' }}>
               {b.business_unit_nom}
               {' '}<button onClick={() => removeBusinessUnit(b.id)} className="btn-icon">×</button>
             </span>
           ))}
-          {u.businessUnits.length === 0 && <span className="empty-row">{t('adm.users.noBu')}</span>}
+          {(u.businessUnitAccess || []).length === 0 && <span className="empty-row">{t('adm.users.noBu')}</span>}
         </div>
         <div className="form-inline" style={{ marginTop: 10 }}>
           <select value={buForm} onChange={e => setBuForm(e.target.value)}>
