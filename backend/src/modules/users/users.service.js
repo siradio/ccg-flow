@@ -159,6 +159,9 @@ async function createUser({ nom, prenom, email, password, employeeId, telephone,
       [row.id, e.id]
     );
   }
+  // Accès à TOUTES les Business Units par défaut (lecture + écriture) : un nouveau compte peut
+  // travailler sur toutes les BU d'emblée ; l'admin retire ensuite au cas par cas pour restreindre.
+  await grantAllBusinessUnits(row.id);
   return row.id;
 }
 

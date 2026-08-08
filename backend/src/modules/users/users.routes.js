@@ -137,6 +137,8 @@ router.post('/:id/approve-access', requireAuth, requireUserAdmin, async (req, re
     const password = generatePassword();
     await usersService.updateUser(user.id, { password });
     await usersService.setAccessStatus(user.id, 'active');
+    // Accès à toutes les BU par défaut à l'activation ; l'admin retire ensuite au cas par cas.
+    await usersService.grantAllBusinessUnits(user.id);
 
     const notification = { sent: false };
     try {
