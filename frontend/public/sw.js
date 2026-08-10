@@ -1,4 +1,4 @@
-/* Service worker CCG Link — rend l'application installable (PWA) et offre un repli hors-ligne.
+/* Service worker CCG Flow — rend l'application installable (PWA) et offre un repli hors-ligne.
    Stratégie « network-first » : en ligne on sert toujours la version fraîche (aucun risque de
    servir un ancien déploiement), et on ne bascule sur le cache qu'en cas d'échec réseau.
    On ne met en cache que les ressources statiques same-origin (jamais /api : données authentifiées

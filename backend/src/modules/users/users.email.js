@@ -22,7 +22,7 @@ async function sendCredentialsEmail({ to, prenom, email, password, loginUrl }) {
   const link = loginUrl || '';
   const bodyHtml = `
     <p style="margin:0 0 14px;">Bonjour ${esc(prenom)},</p>
-    <p style="margin:0 0 18px;">Un compte vient d'être créé pour vous sur <strong>CCG Link</strong>, l'ERP du groupe CCG. Voici vos identifiants de connexion :</p>
+    <p style="margin:0 0 18px;">Un compte vient d'être créé pour vous sur <strong>CCG Flow</strong>, l'ERP du groupe CCG. Voici vos identifiants de connexion :</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; margin:0 0 22px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
       <tr>
         <td style="padding:12px 16px; background:#f8fafc; color:#6b7280; font-size:13px; width:42%; border-bottom:1px solid #e5e7eb;">Adresse email</td>
@@ -33,13 +33,13 @@ async function sendCredentialsEmail({ to, prenom, email, password, loginUrl }) {
         <td style="padding:12px 16px; color:#0f172a; font-size:14px; font-weight:bold; font-family:'Courier New',monospace; letter-spacing:.5px;">${esc(password)}</td>
       </tr>
     </table>
-    ${link ? `<p style="margin:0 0 22px;"><a href="${esc(link)}" style="display:inline-block; background:#1d4ed8; color:#ffffff; text-decoration:none; font-weight:bold; font-size:14px; padding:12px 26px; border-radius:6px;">Se connecter à CCG Link</a></p>` : ''}
+    ${link ? `<p style="margin:0 0 22px;"><a href="${esc(link)}" style="display:inline-block; background:#1d4ed8; color:#ffffff; text-decoration:none; font-weight:bold; font-size:14px; padding:12px 26px; border-radius:6px;">Se connecter à CCG Flow</a></p>` : ''}
     <p style="margin:0; color:#6b7280; font-size:13px; line-height:1.5;">Pour votre sécurité, conservez ces informations confidentielles et ne les partagez avec personne. En cas de question, rapprochez-vous de votre administrateur.</p>
   `;
   const text = [
     `Bonjour ${prenom},`,
     '',
-    "Un compte vient d'être créé pour vous sur CCG Link, l'ERP du groupe CCG.",
+    "Un compte vient d'être créé pour vous sur CCG Flow, l'ERP du groupe CCG.",
     'Voici vos identifiants de connexion :',
     '',
     `  Adresse email : ${email}`,
@@ -52,8 +52,8 @@ async function sendCredentialsEmail({ to, prenom, email, password, loginUrl }) {
 
   return sendMail({
     to,
-    subject: 'Vos accès à CCG Link',
-    html: renderMailTemplate({ title: 'Bienvenue sur CCG Link', bodyHtml }),
+    subject: 'Vos accès à CCG Flow',
+    html: renderMailTemplate({ title: 'Bienvenue sur CCG Flow', bodyHtml }),
     text,
   });
 }
@@ -63,14 +63,14 @@ async function sendAccessRejectedEmail({ to, prenom, note }) {
   const motif = (note || '').trim();
   const bodyHtml = `
     <p style="margin:0 0 14px;">Bonjour ${esc(prenom)},</p>
-    <p style="margin:0 0 16px;">Votre demande d'accès à <strong>CCG Link</strong> n'a pas pu être acceptée.</p>
+    <p style="margin:0 0 16px;">Votre demande d'accès à <strong>CCG Flow</strong> n'a pas pu être acceptée.</p>
     ${motif ? `<p style="margin:0 0 16px; padding:12px 16px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#7f1d1d;"><strong>Motif :</strong> ${esc(motif)}</p>` : ''}
     <p style="margin:0; color:#6b7280; font-size:13px;">Pour toute question, rapprochez-vous de votre administrateur.</p>
   `;
   const text = [
     `Bonjour ${prenom},`,
     '',
-    "Votre demande d'accès à CCG Link n'a pas pu être acceptée.",
+    "Votre demande d'accès à CCG Flow n'a pas pu être acceptée.",
     motif ? `Motif : ${motif}` : '',
     '',
     'Pour toute question, rapprochez-vous de votre administrateur.',
@@ -78,7 +78,7 @@ async function sendAccessRejectedEmail({ to, prenom, note }) {
 
   return sendMail({
     to,
-    subject: "Votre demande d'accès à CCG Link",
+    subject: "Votre demande d'accès à CCG Flow",
     html: renderMailTemplate({ title: "Demande d'accès refusée", bodyHtml }),
     text,
   });

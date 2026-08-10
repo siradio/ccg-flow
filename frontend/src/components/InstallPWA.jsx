@@ -57,7 +57,7 @@ export default function InstallPWA() {
   const steps = {
     ios: ['Ouvrez ce site dans Safari.', 'Touchez le bouton Partager (carré avec une flèche).', '« Sur l’écran d’accueil », puis Ajouter.'],
     android: ['Ouvrez le menu ⋮ de Chrome (en haut à droite).', '« Installer l’application » (ou « Ajouter à l’écran d’accueil »).', 'Confirmez.'],
-    desktop: ['Dans la barre d’adresse, cliquez l’icône d’installation (écran avec une flèche).', 'Ou menu ⋮ → « Installer CCG Link ».', 'Confirmez « Installer ».'],
+    desktop: ['Dans la barre d’adresse, cliquez l’icône d’installation (écran avec une flèche).', 'Ou menu ⋮ → « Installer CCG Flow ».', 'Confirmez « Installer ».'],
   }[platform];
 
   return (
@@ -80,7 +80,7 @@ export default function InstallPWA() {
             boxShadow: '0 16px 40px -12px rgba(0,0,0,0.35)', padding: '14px 16px', textAlign: 'left',
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>Installer CCG Link</div>
+          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>Installer CCG Flow</div>
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
             {steps.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
           </ol>

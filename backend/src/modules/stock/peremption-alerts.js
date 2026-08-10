@@ -58,7 +58,7 @@ function buildEmail(rows) {
         <th style="padding:8px 12px">Produit</th><th style="padding:8px 12px">Lot</th><th style="padding:8px 12px">BU</th><th style="padding:8px 12px">Péremption</th><th style="padding:8px 12px">Reste</th><th style="padding:8px 12px">Délai</th>
       </tr>${lignes}
     </table>
-    <p style="margin:18px 0 0;color:#6b7280;font-size:13px">Écoulez ces lots en priorité (FEFO) — CCG Link → Stock → Lots.</p>`;
+    <p style="margin:18px 0 0;color:#6b7280;font-size:13px">Écoulez ces lots en priorité (FEFO) — CCG Flow → Stock → Lots.</p>`;
   const text = 'Lots proches de la péremption :\n' + rows.map(r => `- ${r.product_code} ${r.designation} · lot ${r.numero_lot} · ${fmt(r.date_peremption)} (${r.jours_restants} j) · reste ${r.quantite_restante}`).join('\n');
   return { html: renderMailTemplate({ title: 'Lots proches de la péremption', bodyHtml }), text };
 }
@@ -67,7 +67,7 @@ async function sendDigestTo(emails, jours) {
   const rows = await expiringLots(jours);
   if (rows.length === 0) return { count: 0, sent: false };
   const { html, text } = buildEmail(rows);
-  await sendMail({ to: emails.join(','), subject: `CCG Link — ${rows.length} lot(s) proche(s) de la péremption`, html, text });
+  await sendMail({ to: emails.join(','), subject: `CCG Flow — ${rows.length} lot(s) proche(s) de la péremption`, html, text });
   return { count: rows.length, sent: true };
 }
 

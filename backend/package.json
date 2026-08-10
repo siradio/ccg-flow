@@ -1,7 +1,7 @@
 {
   "name": "erp-ccg-backend",
   "version": "1.0.0",
-  "description": "API backend CCG Link - Module Demande d'achat",
+  "description": "API backend CCG Flow - Module Demande d'achat",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {

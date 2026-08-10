@@ -875,7 +875,7 @@ a.kpi-tile:hover {
   fill: rgba(59, 106, 219, 0.14);
 }
 
-/* Réseau « CCG Link » : nœuds reliés en arrière-plan de la connexion. */
+/* Réseau « CCG Flow » : nœuds reliés en arrière-plan de la connexion. */
 .login-page-art .net-line {
   stroke: rgba(255, 255, 255, 0.11);
   stroke-width: 1.2;
