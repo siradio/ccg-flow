@@ -76,14 +76,14 @@ router.post('/:id/quote-requests', requireAuth, async (req, res, next) => {
 });
 
 router.post('/:id/quote-requests/:qrId/send', requireAuth, async (req, res, next) => {
-  try { res.json(await service.sendQuoteRequest(req.user, Number(req.params.id), Number(req.params.qrId))); }
+  try { res.json(await service.sendQuoteRequest(req.user, Number(req.params.id), Number(req.params.qrId), (req.body || {}).cc)); }
   catch (e) { next(e); }
 });
 
 // Envoi ciblé de la demande de devis à UN fournisseur, avec une adresse email optionnelle dans le
 // corps (`email`) quand le fournisseur n'en a pas de renseignée dans le référentiel.
 router.post('/:id/quote-requests/suppliers/:qrsId/send', requireAuth, async (req, res, next) => {
-  try { res.json(await service.sendQuoteRequestToSupplier(req.user, Number(req.params.id), Number(req.params.qrsId), req.body && req.body.email)); }
+  try { res.json(await service.sendQuoteRequestToSupplier(req.user, Number(req.params.id), Number(req.params.qrsId), req.body && req.body.email, req.body && req.body.cc)); }
   catch (e) { next(e); }
 });
 
@@ -129,7 +129,7 @@ router.post('/:id/reject-step', requireAuth, async (req, res, next) => {
 
 // Rouvre la consultation (annule le bon de commande / la sélection) pour poursuivre le choix du fournisseur.
 router.post('/:id/reopen-consultation', requireAuth, async (req, res, next) => {
-  try { res.json(await service.reopenConsultation(req.user, Number(req.params.id))); }
+  try { res.json(await service.reopenConsultation(req.user, Number(req.params.id), (req.body || {}).comment)); }
   catch (e) { next(e); }
 });
 

@@ -23,6 +23,7 @@ export default function DetailPage() {
   const { t, lang } = useI18n();
   const confirm = useConfirm();
   const [pr, setPr] = useState(null);
+  const [reopenReason, setReopenReason] = useState('');
   const [steps, setSteps] = useState([]);
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -174,9 +175,12 @@ export default function DetailPage() {
         <section className="card">
           <h2>{t('prd.reopenTitle')}</h2>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('prd.reopenHint')}</p>
-          <button className="btn btn-secondary" onClick={async () => {
+          <textarea value={reopenReason} onChange={e => setReopenReason(e.target.value)} placeholder={t('prd.reopenReasonPlaceholder')}
+            style={{ display: 'block', width: '100%', marginBottom: 10, minHeight: 60 }} />
+          <button className="btn btn-secondary" disabled={!reopenReason.trim()} onClick={async () => {
             if (await confirm(t('prd.reopenConfirm'), { danger: true, confirmLabel: t('prd.reopen') })) {
-              guarded(() => client.post(`/purchase-requests/${pr.id}/reopen-consultation`), t('prd.reopenToast'));
+              const ok = await guarded(() => client.post(`/purchase-requests/${pr.id}/reopen-consultation`, { comment: reopenReason.trim() }), t('prd.reopenToast'));
+              if (ok) setReopenReason('');
             }
           }}>{t('prd.reopen')}</button>
         </section>
@@ -277,6 +281,14 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   const [emailFor, setEmailFor] = useState({});   // { [qrsId]: email saisi } — quand le fournisseur n'a pas d'email
   const [needEmail, setNeedEmail] = useState({}); // { [qrsId]: true } — afficher le champ de saisie
   const [sendingOne, setSendingOne] = useState(null); // qrsId en cours d'envoi
+  // Copie (CC) des e-mails envoyés aux fournisseurs — mémorisée comme préférence de l'utilisateur.
+  const [ccSelf, setCcSelf] = useState(() => localStorage.getItem('ccg-flow-devis-cc-self') !== 'false');
+  const [ccOthers, setCcOthers] = useState(() => localStorage.getItem('ccg-flow-devis-cc-others') || '');
+  function updateCcSelf(v) { setCcSelf(v); localStorage.setItem('ccg-flow-devis-cc-self', v ? 'true' : 'false'); }
+  function updateCcOthers(v) { setCcOthers(v); localStorage.setItem('ccg-flow-devis-cc-others', v); }
+  function buildCc() {
+    return [ccSelf ? user?.email : null, ...ccOthers.split(',')].map(s => (s || '').trim()).filter(Boolean).join(',');
+  }
 
   function copyEmailText(qr, s) {
     const subject = `Demande de devis — ${pr.numero}`;
@@ -288,7 +300,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   }
 
   async function sendQuoteRequestBatch(qrId) {
-    const res = await client.post(`/purchase-requests/${pr.id}/quote-requests/${qrId}/send`);
+    const res = await client.post(`/purchase-requests/${pr.id}/quote-requests/${qrId}/send`, { cc: buildCc() });
     setSendResults(r => ({ ...r, ...Object.fromEntries(res.data.map(x => [x.supplierId, x])) }));
   }
 
@@ -299,7 +311,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
     if (!s.supplier_email && !email) { setNeedEmail(n => ({ ...n, [s.id]: true })); return; }
     setSendingOne(s.id);
     const ok = await guarded(async () => {
-      await client.post(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/send`, email ? { email } : {});
+      await client.post(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/send`, { ...(email ? { email } : {}), cc: buildCc() });
       setSendResults(r => ({ ...r, [s.supplier_id]: { sent: true } }));
       setNeedEmail(n => ({ ...n, [s.id]: false }));
     }, t('prd.sentToSupplier', { nom: s.supplier_nom }));
@@ -307,7 +319,7 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
     if (!ok) setSendResults(r => ({ ...r, [s.supplier_id]: { sent: false, error: t('prd.sendFailed') } }));
   }
 
-  const canCreate = canAct && ['soumise', 'en_analyse_achat'].includes(pr.status);
+  const canCreate = canAct && ['soumise', 'en_analyse_achat', 'devis_en_cours'].includes(pr.status);
 
   if (!canAct && pr.quote_requests.length === 0) return null;
 
@@ -375,6 +387,18 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
             onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests`, { supplierIds: selected, message }), t('prd.launchConsultToast'))}>
             {t('prd.launchConsult')}
           </button>
+        </div>
+      )}
+
+      {canAct && pr.quote_requests.length > 0 && (
+        <div style={{ marginBottom: 12, padding: 10, background: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={ccSelf} onChange={e => updateCcSelf(e.target.checked)} />
+            {t('prd.ccSelf', { email: user?.email || '' })}
+          </label>
+          <input value={ccOthers} onChange={e => updateCcOthers(e.target.value)} placeholder={t('prd.ccOthers')}
+            style={{ display: 'block', width: '100%', marginTop: 6, fontSize: 13 }} />
+          <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>{t('prd.ccHint')}</p>
         </div>
       )}
 

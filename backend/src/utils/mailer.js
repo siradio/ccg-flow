@@ -82,7 +82,7 @@ let lastError = null;
 
 // Ordre des canaux d'envoi : Microsoft Graph (OAuth2) si configuré, sinon SMTP, sinon (dev/test sans
 // rien de configuré) log en console au lieu d'échouer, pour ne pas bloquer le workflow.
-async function sendMail({ to, subject, text, html, attachments }) {
+async function sendMail({ to, cc, subject, text, html, attachments }) {
   // Le logo n'est joint (en inline, via cid) que si un corps HTML utilise le gabarit ci-dessus.
   const allAttachments = html
     ? [...(attachments || []), { filename: 'logo-ccg.png', path: LOGO_PATH, cid: LOGO_CID, contentType: 'image/png' }]
@@ -92,7 +92,7 @@ async function sendMail({ to, subject, text, html, attachments }) {
   if (graphMailer.isGraphConfigured()) {
     if (Date.now() < brokenUntil) throw lastError || new Error('Envoi email indisponible (dernier échec récent).');
     try {
-      const r = await graphMailer.sendViaGraph({ to, subject, text, html, attachments: allAttachments });
+      const r = await graphMailer.sendViaGraph({ to, cc, subject, text, html, attachments: allAttachments });
       brokenUntil = 0;
       return r;
     } catch (e) {
@@ -112,7 +112,7 @@ async function sendMail({ to, subject, text, html, attachments }) {
     throw lastError || new Error('Serveur SMTP indisponible (dernier échec récent).');
   }
   try {
-    const result = await transporter.sendMail({ from: cfg.from, to, subject, text, html, attachments: allAttachments });
+    const result = await transporter.sendMail({ from: cfg.from, to, cc: cc || undefined, subject, text, html, attachments: allAttachments });
     brokenUntil = 0;
     return result;
   } catch (e) {

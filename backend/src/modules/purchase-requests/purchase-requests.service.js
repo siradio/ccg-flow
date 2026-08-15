@@ -195,7 +195,16 @@ function defaultQuoteRequestBody(numero) {
   return `Bonjour,\n\nVeuillez trouver ci-joint notre demande de devis ${numero}.\n\nCordialement.`;
 }
 
-async function sendQuoteRequest(user, prId, quoteRequestId) {
+// Normalise une liste d'adresses en copie (CC) : accepte une chaîne « a@x, b@y » ou un tableau,
+// ne garde que les entrées contenant « @ », renvoie une chaîne CSV ou undefined si vide. Sert au
+// service achat pour se mettre en copie et/ou ajouter d'autres destinataires à l'envoi au fournisseur.
+function cleanCc(cc) {
+  const list = Array.isArray(cc) ? cc : String(cc || '').split(',');
+  const valid = list.map(s => String(s).trim()).filter(s => s.includes('@'));
+  return valid.length ? [...new Set(valid)].join(',') : undefined;
+}
+
+async function sendQuoteRequest(user, prId, quoteRequestId, cc) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'envoyer la demande de devis');
@@ -214,6 +223,7 @@ async function sendQuoteRequest(user, prId, quoteRequestId) {
       });
       await mailer.sendMail({
         to: s.supplier_email,
+        cc: cleanCc(cc),
         subject: `Demande de devis — ${pr.numero}`,
         text: bodyText,
         html: mailer.renderMailTemplate({
@@ -242,7 +252,7 @@ async function sendQuoteRequest(user, prId, quoteRequestId) {
 // email de remplacement (`emailOverride`) — utile quand le fournisseur n'a pas d'email renseigné
 // dans le référentiel. À défaut d'override, on utilise l'email du fournisseur ; s'il n'y en a
 // aucun, on renvoie une 400 explicite pour que l'UI propose la saisie.
-async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride) {
+async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride, cc) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'envoyer la demande de devis');
@@ -262,6 +272,7 @@ async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride) {
   try {
     await mailer.sendMail({
       to,
+      cc: cleanCc(cc),
       subject: `Demande de devis — ${pr.numero}`,
       text: bodyText,
       html: mailer.renderMailTemplate({ title: 'Demande de devis', bodyHtml: `<p>${bodyText.replace(/\n/g, '<br/>')}</p>` }),
@@ -272,7 +283,7 @@ async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride) {
     throw httpError(502, "Échec de l'envoi — le serveur de messagerie a refusé le message.");
   }
   await repo.markQuoteRequestSupplierSent(s.id);
-  await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_sent', userId: user.id, details: { supplier: s.supplier_nom, to } });
+  await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_sent', userId: user.id, details: { supplier: s.supplier_nom, to, cc: cleanCc(cc) || null } });
   return { sent: true, to };
 }
 
@@ -351,21 +362,24 @@ async function markSupplierConsulted(user, prId, qrsId) {
 // commande, dé-sélectionne le devis, remet la demande en « devis_en_cours » pour choisir un autre
 // devis, saisir un nouveau devis ou relancer une consultation. Les devis/consultations déjà reçus
 // sont conservés ; seules les validations en attente sont retirées.
-async function reopenConsultation(user, prId) {
+async function reopenConsultation(user, prId, commentaire) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'rouvrir la consultation');
   if (!['devis_selectionne', 'en_validation', 'bon_commande_genere'].includes(pr.status)) {
     throw httpError(400, `Réouverture impossible depuis le statut "${pr.status}".`);
   }
+  // Motif obligatoire : la réouverture annule un bon de commande / une sélection déjà validés —
+  // on trace toujours la raison (dans l'historique) pour l'auditabilité.
+  if (!commentaire || !commentaire.trim()) throw httpError(400, 'Un motif est obligatoire pour rouvrir la consultation.');
   await poRepo.deleteByPurchaseRequestId(prId);   // supprime le bon de commande (+ ses PJ en cascade)
   await repo.unselectAllQuotes(prId);             // plus aucun devis retenu
   await repo.clearLinesSelection(prId);           // fournisseur retenu + prix final effacés sur les lignes
   await repo.clearMontantFinal(prId);             // montant final effacé
   await repo.deletePendingApprovals(prId);        // validations en attente retirées (cycle abandonné)
   await repo.updateStatusAndStep(prId, 'devis_en_cours', null);
-  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'reouverture_consultation', userId: user.id, details: { depuis: pr.status } });
-  await notifications.notifyRoleOnEntity(pr.entity_id, 'service_achat', 'Consultation rouverte', `La consultation de la demande ${pr.numero} a été rouverte pour poursuivre le choix du fournisseur.`, `/purchase-requests/${prId}`);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'reouverture_consultation', userId: user.id, details: { depuis: pr.status, motif: commentaire.trim() } });
+  await notifications.notifyRoleOnEntity(pr.entity_id, 'service_achat', 'Consultation rouverte', `La consultation de la demande ${pr.numero} a été rouverte : ${commentaire.trim()}`, `/purchase-requests/${prId}`);
   return getFullDetail(prId);
 }
 

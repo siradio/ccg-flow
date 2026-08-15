@@ -67,7 +67,7 @@ function toRecipients(to) {
 }
 
 // Envoie un email via Graph. Signature alignée sur sendMail (utils/mailer.js).
-async function sendViaGraph({ to, subject, text, html, attachments }) {
+async function sendViaGraph({ to, cc, subject, text, html, attachments }) {
   const token = await getToken();
   const g = env.graph;
   const message = {
@@ -75,6 +75,8 @@ async function sendViaGraph({ to, subject, text, html, attachments }) {
     body: html ? { contentType: 'HTML', content: html } : { contentType: 'Text', content: text || '' },
     toRecipients: toRecipients(to),
   };
+  const ccRec = toRecipients(cc);
+  if (ccRec.length) message.ccRecipients = ccRec;
   if (g.fromName) message.from = { emailAddress: { address: g.sender, name: g.fromName } };
   const graphAtt = (attachments || []).map(toGraphAttachment).filter(Boolean);
   if (graphAtt.length) message.attachments = graphAtt;
