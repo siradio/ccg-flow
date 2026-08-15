@@ -169,7 +169,9 @@ async function createQuoteRequest(user, prId, { supplierIds, message }) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'lancer une demande de devis');
-  if (!['soumise', 'en_analyse_achat'].includes(pr.status)) {
+  // 'devis_en_cours' autorisé : permet d'ajouter une nouvelle consultation (autres fournisseurs)
+  // pendant la phase devis, y compris après une réouverture de consultation (voir reopenConsultation).
+  if (!['soumise', 'en_analyse_achat', 'devis_en_cours'].includes(pr.status)) {
     throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
   }
   const minSuppliers = await settings.getIntValue('min_suppliers_devis', 2);
@@ -327,6 +329,43 @@ async function selectQuote(user, prId, quoteId) {
   await repo.setMontantFinal(prId, quote.montant, quote.devise);
   await repo.updateStatusAndStep(prId, 'devis_selectionne', null);
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
+  return getFullDetail(prId);
+}
+
+// Marque un fournisseur sollicité comme « consulté » SANS envoyer d'email — pour les fournisseurs
+// sans adresse email (consultés par téléphone, en personne, ou via le PDF envoyé manuellement).
+// Débloque la saisie de leur devis (l'écran « Devis reçus » ne liste que les fournisseurs consultés).
+async function markSupplierConsulted(user, prId, qrsId) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'marquer le fournisseur comme consulté');
+  const s = await repo.getQuoteRequestSupplier(qrsId);
+  if (!s) throw httpError(404, 'Fournisseur sollicité introuvable.');
+  await repo.markQuoteRequestSupplierSent(s.id);
+  await audit.logAction({ tableName: 'quote_request_suppliers', recordId: s.id, purchaseRequestId: prId, action: 'quote_request_marked_sent', userId: user.id, details: { supplier: s.supplier_nom, mode: 'hors e-mail' } });
+  return getFullDetail(prId);
+}
+
+// Rouvre la consultation d'une demande déjà en validation ou dont le bon de commande est généré —
+// utile si l'accord ne se conclut finalement pas avec le fournisseur retenu. Annule le bon de
+// commande, dé-sélectionne le devis, remet la demande en « devis_en_cours » pour choisir un autre
+// devis, saisir un nouveau devis ou relancer une consultation. Les devis/consultations déjà reçus
+// sont conservés ; seules les validations en attente sont retirées.
+async function reopenConsultation(user, prId) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'rouvrir la consultation');
+  if (!['devis_selectionne', 'en_validation', 'bon_commande_genere'].includes(pr.status)) {
+    throw httpError(400, `Réouverture impossible depuis le statut "${pr.status}".`);
+  }
+  await poRepo.deleteByPurchaseRequestId(prId);   // supprime le bon de commande (+ ses PJ en cascade)
+  await repo.unselectAllQuotes(prId);             // plus aucun devis retenu
+  await repo.clearLinesSelection(prId);           // fournisseur retenu + prix final effacés sur les lignes
+  await repo.clearMontantFinal(prId);             // montant final effacé
+  await repo.deletePendingApprovals(prId);        // validations en attente retirées (cycle abandonné)
+  await repo.updateStatusAndStep(prId, 'devis_en_cours', null);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'reouverture_consultation', userId: user.id, details: { depuis: pr.status } });
+  await notifications.notifyRoleOnEntity(pr.entity_id, 'service_achat', 'Consultation rouverte', `La consultation de la demande ${pr.numero} a été rouverte pour poursuivre le choix du fournisseur.`, `/purchase-requests/${prId}`);
   return getFullDetail(prId);
 }
 
@@ -499,5 +538,6 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
+  markSupplierConsulted, reopenConsultation,
   validateStep, rejectStep, listForUser,
 };

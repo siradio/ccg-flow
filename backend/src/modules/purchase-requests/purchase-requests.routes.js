@@ -87,6 +87,12 @@ router.post('/:id/quote-requests/suppliers/:qrsId/send', requireAuth, async (req
   catch (e) { next(e); }
 });
 
+// Marque un fournisseur comme consulté SANS e-mail (fournisseur sans adresse, consulté autrement).
+router.post('/:id/quote-requests/suppliers/:qrsId/mark-sent', requireAuth, async (req, res, next) => {
+  try { res.json(await service.markSupplierConsulted(req.user, Number(req.params.id), Number(req.params.qrsId))); }
+  catch (e) { next(e); }
+});
+
 // Repli manuel quand l'envoi automatique échoue (ex. SMTP tenant bloqué) : le PDF seul, à envoyer
 // soi-même depuis sa messagerie habituelle avec le texte copié depuis l'écran.
 router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, res, next) => {
@@ -118,6 +124,12 @@ router.post('/:id/validate-step', requireAuth, async (req, res, next) => {
 
 router.post('/:id/reject-step', requireAuth, async (req, res, next) => {
   try { res.json(await service.rejectStep(req.user, Number(req.params.id), (req.body || {}).comment)); }
+  catch (e) { next(e); }
+});
+
+// Rouvre la consultation (annule le bon de commande / la sélection) pour poursuivre le choix du fournisseur.
+router.post('/:id/reopen-consultation', requireAuth, async (req, res, next) => {
+  try { res.json(await service.reopenConsultation(req.user, Number(req.params.id))); }
   catch (e) { next(e); }
 });
 

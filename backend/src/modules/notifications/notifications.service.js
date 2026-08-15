@@ -18,13 +18,13 @@ async function notify(userId, type, message, lien) {
 
 // Notifie tous les utilisateurs détenant role_code sur entity_id (utilisé par le workflow des demandes d'achat).
 async function notifyRoleOnEntity(entityId, roleCode, type, message, lien) {
+  // On ne notifie QUE les vrais titulaires du rôle demandé sur cette entité. Les super_admin ne
+  // sont PAS inclus : bien qu'ils puissent agir partout, ils n'ont pas à recevoir chaque
+  // notification de validation d'un rôle qu'ils n'exercent pas (ex. « valider le besoin »).
   const holders = await all(
     `SELECT DISTINCT u.id FROM users u
      JOIN user_entity_roles uer ON uer.user_id = u.id
-     WHERE u.actif = true AND (
-       uer.role_code = 'super_admin'
-       OR (uer.role_code = $1 AND uer.entity_id = $2)
-     )`,
+     WHERE u.actif = true AND uer.role_code = $1 AND uer.entity_id = $2`,
     [roleCode, entityId]
   );
   for (const h of holders) {

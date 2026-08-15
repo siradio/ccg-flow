@@ -1,4 +1,4 @@
-const { all, one } = require('../../db');
+const { all, one, run } = require('../../db');
 
 async function create({ purchaseRequestId, numero, supplierId, montant, devise }) {
   return one(
@@ -30,4 +30,10 @@ async function getByPurchaseRequestId(prId) {
   return one('SELECT * FROM purchase_orders WHERE purchase_request_id = $1', [prId]);
 }
 
-module.exports = { create, setNumero, getById, getByPurchaseRequestId };
+// Supprime le bon de commande d'une demande (réouverture de consultation). Les pièces jointes du
+// BC sont supprimées en cascade (attachments.purchase_order_id ON DELETE CASCADE).
+async function deleteByPurchaseRequestId(prId) {
+  await run('DELETE FROM purchase_orders WHERE purchase_request_id = $1', [prId]);
+}
+
+module.exports = { create, setNumero, getById, getByPurchaseRequestId, deleteByPurchaseRequestId };

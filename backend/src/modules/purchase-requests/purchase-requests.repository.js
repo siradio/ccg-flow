@@ -350,6 +350,31 @@ async function getApprovalsForPR(prId) {
   );
 }
 
+// ─── Réouverture de consultation : remise à zéro de la sélection ──────────
+async function unselectAllQuotes(prId) {
+  await run(
+    `UPDATE quotes SET selectionne = false
+     WHERE quote_request_supplier_id IN (
+       SELECT qrs.id FROM quote_request_suppliers qrs
+       JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+       WHERE qr.purchase_request_id = $1
+     )`,
+    [prId]
+  );
+}
+
+async function clearLinesSelection(prId) {
+  await run('UPDATE purchase_request_lines SET fournisseur_retenu_id = NULL, prix_unitaire_final = NULL WHERE purchase_request_id = $1', [prId]);
+}
+
+async function clearMontantFinal(prId) {
+  await run('UPDATE purchase_requests SET montant_final = NULL, updated_at = now() WHERE id = $1', [prId]);
+}
+
+async function deletePendingApprovals(prId) {
+  await run("DELETE FROM approvals WHERE purchase_request_id = $1 AND statut = 'en_attente'", [prId]);
+}
+
 module.exports = {
   createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal,
   addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu, setLinesPrixUnitaireFinal,
@@ -357,4 +382,5 @@ module.exports = {
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,
   createQuote, getQuote, getQuotesForPR, selectQuote, getAttachments,
   createApproval, getPendingApproval, decideApproval, getApprovalsForPR,
+  unselectAllQuotes, clearLinesSelection, clearMontantFinal, deletePendingApprovals,
 };

@@ -7,6 +7,7 @@ import { StatusBadge } from './statusLabels.jsx';
 import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
 import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 
 // Les téléchargements passent par l'API JWT : un <a href> direct n'enverrait pas le header
 // d'autorisation, d'où un fetch authentifié suivi de l'ouverture d'une blob URL.
@@ -20,6 +21,7 @@ export default function DetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const confirm = useConfirm();
   const [pr, setPr] = useState(null);
   const [steps, setSteps] = useState([]);
   const [products, setProducts] = useState([]);
@@ -166,6 +168,18 @@ export default function DetailPage() {
 
       {pr.purchase_order && (
         <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
+      )}
+
+      {['devis_selectionne', 'en_validation', 'bon_commande_genere'].includes(pr.status) && hasRoleOnEntity(user, 'service_achat', pr.entity_id) && (
+        <section className="card">
+          <h2>{t('prd.reopenTitle')}</h2>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('prd.reopenHint')}</p>
+          <button className="btn btn-secondary" onClick={async () => {
+            if (await confirm(t('prd.reopenConfirm'), { danger: true, confirmLabel: t('prd.reopen') })) {
+              guarded(() => client.post(`/purchase-requests/${pr.id}/reopen-consultation`), t('prd.reopenToast'));
+            }
+          }}>{t('prd.reopen')}</button>
+        </section>
       )}
 
       <HistorySection key={version} prId={pr.id} />
@@ -403,6 +417,16 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
                             disabled={sendingOne === s.id || !(emailFor[s.id] || '').trim()}
                             onClick={() => sendToSupplier(s)}>{t('prd.send')}</button>
                         </span>
+                      )}
+                      {s.statut === 'a_envoyer' && (
+                        <>
+                          {' '}
+                          <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '1px 8px', fontSize: 11 }}
+                            title={t('prd.markConsultedHint')}
+                            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quote-requests/suppliers/${s.id}/mark-sent`), t('prd.markConsultedToast'))}>
+                            {t('prd.markConsulted')}
+                          </button>
+                        </>
                       )}
                       {result?.sent === true && <span style={{ color: 'var(--color-success-fg)' }}> — {t('prd.sentOk')}</span>}
                     </>
