@@ -1,6 +1,6 @@
 import { useI18n } from '../../../i18n/I18nContext';
 
-export const ROLE_CODES = ['super_admin', 'support_it', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'validateur_besoin'];
+export const ROLE_CODES = ['super_admin', 'support_it', 'demandeur', 'service_achat', 'controle_gestion', 'finances', 'validateur_besoin', 'observateur_achats'];
 // Rôles globaux, non rattachés à une entité (comme super_admin) — voir users.routes.js.
 export const GLOBAL_ROLES = ['super_admin', 'support_it'];
 // Niveaux d'accès module — le libellé est traduit à l'affichage (labelKey), la valeur stockée ne change pas.

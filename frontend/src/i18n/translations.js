@@ -1013,6 +1013,7 @@ export const translations = {
     'adm.role.controle_gestion': 'Contrôle de gestion',
     'adm.role.finances': 'Finances',
     'adm.role.validateur_besoin': 'Validateur besoin',
+    'adm.role.observateur_achats': 'Observateur achats (lecture seule)',
     // Niveaux d'accès module
     'adm.niveau.none': '— (aucun accès)',
     'adm.niveau.consultation': 'Consultation (lecture seule)',
@@ -2420,6 +2421,7 @@ export const translations = {
     'adm.role.controle_gestion': 'Management control',
     'adm.role.finances': 'Finance',
     'adm.role.validateur_besoin': 'Needs approver',
+    'adm.role.observateur_achats': 'Purchasing observer (read-only)',
     // Module access levels
     'adm.niveau.none': '— (no access)',
     'adm.niveau.consultation': 'View only (read)',
