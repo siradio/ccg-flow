@@ -2,6 +2,7 @@ const { one } = require('../../db');
 const { hasAnyRoleOnEntity } = require('../../middleware/permissions');
 const { httpError } = require('../../utils/httpError');
 const auditService = require('../audit/audit.service');
+const blob = require('../../storage/blob');
 
 async function purchaseRequestEntity(prId) {
   const row = await one('SELECT entity_id FROM purchase_requests WHERE id = $1', [prId]);
@@ -13,11 +14,13 @@ async function uploadForPurchaseRequest(user, prId, file) {
   if (!entityId) throw httpError(404, 'Demande introuvable.');
   if (!hasAnyRoleOnEntity(user, entityId)) throw httpError(403, "Vous n'avez aucun rôle sur cette entité.");
 
+  const key = await blob.putBuffer(file.buffer, file.mimetype, 'attachments');
+  const content = key ? null : file.buffer; // Blob si configuré, sinon BYTEA (dev local)
   const row = await one(
-    `INSERT INTO attachments (purchase_request_id, filename, mimetype, content, taille, uploaded_by)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO attachments (purchase_request_id, filename, mimetype, content, content_key, taille, uploaded_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      RETURNING id, filename, mimetype, taille, uploaded_by, uploaded_at`,
-    [prId, file.originalname, file.mimetype, file.buffer, file.size, user.id]
+    [prId, file.originalname, file.mimetype, content, key, file.size, user.id]
   );
   await auditService.logAction({ tableName: 'attachments', recordId: row.id, purchaseRequestId: prId, action: 'attachment_uploaded', userId: user.id, details: { filename: file.originalname } });
   return row;
@@ -28,11 +31,13 @@ async function uploadForPurchaseRequest(user, prId, file) {
 // lui-même (avec le purchase_request_id, pour que l'action apparaisse dans l'historique de la
 // demande — un log rattaché seulement au quote_id n'y apparaîtrait pas, voir audit.service.js).
 async function attachToQuote(quoteId, file, userId) {
+  const key = await blob.putBuffer(file.buffer, file.mimetype, 'attachments');
+  const content = key ? null : file.buffer;
   return one(
-    `INSERT INTO attachments (quote_id, filename, mimetype, content, taille, uploaded_by)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO attachments (quote_id, filename, mimetype, content, content_key, taille, uploaded_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      RETURNING id, filename, mimetype, taille, uploaded_by, uploaded_at`,
-    [quoteId, file.originalname, file.mimetype, file.buffer, file.size, userId]
+    [quoteId, file.originalname, file.mimetype, content, key, file.size, userId]
   );
 }
 
@@ -71,6 +76,8 @@ async function download(user, attachmentId) {
   if (!entityId || !hasAnyRoleOnEntity(user, entityId)) {
     throw httpError(403, "Vous n'avez pas accès à cette pièce jointe.");
   }
+  // Blob : on télécharge le binaire pour que la route serve `content` comme avant.
+  if (attachment.content_key) attachment.content = await blob.getBuffer(attachment.content_key);
   return attachment;
 }
 
