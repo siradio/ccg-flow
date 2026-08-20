@@ -9,10 +9,10 @@ import { useI18n } from '../../i18n/I18nContext';
 // conducteurs, types, documents), puis missions, checklists, la maintenance (pannes, garages),
 // accidents et le suivi.
 const NAV = [
-  // Parc véhicule (logistique.parc)
+  // Parc véhicule (logistique.parc) — ordre logique de saisie : type d'abord, puis véhicules.
+  ['/logistique/types', 'log.nav.types', 'logistique.parc'],
   ['/logistique/vehicules', 'log.nav.vehicules', 'logistique.parc'],
   ['/logistique/conducteurs', 'log.nav.conducteurs', 'logistique.parc'],
-  ['/logistique/types', 'log.nav.types', 'logistique.parc'],
   ['/logistique/documents', 'log.nav.documents', 'logistique.parc'],
   // Missions
   ['/logistique/missions', 'log.nav.missions', 'logistique.missions'],
