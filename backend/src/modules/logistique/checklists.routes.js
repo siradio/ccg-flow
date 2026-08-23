@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { pool, all, one, run } = require('../../db');
+const blob = require('../../storage/blob');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule } = require('../../middleware/permissions');
 
@@ -93,7 +94,7 @@ async function getRunDetail(id) {
      WHERE r.id = $1`, [id]);
   if (!runRow) return null;
   const items = await all(
-    `SELECT id, libelle, statut, commentaire, ordre, (photo IS NOT NULL) AS has_photo
+    `SELECT id, libelle, statut, commentaire, ordre, (photo IS NOT NULL OR photo_key IS NOT NULL) AS has_photo
      FROM checklist_run_items WHERE run_id = $1 ORDER BY ordre`, [id]);
   return { ...runRow, items };
 }
@@ -178,11 +179,12 @@ router.delete('/runs/:id', requireSubModule('logistique.checklists', 'edition'),
 // Photo d'un item de réalisation (preuve). Octets en BYTEA, servis avec authentification.
 router.get('/run-items/:id/photo', requireSubModule('logistique.checklists'), async (req, res, next) => {
   try {
-    const row = await one('SELECT photo, photo_mime FROM checklist_run_items WHERE id = $1', [Number(req.params.id)]);
-    if (!row || !row.photo) return res.status(404).json({ error: 'Aucune photo.' });
+    const row = await one('SELECT photo, photo_mime, photo_key FROM checklist_run_items WHERE id = $1', [Number(req.params.id)]);
+    if (!row || (!row.photo && !row.photo_key)) return res.status(404).json({ error: 'Aucune photo.' });
+    const buf = row.photo_key ? await blob.getBuffer(row.photo_key) : row.photo;
     res.setHeader('Content-Type', row.photo_mime || 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store');
-    res.send(row.photo);
+    res.send(buf);
   } catch (e) { next(e); }
 });
 
@@ -190,7 +192,8 @@ router.put('/run-items/:id/photo', requireSubModule('logistique.checklists', 'aj
   try {
     if (!req.file) return res.status(400).json({ error: 'Fichier manquant.' });
     if (!ALLOWED_MIME.has(req.file.mimetype)) return res.status(400).json({ error: 'Formats acceptés : PNG ou JPEG.' });
-    await run('UPDATE checklist_run_items SET photo = $1, photo_mime = $2 WHERE id = $3', [req.file.buffer, req.file.mimetype, Number(req.params.id)]);
+    const key = await blob.putBuffer(req.file.buffer, req.file.mimetype, 'checklists');
+    await run('UPDATE checklist_run_items SET photo = $1, photo_key = $2, photo_mime = $3 WHERE id = $4', [key ? null : req.file.buffer, key, req.file.mimetype, Number(req.params.id)]);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

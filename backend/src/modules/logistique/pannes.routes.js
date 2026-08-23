@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { all, one, run } = require('../../db');
+const blob = require('../../storage/blob');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule, requireSubModuleWrite } = require('../../middleware/permissions');
 
@@ -17,11 +18,12 @@ const clean = v => (v === '' || v === undefined ? null : v);
 // Photos (octets en BYTEA) — servies avec auth. Défini avant /:id (deux segments, pas de collision).
 router.get('/photos/:photoId', requireSubModule('logistique.maintenance'), async (req, res, next) => {
   try {
-    const row = await one('SELECT photo, photo_mime FROM panne_photos WHERE id = $1', [Number(req.params.photoId)]);
-    if (!row || !row.photo) return res.status(404).json({ error: 'Photo introuvable.' });
+    const row = await one('SELECT photo, photo_mime, photo_key FROM panne_photos WHERE id = $1', [Number(req.params.photoId)]);
+    if (!row || (!row.photo && !row.photo_key)) return res.status(404).json({ error: 'Photo introuvable.' });
+    const buf = row.photo_key ? await blob.getBuffer(row.photo_key) : row.photo;
     res.setHeader('Content-Type', row.photo_mime || 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store');
-    res.send(row.photo);
+    res.send(buf);
   } catch (e) { next(e); }
 });
 
@@ -100,8 +102,9 @@ router.post('/:id/photos', requireCreate, upload.single('file'), async (req, res
   try {
     if (!req.file) return res.status(400).json({ error: 'Fichier manquant.' });
     if (!ALLOWED_MIME.has(req.file.mimetype)) return res.status(400).json({ error: 'Formats acceptés : PNG ou JPEG.' });
-    const row = await one('INSERT INTO panne_photos (panne_id, photo, photo_mime) VALUES ($1,$2,$3) RETURNING id',
-      [Number(req.params.id), req.file.buffer, req.file.mimetype]);
+    const key = await blob.putBuffer(req.file.buffer, req.file.mimetype, 'pannes');
+    const row = await one('INSERT INTO panne_photos (panne_id, photo, photo_key, photo_mime) VALUES ($1,$2,$3,$4) RETURNING id',
+      [Number(req.params.id), key ? null : req.file.buffer, key, req.file.mimetype]);
     res.status(201).json(row);
   } catch (e) { next(e); }
 });

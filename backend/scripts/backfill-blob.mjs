@@ -22,6 +22,14 @@ const cc = BlobServiceClient.fromConnectionString(conn).getContainerClient(conta
 // table, id, colonne BYTEA, colonne clé, colonne mime, préfixe blob
 const TARGETS = [
   { table: 'attachments', id: 'id', col: 'content', keyCol: 'content_key', mimeCol: 'mimetype', prefix: 'attachments' },
+  { table: 'entities', id: 'id', col: 'logo', keyCol: 'logo_key', mimeCol: 'logo_mime', prefix: 'branding' },
+  { table: 'entities', id: 'id', col: 'signature', keyCol: 'signature_key', mimeCol: 'signature_mime', prefix: 'branding' },
+  { table: 'entities', id: 'id', col: 'stamp', keyCol: 'stamp_key', mimeCol: 'stamp_mime', prefix: 'branding' },
+  { table: 'machines', id: 'id', col: 'photo', keyCol: 'photo_key', mimeCol: 'photo_mime', prefix: 'machines' },
+  { table: 'vehicles', id: 'id', col: 'photo', keyCol: 'photo_key', mimeCol: 'photo_mime', prefix: 'vehicles' },
+  { table: 'checklist_run_items', id: 'id', col: 'photo', keyCol: 'photo_key', mimeCol: 'photo_mime', prefix: 'checklists' },
+  { table: 'panne_photos', id: 'id', col: 'photo', keyCol: 'photo_key', mimeCol: 'photo_mime', prefix: 'pannes' },
+  { table: 'accident_photos', id: 'id', col: 'photo', keyCol: 'photo_key', mimeCol: 'photo_mime', prefix: 'accidents' },
 ];
 
 const ext = (m) => (m && m.split('/')[1] ? m.split('/')[1].split('+')[0].split(';')[0] : 'bin');
