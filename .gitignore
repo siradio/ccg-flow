@@ -17,3 +17,4 @@ backend/public/
 .vscode/*
 !.vscode/extensions.json
 .idea
+_bytea-backup-prod/

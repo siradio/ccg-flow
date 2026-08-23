@@ -14,6 +14,7 @@ import { BlobServiceClient } from '@azure/storage-blob';
 import { randomUUID } from 'crypto';
 
 const APPLY = process.argv.includes('--apply');
+const PURGE = process.argv.includes('--purge'); // vide le BYTEA après migration (sinon on le garde en filet)
 const conn = process.env.AZURE_STORAGE_CONNECTION_STRING;
 const container = process.env.AZURE_STORAGE_CONTAINER || 'ccgflow';
 if (!conn) { console.error('AZURE_STORAGE_CONNECTION_STRING manquant.'); process.exit(1); }
@@ -37,7 +38,7 @@ const ext = (m) => (m && m.split('/')[1] ? m.split('/')[1].split('+')[0].split('
 async function main() {
   const c = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   await c.connect();
-  console.log(`Mode : ${APPLY ? 'APPLY' : 'DRY-RUN'} · container ${container}\n`);
+  console.log(`Mode : ${APPLY ? 'APPLY' : 'DRY-RUN'}${APPLY ? (PURGE ? ' (+purge BYTEA)' : ' (garde BYTEA)') : ''} · container ${container}\n`);
   let total = 0;
   for (const t of TARGETS) {
     const rows = (await c.query(
@@ -50,7 +51,9 @@ async function main() {
         const buf = (await c.query(`SELECT "${t.col}" AS b FROM "${t.table}" WHERE "${t.id}" = $1`, [r.id])).rows[0].b;
         const key = `${t.prefix}/${randomUUID()}.${ext(r.mime)}`;
         await cc.getBlockBlobClient(key).uploadData(buf, { blobHTTPHeaders: { blobContentType: r.mime || 'application/octet-stream' } });
-        await c.query(`UPDATE "${t.table}" SET "${t.keyCol}" = $1, "${t.col}" = NULL WHERE "${t.id}" = $2`, [key, r.id]);
+        // Par défaut on GARDE le BYTEA (filet de sécurité) ; --purge le vide.
+        const set = PURGE ? `"${t.keyCol}" = $1, "${t.col}" = NULL` : `"${t.keyCol}" = $1`;
+        await c.query(`UPDATE "${t.table}" SET ${set} WHERE "${t.id}" = $2`, [key, r.id]);
       }
       console.log(`    ${APPLY ? '↑' : '·'} id=${r.id} (${Math.round((r.len || 0) / 1024)} Ko)`);
       total++;
