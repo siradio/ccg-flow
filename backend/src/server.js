@@ -12,6 +12,8 @@ app.use(express.json({ limit: '15mb' }));
 
 app.use('/api/auth', require('./modules/auth/auth.routes'));
 app.use('/api/access-requests', require('./modules/access-requests/access-requests.routes'));
+app.use('/api/public', require('./modules/login-backgrounds/public.routes'));
+app.use('/api/login-backgrounds', require('./modules/login-backgrounds/login-backgrounds.routes'));
 app.use('/api/users', require('./modules/users/users.routes'));
 app.use('/api/access-profiles', require('./modules/access-profiles/access-profiles.routes'));
 app.use('/api/stats', require('./modules/stats/stats.routes'));

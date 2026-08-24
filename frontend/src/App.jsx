@@ -24,6 +24,7 @@ import Statistiques from './pages/Admin/Statistiques';
 import WorkflowConfig from './pages/Admin/WorkflowConfig';
 import EmailSettings from './pages/Admin/EmailSettings';
 import DocumentsBranding from './pages/Admin/DocumentsBranding';
+import LoginBackground from './pages/Admin/LoginBackground';
 import TestData from './pages/Admin/TestData';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
@@ -90,6 +91,7 @@ export default function App() {
         <Route path="admin/workflow" element={<RequireAdmin><WorkflowConfig /></RequireAdmin>} />
         <Route path="admin/email" element={<RequireAdmin><EmailSettings /></RequireAdmin>} />
         <Route path="admin/documents" element={<RequireAdmin><DocumentsBranding /></RequireAdmin>} />
+        <Route path="admin/login-background" element={<RequireAdmin><LoginBackground /></RequireAdmin>} />
         <Route path="admin/test-data" element={<RequireAdmin><TestData /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

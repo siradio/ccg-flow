@@ -50,6 +50,7 @@ const PARAMS_ITEMS = [
   { to: '/admin/workflow', labelKey: 'nav.workflow', Icon: IconWorkflow, superOnly: true },
   { to: '/admin/email', labelKey: 'nav.email', Icon: IconMail, superOnly: true },
   { to: '/admin/documents', labelKey: 'nav.branding', Icon: IconImage, superOnly: true },
+  { to: '/admin/login-background', labelKey: 'nav.loginBg', Icon: IconImage, superOnly: true },
   { to: '/admin/test-data', labelKey: 'nav.testData', Icon: IconDatabase, superOnly: true },
 ];
 

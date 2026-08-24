@@ -37,11 +37,21 @@ export default function Login() {
   const [reqLoading, setReqLoading] = useState(false);
   const [reqDone, setReqDone] = useState(false);
 
+  // Habillage événementiel de la page (configuré par le super_admin). null = fond par défaut.
+  const [bg, setBg] = useState(null);
+
+  useEffect(() => {
+    client.get('/public/login-background').then(res => setBg(res.data.active)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (mode === 'request' && entities.length === 0) {
       client.get('/access-requests/entities').then(res => setEntities(res.data)).catch(() => {});
     }
   }, [mode, entities.length]);
+
+  const hasCustomBg = !!(bg && bg.has_image);
+  const bgImageUrl = hasCustomBg ? `${client.defaults.baseURL}/public/login-background/image?v=${bg.id}` : null;
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -74,8 +84,16 @@ export default function Login() {
   function updateReq(field, value) { setReq(r => ({ ...r, [field]: value })); }
 
   return (
-    <div className="login-page">
-      {/* Arrière-plan « CCG Flow » : un réseau de nœuds reliés, illustrant la connexion / le lien. */}
+    <div className={`login-page${hasCustomBg ? ' login-page--custom-bg' : ''}`}>
+      {/* Habillage événementiel (super_admin) : image d'arrière-plan + voile de lisibilité. */}
+      {hasCustomBg && (
+        <>
+          <div className="login-page-image" style={{ backgroundImage: `url("${bgImageUrl}")` }} aria-hidden="true" />
+          <div className="login-page-scrim" aria-hidden="true" />
+        </>
+      )}
+      {/* Arrière-plan par défaut « CCG Flow » : un réseau de nœuds reliés, illustrant la connexion / le lien. */}
+      {!hasCustomBg && (
       <svg className="login-page-art" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         {/* halos d'ambiance */}
         <circle cx="1080" cy="160" r="240" />
@@ -125,6 +143,7 @@ export default function Login() {
         <circle className="net-node" cx="600" cy="760" r="5" />
         <text x="860" y="745" textAnchor="middle" className="login-watermark login-watermark-sm" transform="rotate(-8 860 745)">CCG</text>
       </svg>
+      )}
       <div style={{ position: 'absolute', top: 14, right: 16, zIndex: 5 }}><LanguageSwitcher /></div>
       <div className="login-shell">
         <div className="login-brand">
@@ -142,6 +161,7 @@ export default function Login() {
           </ul>
         </div>
         <div className="card login-card" style={{ width: '100%', maxWidth: mode === 'request' ? 420 : 360 }}>
+        {bg?.message && <div className="login-event" role="status">{bg.message}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
           <div>

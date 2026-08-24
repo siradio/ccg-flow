@@ -865,6 +865,38 @@ a.kpi-tile:hover {
   z-index: 0;
 }
 
+/* Habillage événementiel : image de fond + voile assurant la lisibilité de la carte. */
+.login-page-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+.login-page-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(8, 16, 34, 0.35), transparent 60%),
+    linear-gradient(180deg, rgba(8, 16, 34, 0.55) 0%, rgba(8, 16, 34, 0.35) 40%, rgba(8, 16, 34, 0.60) 100%);
+}
+.login-page--custom-bg .login-shell { position: relative; z-index: 2; }
+
+/* Message d'événement affiché en haut de la carte de connexion. */
+.login-event {
+  margin: -4px 0 18px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(59, 106, 219, 0.14), rgba(23, 162, 160, 0.14));
+  border: 1px solid rgba(59, 106, 219, 0.30);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .login-page-art path {
   fill: none;
   stroke: rgba(255, 255, 255, 0.09);
