@@ -52,7 +52,7 @@ export default function LoginBackground() {
 
   async function toggleActive(it) {
     setError('');
-    if (!it.actif && !it.has_image) { setError(t('adm.loginBg.activeNeedsImage')); return; }
+    if (!it.actif && !it.has_image && !(it.message || '').trim()) { setError(t('adm.loginBg.activeNeedsContent')); return; }
     await client.put(`/login-backgrounds/${it.id}/active`, { actif: !it.actif });
     load();
   }
