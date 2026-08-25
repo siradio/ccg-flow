@@ -61,6 +61,16 @@ app.use('/api/reparations', require('./modules/logistique/reparations.routes'));
 app.use('/api/accidents', require('./modules/logistique/accidents.routes'));
 app.use('/api/positions', require('./modules/logistique/positions.routes'));
 app.use('/api/production', require('./modules/production/production.routes'));
+// Module Commerce — Phase D : référentiels & affectations (versements en Phase F).
+app.use('/api/commerce/payment-methods', require('./modules/commerce/payment-methods.routes'));
+app.use('/api/commerce/banks', require('./modules/commerce/banks.routes'));
+app.use('/api/commerce/zones', require('./modules/commerce/zones.routes'));
+app.use('/api/commerce/commerciaux', require('./modules/commerce/commerciaux.routes'));
+app.use('/api/commerce/assignments', require('./modules/commerce/assignments.routes'));
+app.use('/api/commerce/versements', require('./modules/commerce/versements.routes'));
+app.use('/api/commerce/objectifs', require('./modules/commerce/objectifs.routes'));
+app.use('/api/commerce/dashboard', require('./modules/commerce/dashboard.routes'));
+app.use('/api/commerce/settings', require('./modules/commerce/settings.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 

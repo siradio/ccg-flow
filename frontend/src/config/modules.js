@@ -16,6 +16,10 @@ export const MODULE_SUB_KEYS = {
     'logistique.maintenance', 'logistique.accidents', 'logistique.suivi',
   ],
   production: ['production.releve', 'production.suivi'],
+  commerce: [
+    'commerce.tableau_bord', 'commerce.versements', 'commerce.objectifs',
+    'commerce.commerciaux', 'commerce.commissions', 'commerce.rapports', 'commerce.parametres',
+  ],
   kpi: ['kpi.global', 'kpi.achats', 'kpi.rh', 'kpi.stock'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',

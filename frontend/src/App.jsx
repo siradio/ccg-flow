@@ -41,6 +41,13 @@ import StockInventaires from './pages/Stock/StockInventaires';
 import StockImport from './pages/Stock/StockImport';
 import StockReleveJour from './pages/Stock/StockReleveJour';
 import ProductionReleve from './pages/Production/ProductionReleve';
+import CommerceIndex from './pages/Commerce/CommerceIndex';
+import CommerceParametres from './pages/Commerce/CommerceParametres';
+import VersementsList from './pages/Commerce/VersementsList';
+import VersementForm from './pages/Commerce/VersementForm';
+import VersementDetail from './pages/Commerce/VersementDetail';
+import DashboardCommerce from './pages/Commerce/DashboardCommerce';
+import ObjectifsPage from './pages/Commerce/ObjectifsPage';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -73,6 +80,14 @@ export default function App() {
         <Route path="stock/transferts" element={<RequireModule subModule="stock.transferts"><StockTransferts /></RequireModule>} />
         <Route path="stock/inventaires" element={<RequireModule subModule="stock.inventaires"><StockInventaires /></RequireModule>} />
         <Route path="stock/import" element={<RequireModule subModule="stock.import"><StockImport /></RequireModule>} />
+        <Route path="commerce/tableau-bord" element={<RequireModule subModule="commerce.tableau_bord"><DashboardCommerce /></RequireModule>} />
+        <Route path="commerce/objectifs" element={<RequireModule subModule="commerce.objectifs"><ObjectifsPage /></RequireModule>} />
+        <Route path="commerce/versements" element={<RequireModule subModule="commerce.versements"><VersementsList /></RequireModule>} />
+        <Route path="commerce/versements/new" element={<RequireModule subModule="commerce.versements" minNiveau="ajout"><VersementForm /></RequireModule>} />
+        <Route path="commerce/versements/:id" element={<RequireModule subModule="commerce.versements"><VersementDetail /></RequireModule>} />
+        <Route path="commerce/versements/:id/edit" element={<RequireModule subModule="commerce.versements" minNiveau="edition"><VersementForm /></RequireModule>} />
+        <Route path="commerce/parametres" element={<RequireModule subModule="commerce.parametres"><CommerceParametres /></RequireModule>} />
+        <Route path="commerce/:type" element={<RequireModule subModule={['commerce.commerciaux', 'commerce.parametres']}><CommerceIndex /></RequireModule>} />
         <Route path="production/releve" element={<RequireModule subModule="production.releve"><ProductionReleve /></RequireModule>} />
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />

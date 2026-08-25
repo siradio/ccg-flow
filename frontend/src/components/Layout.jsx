@@ -7,10 +7,11 @@ import ThemeSwitcher from './ThemeSwitcher';
 import InstallPWA from './InstallPWA';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useI18n } from '../i18n/I18nContext';
+import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -95,6 +96,7 @@ export default function Layout() {
           {hasModuleAccess(user, 'stock') && <NavLink to={stockLinkTarget(user)} className={navClass} onClick={closeNav}><IconBox /> {t('nav.stock')}</NavLink>}
           {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> {t('nav.logistics')}</NavLink>}
           {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> {t('nav.production')}</NavLink>}
+          {hasModuleAccess(user, 'commerce') && <NavLink to={firstCommerceTarget(user) || '/commerce/versements'} className={navClass} onClick={closeNav}><IconTag /> {t('nav.commerce')}</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
           {hasLiens && (
             <div className="sidebar-group">

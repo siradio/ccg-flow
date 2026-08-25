@@ -59,6 +59,20 @@ const MODULES = [
     ],
   },
   { key: 'rh', label: 'RH (Employés)', subModules: [] },
+  // Module Commerce — démarre avec les versements commerciaux (remplace 2 fichiers Excel) ;
+  // s'enrichira (clients, commandes, ventes, tarifs…). Réutilise BU/produits/employés existants.
+  {
+    key: 'commerce', label: 'Commerce',
+    subModules: [
+      { key: 'commerce.tableau_bord', label: 'Tableau de bord commercial' },
+      { key: 'commerce.versements', label: 'Versements commerciaux' },
+      { key: 'commerce.objectifs', label: 'Objectifs commerciaux' },
+      { key: 'commerce.commerciaux', label: 'Commerciaux' },
+      { key: 'commerce.commissions', label: 'Commissions' },
+      { key: 'commerce.rapports', label: 'Rapports commerciaux' },
+      { key: 'commerce.parametres', label: 'Paramètres Commerce' },
+    ],
+  },
   { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
     key: 'referentiels', label: 'Référentiels',
