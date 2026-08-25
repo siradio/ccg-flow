@@ -109,11 +109,11 @@ export default function VersementDetail() {
             <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
               <button className="link-button" onClick={() => openJustif(a.id, a.filename)}>{a.filename}</button>
               <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round((a.taille || 0) / 1024)} Ko</span>
-              {canEdit && !locked && <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => delJustif(a.id)}>Supprimer</button>}
+              {canEdit && v.status !== 'annule' && <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => delJustif(a.id)}>Supprimer</button>}
             </li>
           ))}
         </ul>
-        {canAdd && !locked && (
+        {canAdd && v.status !== 'annule' && (
           <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', marginTop: 10 }}>
             + Ajouter un justificatif
             <input type="file" accept=".pdf,image/png,image/jpeg" style={{ display: 'none' }} onChange={e => uploadJustif(e.target.files?.[0])} />

@@ -27,6 +27,8 @@ export default function VersementForm() {
   const [bankRows, setBankRows] = useState({});      // { [methodId]: { bank_id, transaction_reference, transaction_date } }
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState([]);   // justificatifs à téléverser à l'enregistrement
+  const [existingAtts, setExistingAtts] = useState([]);  // justificatifs déjà attachés (édition)
 
   useEffect(() => {
     client.get('/commerce/commerciaux').then(r => setCommerciaux(r.data)).catch(() => {});
@@ -40,7 +42,7 @@ export default function VersementForm() {
         setForm({ commercial_id: v.commercial_id, product_id: v.product_id || '', payment_date: v.payment_date?.slice(0, 10) || todayISO(), reference_generale: v.reference_generale || '', commentaire: v.commentaire || '' });
         const a = {}; const br = {};
         for (const l of v.lines) { a[l.payment_method_id] = l.amount; if (l.bank_id || l.transaction_reference) br[l.payment_method_id] = { bank_id: l.bank_id || '', transaction_reference: l.transaction_reference || '', transaction_date: l.transaction_date?.slice(0, 10) || '' }; }
-        setAmounts(a); setBankRows(br);
+        setAmounts(a); setBankRows(br); setExistingAtts(v.attachments || []);
       }).catch(() => setError('Versement introuvable.'));
     }
   }, [id, editing]);
@@ -78,10 +80,30 @@ export default function VersementForm() {
       const res = editing
         ? await client.put(`/commerce/versements/${id}`, payload)
         : await client.post('/commerce/versements', payload);
-      navigate(`/commerce/versements/${res.data.id}`);
+      const vid = res.data.id;
+      // Téléverse les justificatifs sélectionnés (à la saisie comme à l'édition).
+      for (const f of stagedFiles) {
+        const fd = new FormData(); fd.append('file', f);
+        await client.post(`/commerce/versements/${vid}/attachments`, fd);
+      }
+      navigate(`/commerce/versements/${vid}`);
     } catch (e) {
       setError(e.response?.data?.error || 'Erreur à l’enregistrement.');
     } finally { setBusy(false); }
+  }
+
+  async function openAtt(attId) {
+    try {
+      const res = await client.get(`/commerce/versements/attachments/${attId}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch { setError('Ouverture impossible.'); }
+  }
+  async function delExistingAtt(attId) {
+    if (!window.confirm('Supprimer ce justificatif ?')) return;
+    try { await client.delete(`/commerce/versements/attachments/${attId}`); setExistingAtts(a => a.filter(x => x.id !== attId)); }
+    catch (e) { setError(e.response?.data?.error || 'Suppression impossible.'); }
   }
 
   return (
@@ -156,6 +178,28 @@ export default function VersementForm() {
           <textarea rows={2} value={form.commentaire} onChange={e => setForm(f => ({ ...f, commentaire: e.target.value }))} />
         </label>
 
+        <h2 style={{ fontSize: 15, marginTop: 18 }}>Justificatifs</h2>
+        {editing && existingAtts.map(a => (
+          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+            <button type="button" className="link-button" onClick={() => openAtt(a.id)}>{a.filename}</button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round((a.taille || 0) / 1024)} Ko</span>
+            <button type="button" className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => delExistingAtt(a.id)}>Supprimer</button>
+          </div>
+        ))}
+        {stagedFiles.map((f, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+            <span>📎 {f.name}</span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round(f.size / 1024)} Ko — à téléverser</span>
+            <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setStagedFiles(fs => fs.filter((_, j) => j !== i))}>Retirer</button>
+          </div>
+        ))}
+        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', marginTop: 6 }}>
+          + Ajouter un justificatif
+          <input type="file" accept=".pdf,image/png,image/jpeg" multiple style={{ display: 'none' }}
+            onChange={e => { setStagedFiles(fs => [...fs, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+        </label>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>PDF, JPG ou PNG — bordereau, reçu bancaire, reçu Orange Money, reçu caisse…</div>
+
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           {workflowActif ? (
             <>
@@ -167,7 +211,6 @@ export default function VersementForm() {
           )}
           <button className="btn btn-secondary" onClick={() => navigate('/commerce/versements')}>Annuler</button>
         </div>
-        {!editing && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 0 }}>Les justificatifs s’ajoutent après enregistrement, sur la fiche du versement.</p>}
       </section>
     </div>
   );

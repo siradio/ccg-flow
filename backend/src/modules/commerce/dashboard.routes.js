@@ -38,7 +38,9 @@ router.get('/', requireAuth, requireSubModule('commerce.tableau_bord'), async (r
     const params = [periode, monthEnd];
     const visible = visibleBusinessUnitIds(req.user);
     if (visible) { params.push(visible); where.push(`c.business_unit_id = ANY($${params.length})`); }
-    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`c.business_unit_id = $${params.length}`); }
+    // business_unit_id accepte un id ou une liste séparée par des virgules (ex. groupe « Divers »).
+    const buFilter = String(req.query.business_unit_id || '').split(',').map(s => Number(s)).filter(Boolean);
+    if (buFilter.length) { params.push(buFilter); where.push(`c.business_unit_id = ANY($${params.length})`); }
     if (req.query.commercial_id) { params.push(Number(req.query.commercial_id)); where.push(`c.id = $${params.length}`); }
 
     const rows = await all(`
@@ -90,6 +92,51 @@ router.get('/', requireAuth, requireSubModule('commerce.tableau_bord'), async (r
       },
       lignes,
     });
+  } catch (e) { next(e); }
+});
+
+// Évolution mensuelle (12 mois d'une année) : objectif total vs réalisé total — pour la courbe CA.
+router.get('/evolution', requireAuth, requireSubModule('commerce.tableau_bord'), async (req, res, next) => {
+  try {
+    const now = new Date();
+    const annee = /^\d{4}$/.test(req.query.annee || '') ? Number(req.query.annee) : now.getFullYear();
+    const start = `${annee}-01-01`;
+    const end = `${annee}-12-31`;
+
+    const buParams = [];
+    const buFilter = String(req.query.business_unit_id || '').split(',').map(s => Number(s)).filter(Boolean);
+    const visible = visibleBusinessUnitIds(req.user);
+    // Construit un filtre BU commun (visibilité + sélection) appliqué aux deux agrégats.
+    const buClause = (col, base) => {
+      const parts = [];
+      let p = [...base];
+      if (visible) { p.push(visible); parts.push(`${col} = ANY($${p.length})`); }
+      if (buFilter.length) { p.push(buFilter); parts.push(`${col} = ANY($${p.length})`); }
+      return { clause: parts.length ? ' AND ' + parts.join(' AND ') : '', params: p };
+    };
+
+    const oq = buClause('business_unit_id', [start, end]);
+    const obj = await all(
+      `SELECT TO_CHAR(periode, 'YYYY-MM') AS mois, SUM(objectif_montant) AS total
+         FROM commercial_objectifs
+        WHERE periode >= $1 AND periode <= $2 AND product_id IS NULL AND actif${oq.clause}
+        GROUP BY 1`, oq.params);
+
+    const rq = buClause('business_unit_id', [start, end]);
+    const rea = await all(
+      `SELECT TO_CHAR(payment_date, 'YYYY-MM') AS mois, SUM(total_amount) AS total
+         FROM commercial_payments
+        WHERE status = 'valide' AND payment_date >= $1 AND payment_date <= $2${rq.clause}
+        GROUP BY 1`, rq.params);
+
+    const objMap = Object.fromEntries(obj.map(r => [r.mois, Number(r.total)]));
+    const reaMap = Object.fromEntries(rea.map(r => [r.mois, Number(r.total)]));
+    const mois = [];
+    for (let m = 1; m <= 12; m++) {
+      const key = `${annee}-${String(m).padStart(2, '0')}`;
+      mois.push({ mois: key, objectif_total: objMap[key] || 0, realise_total: reaMap[key] || 0 });
+    }
+    res.json({ annee, mois });
   } catch (e) { next(e); }
 });
 

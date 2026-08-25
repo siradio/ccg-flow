@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
+} from 'recharts';
 import client from '../../api/client';
 import CommerceSubnav from './CommerceSubnav';
 import { ExportButtons } from '../../utils/exportData';
 
 const money = (n) => (Number(n) || 0).toLocaleString('fr-FR') + ' GNF';
+const short = (n) => {
+  const v = Number(n) || 0;
+  if (Math.abs(v) >= 1e9) return (v / 1e9).toFixed(1).replace('.0', '') + ' Md';
+  if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(0) + ' M';
+  if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + ' k';
+  return String(v);
+};
 const pct = (n) => (n == null ? '—' : n.toLocaleString('fr-FR') + ' %');
 const curMonth = () => new Date().toISOString().slice(0, 7);
+const MOIS_COURT = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 const STATUT_COLOR = {
   'Objectif dépassé': '#128a54', 'Objectif atteint': '#2554e0',
   'À surveiller': '#b45309', 'En retard': '#dc2626', 'Sans objectif': '#6b7280',
@@ -23,19 +34,43 @@ function Kpi({ label, value, accent }) {
 export default function DashboardCommerce() {
   const [mois, setMois] = useState(curMonth());
   const [bus, setBus] = useState([]);
-  const [buId, setBuId] = useState('');
+  const [buSel, setBuSel] = useState('');
   const [data, setData] = useState(null);
+  const [evolution, setEvolution] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => { client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {}); }, []);
+
+  // Regroupements « Yaourt » / « Divers » (tout ce qui n'est pas Yaourt) — commodité d'affichage
+  // façon fichiers Excel (BEST YAOURT vs DIVERS). Reste piloté par les IDs réels des BU.
+  const yaourtIds = useMemo(() => bus.filter(b => /yaourt/i.test(`${b.code} ${b.nom}`)).map(b => b.id), [bus]);
+  const diversIds = useMemo(() => bus.filter(b => !/yaourt/i.test(`${b.code} ${b.nom}`)).map(b => b.id), [bus]);
+  const buParam = useMemo(() => {
+    if (buSel === 'yaourt') return yaourtIds.join(',');
+    if (buSel === 'divers') return diversIds.join(',');
+    return buSel; // '' = toutes, sinon un id
+  }, [buSel, yaourtIds, diversIds]);
+  const annee = mois.slice(0, 4);
+
   useEffect(() => {
     setError('');
     const p = new URLSearchParams({ mois });
-    if (buId) p.append('business_unit_id', buId);
+    if (buParam) p.append('business_unit_id', buParam);
     client.get('/commerce/dashboard?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
-  }, [mois, buId]);
+  }, [mois, buParam]);
+
+  useEffect(() => {
+    const p = new URLSearchParams({ annee });
+    if (buParam) p.append('business_unit_id', buParam);
+    client.get('/commerce/dashboard/evolution?' + p.toString()).then(r => setEvolution(r.data.mois || [])).catch(() => setEvolution([]));
+  }, [annee, buParam]);
 
   const k = data?.kpi;
+  const evoData = useMemo(() => evolution.map(m => ({
+    label: MOIS_COURT[Number(m.mois.slice(5, 7)) - 1],
+    Objectif: m.objectif_total, Réalisé: m.realise_total,
+  })), [evolution]);
+
   const exportCols = [
     { key: 'rang', label: 'Rang', type: 'number' }, { key: 'code', label: 'Code' }, { key: 'nom', label: 'Commercial' },
     { key: 'business_unit_nom', label: 'BU' }, { key: 'objectif', label: 'Objectif', type: 'number' },
@@ -52,9 +87,13 @@ export default function DashboardCommerce() {
         <h1 className="page-title" style={{ margin: 0 }}>Tableau de bord commercial</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
-          <select value={buId} onChange={e => setBuId(e.target.value)}>
+          <select value={buSel} onChange={e => setBuSel(e.target.value)}>
             <option value="">Toutes les BU</option>
-            {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            {yaourtIds.length > 0 && <option value="yaourt">Yaourt</option>}
+            {diversIds.length > 0 && <option value="divers">Divers (Mayo/Margarine, Tomate, Lait)</option>}
+            <optgroup label="Par BU">
+              {bus.map(b => <option key={b.id} value={String(b.id)}>{b.nom}</option>)}
+            </optgroup>
           </select>
         </div>
       </div>
@@ -71,11 +110,29 @@ export default function DashboardCommerce() {
             <Kpi label="Reste à faire" value={money(k.reste)} />
             <Kpi label="Commerciaux actifs" value={k.commerciaux_actifs} />
           </div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-            {data.joursEcoules} / {data.joursMois} jours écoulés
+
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 15 }}>Évolution mensuelle — Objectif vs Réalisé ({annee})</h2>
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{data.joursEcoules} / {data.joursMois} jours écoulés (mois sélectionné)</span>
+            </div>
+            <div style={{ width: '100%', height: 300, marginTop: 10 }}>
+              <ResponsiveContainer>
+                <LineChart data={evoData} margin={{ top: 6, right: 16, left: 6, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={short} width={64} tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(v) => money(v)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="Réalisé" stroke="#128a54" strokeWidth={2.5} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Objectif" stroke="#2554e0" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h2 style={{ margin: 0, fontSize: 15 }}>Performance & classement — {MOIS_COURT[Number(mois.slice(5, 7)) - 1]} {annee}</h2>
             <ExportButtons filename={`dashboard_commerce_${mois}`} columns={exportCols} rows={exportRows} />
           </div>
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
