@@ -17,6 +17,7 @@ export const translations = {
     // Sous-navigation du module Commerce
     'com.nav.dashboard': 'Tableau de bord',
     'com.nav.versements': 'Versements',
+    'com.nav.import': 'Import',
     'com.nav.objectifs': 'Objectifs',
     'com.nav.commerciaux': 'Commerciaux',
     'com.nav.affectations': 'Affectations',
@@ -1464,6 +1465,7 @@ export const translations = {
     // Commerce sub-navigation
     'com.nav.dashboard': 'Dashboard',
     'com.nav.versements': 'Payments',
+    'com.nav.import': 'Import',
     'com.nav.objectifs': 'Targets',
     'com.nav.commerciaux': 'Sales reps',
     'com.nav.affectations': 'Assignments',

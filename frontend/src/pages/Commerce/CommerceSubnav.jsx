@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/I18nContext';
 export const NAV = [
   ['/commerce/tableau-bord', 'com.nav.dashboard', 'commerce.tableau_bord'],
   ['/commerce/versements', 'com.nav.versements', 'commerce.versements'],
+  ['/commerce/import', 'com.nav.import', 'commerce.versements'],
   ['/commerce/objectifs', 'com.nav.objectifs', 'commerce.objectifs'],
   ['/commerce/commerciaux', 'com.nav.commerciaux', 'commerce.commerciaux'],
   ['/commerce/affectations', 'com.nav.affectations', 'commerce.commerciaux'],

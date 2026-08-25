@@ -273,4 +273,85 @@ router.delete('/attachments/:attId', requireAuth, requireSubModule('commerce.ver
   } catch (e) { next(e); }
 });
 
+// --- Import Excel (saisie hors-ligne) -------------------------------------------------------
+
+const parseNum = (v) => {
+  if (v == null || v === '') return 0;
+  const n = Number(String(v).replace(/[^\d.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+const parseDate = (v) => {
+  const s = String(v || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // JJ/MM/AAAA
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return null;
+};
+
+// Chaque ligne du fichier = un versement. Les colonnes de montant deviennent les lignes de moyens.
+router.post('/import', requireAuth, requireSubModule('commerce.versements', 'ajout'), async (req, res, next) => {
+  try {
+    const rows = (req.body || {}).rows || [];
+    const commerciaux = await all('SELECT id, code, business_unit_id FROM commerciaux');
+    const byCode = Object.fromEntries(commerciaux.map(c => [String(c.code).toLowerCase(), c]));
+    const methods = await all('SELECT id, code FROM payment_methods');
+    const mId = (code) => (methods.find(m => m.code === code) || {}).id;
+    const banks = await all('SELECT id, code, nom FROM banks');
+    const findBank = (v) => {
+      if (!v) return null;
+      const s = String(v).toLowerCase().trim();
+      const b = banks.find(x => String(x.nom).toLowerCase() === s || String(x.code).toLowerCase() === s);
+      return b ? b.id : null;
+    };
+    const AMOUNT_COLS = ['especes', 'orange_money', 'banque', 'credit', 'autres_ecart'];
+    const report = { total: rows.length, inserted: 0, skipped: 0, errors: [] };
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || {};
+      const ligne = r.__ligne || (i + 2); // n° de ligne Excel (en-tête = 1)
+      try {
+        const code = String(r.code_commercial || '').trim();
+        const hasAmount = AMOUNT_COLS.some(c => parseNum(r[c]) > 0);
+        if (!code && !hasAmount) { report.skipped++; continue; } // ligne vide
+        const com = byCode[code.toLowerCase()];
+        if (!com) { report.errors.push({ ligne, message: `Commercial « ${code || '(vide)'} » introuvable` }); continue; }
+        const date = parseDate(r.date);
+        if (!date) { report.errors.push({ ligne, message: 'Date invalide (attendu AAAA-MM-JJ ou JJ/MM/AAAA)' }); continue; }
+        const buId = com.business_unit_id;
+        if (!buId) { report.errors.push({ ligne, message: 'Le commercial n’a pas de BU' }); continue; }
+        if (!canWriteBusinessUnit(req.user, buId)) { report.errors.push({ ligne, message: 'BU non autorisée' }); continue; }
+
+        const raw = [];
+        for (const col of AMOUNT_COLS) {
+          const amt = parseNum(r[col]);
+          if (amt > 0) {
+            const line = { payment_method_id: mId(col), amount: amt };
+            if (col === 'banque') { line.bank_id = findBank(r.banque_nom); line.transaction_reference = (r.reference || '').toString().trim() || null; line.transaction_date = date; }
+            raw.push(line);
+          }
+        }
+        const { lines, total } = await normalizeLines(raw);
+        if (!lines.length) { report.skipped++; continue; }
+        const actif = await workflowActif(buId);
+        const status = actif ? 'brouillon' : 'valide';
+        await withTransaction(async (tx) => {
+          const h = await tx.one(`INSERT INTO commercial_payments
+              (commercial_id, business_unit_id, payment_date, total_amount, reference_generale, commentaire, status, created_by, updated_by)
+              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) RETURNING id`,
+            [com.id, buId, date, total, (r.reference || '').toString().trim() || null, (r.commentaire || '').toString().trim() || null, status, req.user.id]);
+          await tx.run("UPDATE commercial_payments SET reference = 'VER-' || LPAD(id::text, 5, '0') WHERE id = $1", [h.id]);
+          for (const l of lines) {
+            await tx.run(`INSERT INTO commercial_payment_details
+              (commercial_payment_id, payment_method_id, amount, bank_id, transaction_reference, transaction_date, commentaire)
+              VALUES ($1,$2,$3,$4,$5,$6,$7)`, [h.id, l.payment_method_id, l.amount, l.bank_id, l.transaction_reference, l.transaction_date, l.commentaire]);
+          }
+        });
+        report.inserted++;
+      } catch (e) { report.errors.push({ ligne, message: e.message || 'Erreur' }); }
+    }
+    await logAction({ tableName: 'commercial_payments', recordId: 0, action: 'import', userId: req.user.id, details: { inserted: report.inserted, total: report.total } });
+    res.json(report);
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
