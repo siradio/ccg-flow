@@ -51,6 +51,7 @@ import ObjectifsPage from './pages/Commerce/ObjectifsPage';
 import CommercialFiche from './pages/Commerce/CommercialFiche';
 import CommerceImport from './pages/Commerce/CommerceImport';
 import CommissionsPage from './pages/Commerce/CommissionsPage';
+import RapportsPage from './pages/Commerce/RapportsPage';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="commerce/tableau-bord" element={<RequireModule subModule="commerce.tableau_bord"><DashboardCommerce /></RequireModule>} />
         <Route path="commerce/objectifs" element={<RequireModule subModule="commerce.objectifs"><ObjectifsPage /></RequireModule>} />
         <Route path="commerce/commissions" element={<RequireModule subModule="commerce.commissions"><CommissionsPage /></RequireModule>} />
+        <Route path="commerce/rapports" element={<RequireModule subModule="commerce.rapports"><RapportsPage /></RequireModule>} />
         <Route path="commerce/versements" element={<RequireModule subModule="commerce.versements"><VersementsList /></RequireModule>} />
         <Route path="commerce/versements/new" element={<RequireModule subModule="commerce.versements" minNiveau="ajout"><VersementForm /></RequireModule>} />
         <Route path="commerce/versements/:id" element={<RequireModule subModule="commerce.versements"><VersementDetail /></RequireModule>} />
