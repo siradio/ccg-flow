@@ -22,6 +22,7 @@ const STATUT_COLOR = {
   'Objectif dépassé': '#128a54', 'Objectif atteint': '#2554e0',
   'À surveiller': '#b45309', 'En retard': '#dc2626', 'Sans objectif': '#6b7280',
   brouillon: '#6b7280', soumis: '#b45309', valide: '#128a54', rejete: '#dc2626', annule: '#6b7280',
+  calculee: '#6b7280', validee: '#2554e0', payee: '#128a54', annulee: '#dc2626',
 };
 const STATUT_VER = { brouillon: 'Brouillon', soumis: 'Soumis', valide: 'Validé', rejete: 'Rejeté', annule: 'Annulé' };
 
@@ -164,7 +165,19 @@ export default function CommercialFiche() {
         </section>
       </div>
 
-      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 14 }}>💡 Les commissions apparaîtront ici une fois le moteur de commissions activé.</p>
+      <section className="card" style={{ marginTop: 16, maxWidth: 520 }}>
+        <h2 style={{ marginTop: 0, fontSize: 15 }}>Commission — {MOIS_COURT[Number(mois.slice(5, 7)) - 1]} {mois.slice(0, 4)}</h2>
+        {data.commission ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 18px', fontSize: 14 }}>
+            <span style={{ color: 'var(--color-text-muted)' }}>Base (CA validé)</span><span style={{ fontWeight: 600 }}>{money(data.commission.base_montant)}</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>Taux</span><span>{(Number(data.commission.taux) * 100).toLocaleString('fr-FR')} %</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>Commission</span><span style={{ fontWeight: 700, color: '#128a54' }}>{money(data.commission.montant)}</span>
+            <span style={{ color: 'var(--color-text-muted)' }}>Statut</span><span><span className="badge" style={{ background: STATUT_COLOR[data.commission.statut] || '#6b7280', color: '#fff' }}>{{ calculee: 'Calculée', validee: 'Validée', payee: 'Payée', annulee: 'Annulée' }[data.commission.statut] || data.commission.statut}</span></span>
+          </div>
+        ) : (
+          <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>Pas encore calculée pour ce mois. <Link to="/commerce/commissions">Calculer les commissions</Link></p>
+        )}
+      </section>
     </div>
   );
 }

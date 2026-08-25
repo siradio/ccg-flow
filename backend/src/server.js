@@ -70,6 +70,7 @@ app.use('/api/commerce/assignments', require('./modules/commerce/assignments.rou
 app.use('/api/commerce/versements', require('./modules/commerce/versements.routes'));
 app.use('/api/commerce/objectifs', require('./modules/commerce/objectifs.routes'));
 app.use('/api/commerce/dashboard', require('./modules/commerce/dashboard.routes'));
+app.use('/api/commerce/commissions', require('./modules/commerce/commissions.routes'));
 app.use('/api/commerce/settings', require('./modules/commerce/settings.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));

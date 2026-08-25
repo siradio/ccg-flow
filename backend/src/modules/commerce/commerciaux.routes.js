@@ -219,7 +219,11 @@ async function buildFiche(user, idRaw, moisRaw) {
       mensuel.push({ mois: key, objectif: o, realise: r, taux: o > 0 ? Math.round((r / o) * 1000) / 10 : null, ecart: r - o, rang: mine && mine.rea > 0 ? arr.findIndex(x => x.id === id) + 1 : null });
     }
 
-    return { commercial, affectations, metrics, journalier, mensuel };
+    const commission = await one(
+      `SELECT base_montant, taux, montant, statut FROM commissions WHERE commercial_id = $1 AND periode = $2`,
+      [id, periode]);
+
+    return { commercial, affectations, metrics, journalier, mensuel, commission };
 }
 
 const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];

@@ -10,6 +10,7 @@ export const NAV = [
   ['/commerce/versements', 'com.nav.versements', 'commerce.versements'],
   ['/commerce/import', 'com.nav.import', 'commerce.versements'],
   ['/commerce/objectifs', 'com.nav.objectifs', 'commerce.objectifs'],
+  ['/commerce/commissions', 'com.nav.commissions', 'commerce.commissions'],
   ['/commerce/commerciaux', 'com.nav.commerciaux', 'commerce.commerciaux'],
   ['/commerce/affectations', 'com.nav.affectations', 'commerce.commerciaux'],
   ['/commerce/moyens', 'com.nav.moyens', 'commerce.parametres'],
