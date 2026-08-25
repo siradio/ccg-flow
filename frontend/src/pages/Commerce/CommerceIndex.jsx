@@ -121,6 +121,8 @@ export default function CommerceIndex() {
         lists={lists}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
+        rowLink={type === 'commerciaux' ? (item) => `/commerce/commerciaux/${item.id}` : null}
+        rowLinkLabel="Fiche"
       />
     </div>
   );

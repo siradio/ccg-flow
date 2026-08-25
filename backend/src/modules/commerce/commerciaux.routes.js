@@ -5,6 +5,7 @@ const {
   requireSubModule, requireSubModuleWrite, visibleBusinessUnitIds, canWriteBusinessUnit,
 } = require('../../middleware/permissions');
 const { logAction } = require('../audit/audit.service');
+const { generateCommercialFichePdf } = require('../../utils/pdf');
 
 // Référentiel Commerciaux. Un commercial INTERNE référence un employé existant (l'identité —
 // matricule, nom, prénom, tél, email — provient du référentiel Employés) ; un commercial EXTERNE
@@ -131,10 +132,9 @@ router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
 // Fiche individuelle : identité + indicateurs du mois + classement + historiques (journalier, mensuel).
 const statutDe = (taux) => (taux == null ? 'Sans objectif' : taux >= 100 ? 'Objectif dépassé' : taux >= 80 ? 'Objectif atteint' : taux >= 50 ? 'À surveiller' : 'En retard');
 
-router.get('/:id/fiche', requireAuth, requireSubModule('commerce.commerciaux'), async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    const mois = /^\d{4}-\d{2}$/.test(req.query.mois || '') ? req.query.mois : new Date().toISOString().slice(0, 7);
+async function buildFiche(user, idRaw, moisRaw) {
+    const id = Number(idRaw);
+    const mois = /^\d{4}-\d{2}$/.test(moisRaw || '') ? moisRaw : new Date().toISOString().slice(0, 7);
     const [year, month] = mois.split('-').map(Number);
     const periode = `${mois}-01`;
     const joursMois = new Date(year, month, 0).getDate();
@@ -145,11 +145,9 @@ router.get('/:id/fiche', requireAuth, requireSubModule('commerce.commerciaux'), 
     else if (year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1)) joursEcoules = 0;
 
     const commercial = await one(BASE_SELECT + ' WHERE c.id = $1', [id]);
-    if (!commercial) return res.status(404).json({ error: 'Commercial introuvable.' });
-    const visible = visibleBusinessUnitIds(req.user);
-    if (visible && commercial.business_unit_id && !visible.includes(commercial.business_unit_id)) {
-      return res.status(404).json({ error: 'Commercial introuvable.' });
-    }
+    if (!commercial) return null;
+    const visible = visibleBusinessUnitIds(user);
+    if (visible && commercial.business_unit_id && !visible.includes(commercial.business_unit_id)) return null;
 
     const affectations = await all(`
       SELECT a.*, bu.nom AS bu_nom, p.designation AS product_nom, z.nom AS zone_nom
@@ -221,7 +219,46 @@ router.get('/:id/fiche', requireAuth, requireSubModule('commerce.commerciaux'), 
       mensuel.push({ mois: key, objectif: o, realise: r, taux: o > 0 ? Math.round((r / o) * 1000) / 10 : null, ecart: r - o, rang: mine && mine.rea > 0 ? arr.findIndex(x => x.id === id) + 1 : null });
     }
 
-    res.json({ commercial, affectations, metrics, journalier, mensuel });
+    return { commercial, affectations, metrics, journalier, mensuel };
+}
+
+const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const moisLabel = (ym) => `${MOIS_FR[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+const moisCourt = (ym) => `${MOIS_FR[Number(ym.slice(5, 7)) - 1].slice(0, 4)}. ${ym.slice(0, 4)}`;
+
+router.get('/:id/fiche', requireAuth, requireSubModule('commerce.commerciaux'), async (req, res, next) => {
+  try {
+    const fiche = await buildFiche(req.user, req.params.id, req.query.mois);
+    if (!fiche) return res.status(404).json({ error: 'Commercial introuvable.' });
+    res.json(fiche);
+  } catch (e) { next(e); }
+});
+
+// Export PDF de la situation d'un commercial (branded, comme les devis/BC).
+router.get('/:id/fiche.pdf', requireAuth, requireSubModule('commerce.commerciaux'), async (req, res, next) => {
+  try {
+    const fiche = await buildFiche(req.user, req.params.id, req.query.mois);
+    if (!fiche) return res.status(404).json({ error: 'Commercial introuvable.' });
+    const m = fiche.metrics;
+    const fmt = (n) => (Number(n) || 0).toLocaleString('fr-FR');
+    const buf = await generateCommercialFichePdf({
+      commercial: fiche.commercial,
+      metrics: m,
+      moisLabel: moisLabel(m.mois),
+      mensuel: fiche.mensuel.map(r => ({
+        mois: moisCourt(r.mois), objectif: fmt(r.objectif) + ' GNF', realise: fmt(r.realise) + ' GNF',
+        taux: r.taux == null ? '—' : r.taux + ' %', ecart: fmt(r.ecart) + ' GNF', rang: r.rang ? '#' + r.rang : '—',
+      })),
+      journalier: fiche.journalier.map(v => ({
+        date: v.payment_date.slice(0, 10).split('-').reverse().join('/'), moyens: v.moyens || '—',
+        total: fmt(v.total_amount) + ' GNF', statut: { brouillon: 'Brouillon', soumis: 'Soumis', valide: 'Validé', rejete: 'Rejeté', annule: 'Annulé' }[v.status] || v.status,
+      })),
+    });
+    const cc = fiche.commercial;
+    const fname = `Situation_${cc.code}_${m.mois}.pdf`.replace(/\s+/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fname}"`);
+    res.send(buf);
   } catch (e) { next(e); }
 });
 

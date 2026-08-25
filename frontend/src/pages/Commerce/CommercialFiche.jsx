@@ -45,6 +45,15 @@ export default function CommercialFiche() {
     client.get(`/commerce/commerciaux/${id}/fiche?mois=${mois}`).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || 'Fiche introuvable.'));
   }, [id, mois]);
 
+  async function exportPdf() {
+    try {
+      const res = await client.get(`/commerce/commerciaux/${id}/fiche.pdf?mois=${mois}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch { setError('Export PDF impossible.'); }
+  }
+
   const evo = useMemo(() => (data?.mensuel || []).map(m => ({
     label: MOIS_COURT[Number(m.mois.slice(5, 7)) - 1], Objectif: m.objectif, Réalisé: m.realise,
   })), [data]);
@@ -66,6 +75,7 @@ export default function CommercialFiche() {
         </h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
+          <button className="btn btn-secondary btn-sm" onClick={exportPdf}>🖨️ Imprimer / PDF</button>
           <Link to="/commerce/commerciaux" className="btn btn-secondary btn-sm">← Commerciaux</Link>
         </div>
       </div>

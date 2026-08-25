@@ -35,36 +35,27 @@ function Kpi({ label, value, accent }) {
 export default function DashboardCommerce() {
   const [mois, setMois] = useState(curMonth());
   const [bus, setBus] = useState([]);
-  const [buSel, setBuSel] = useState('');
+  const [buId, setBuId] = useState('');
   const [data, setData] = useState(null);
   const [evolution, setEvolution] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => { client.get('/business-units/mine').then(r => setBus(r.data)).catch(() => {}); }, []);
 
-  // Regroupements « Yaourt » / « Divers » (tout ce qui n'est pas Yaourt) — commodité d'affichage
-  // façon fichiers Excel (BEST YAOURT vs DIVERS). Reste piloté par les IDs réels des BU.
-  const yaourtIds = useMemo(() => bus.filter(b => /yaourt/i.test(`${b.code} ${b.nom}`)).map(b => b.id), [bus]);
-  const diversIds = useMemo(() => bus.filter(b => !/yaourt/i.test(`${b.code} ${b.nom}`)).map(b => b.id), [bus]);
-  const buParam = useMemo(() => {
-    if (buSel === 'yaourt') return yaourtIds.join(',');
-    if (buSel === 'divers') return diversIds.join(',');
-    return buSel; // '' = toutes, sinon un id
-  }, [buSel, yaourtIds, diversIds]);
   const annee = mois.slice(0, 4);
 
   useEffect(() => {
     setError('');
     const p = new URLSearchParams({ mois });
-    if (buParam) p.append('business_unit_id', buParam);
+    if (buId) p.append('business_unit_id', buId);
     client.get('/commerce/dashboard?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
-  }, [mois, buParam]);
+  }, [mois, buId]);
 
   useEffect(() => {
     const p = new URLSearchParams({ annee });
-    if (buParam) p.append('business_unit_id', buParam);
+    if (buId) p.append('business_unit_id', buId);
     client.get('/commerce/dashboard/evolution?' + p.toString()).then(r => setEvolution(r.data.mois || [])).catch(() => setEvolution([]));
-  }, [annee, buParam]);
+  }, [annee, buId]);
 
   const k = data?.kpi;
   const evoData = useMemo(() => evolution.map(m => ({
@@ -88,13 +79,9 @@ export default function DashboardCommerce() {
         <h1 className="page-title" style={{ margin: 0 }}>Tableau de bord commercial</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
-          <select value={buSel} onChange={e => setBuSel(e.target.value)}>
+          <select value={buId} onChange={e => setBuId(e.target.value)}>
             <option value="">Toutes les BU</option>
-            {yaourtIds.length > 0 && <option value="yaourt">Yaourt</option>}
-            {diversIds.length > 0 && <option value="divers">Divers (Mayo/Margarine, Tomate, Lait)</option>}
-            <optgroup label="Par BU">
-              {bus.map(b => <option key={b.id} value={String(b.id)}>{b.nom}</option>)}
-            </optgroup>
+            {bus.map(b => <option key={b.id} value={String(b.id)}>{b.nom}</option>)}
           </select>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useI18n } from '../../i18n/I18nContext';
@@ -14,7 +15,7 @@ const optLabel = (f, o) => (f.optionLabels && f.optionLabels[o] != null ? f.opti
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
-export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false }) {
+export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false, rowLink = null, rowLinkLabel = 'Ouvrir' }) {
   const confirm = useConfirm();
   const { t } = useI18n();
   const [items, setItems] = useState([]);
@@ -151,15 +152,16 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             <thead>
               <tr>
                 {fields.map(f => <th key={f.key}>{fieldLabel(f, t)}</th>)}
-                {(canEdit || (canAdd && duplicable)) && <th className="sticky-col" />}
+                {(canEdit || (canAdd && duplicable) || rowLink) && <th className="sticky-col" />}
               </tr>
             </thead>
             <tbody>
               {visibleItems.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint, t)}</td>)}
-                  {(canEdit || (canAdd && duplicable)) && (
+                  {(canEdit || (canAdd && duplicable) || rowLink) && (
                     <td className="sticky-col" style={{ whiteSpace: 'nowrap' }}>
+                      {rowLink && <Link to={rowLink(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{rowLinkLabel}</Link>}
                       {canAdd && duplicable && <button onClick={() => startDuplicate(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{t('ref.duplicate')}</button>}
                       {canEdit && <button onClick={() => startEdit(item)} className="btn btn-secondary btn-sm" style={{ marginRight: 6 }}>{t('common.edit')}</button>}
                       {canEdit && <button onClick={() => onDelete(item.id)} className="btn btn-danger btn-sm">{t('common.delete')}</button>}

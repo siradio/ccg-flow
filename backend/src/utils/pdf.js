@@ -224,4 +224,72 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
   });
 }
 
-module.exports = { generateQuoteRequestPdf, generatePurchaseOrderPdf };
+// Petit tableau générique (en-tête bleu + lignes zébrées) pour les documents de synthèse.
+function simpleTable(doc, columns, rows) {
+  const startX = 50;
+  const rowH = 18;
+  let y = doc.y;
+  const drawHeader = () => {
+    doc.rect(startX, y, PAGE_WIDTH, rowH).fill(BRAND_BLUE);
+    let x = startX;
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('white');
+    columns.forEach(c => { doc.text(c.label, x + 4, y + 5, { width: c.width - 8, align: c.align || 'left' }); x += c.width; });
+    y += rowH;
+  };
+  drawHeader();
+  doc.font('Helvetica').fontSize(9);
+  rows.forEach((r, i) => {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 50; drawHeader(); doc.font('Helvetica').fontSize(9); }
+    if (i % 2 === 1) doc.rect(startX, y, PAGE_WIDTH, rowH).fill('#f3f4f6');
+    let x = startX;
+    doc.fillColor('black');
+    columns.forEach(c => { doc.text(String(r[c.key] ?? ''), x + 4, y + 5, { width: c.width - 8, align: c.align || 'left' }); x += c.width; });
+    y += rowH;
+  });
+  if (!rows.length) { doc.fillColor(MUTED_GRAY).text('Aucune donnée.', startX + 4, y + 5); y += rowH; }
+  doc.y = y + 8; doc.x = 50;
+}
+
+// Situation d'un commercial (fiche) — identité, indicateurs du mois, historiques mensuel et journalier.
+async function generateCommercialFichePdf({ commercial, metrics, mensuel, journalier, moisLabel }) {
+  return renderPdf(doc => {
+    renderLetterhead(doc, 'Situation commerciale', null);
+    doc.fontSize(13).font('Helvetica-Bold').fillColor(BRAND_NAVY)
+      .text(`${commercial.code} — ${commercial.prenom_affiche || ''} ${commercial.nom_affiche || ''}`.trim());
+    doc.fontSize(10).font('Helvetica').fillColor('black');
+    doc.text(`Type : ${commercial.type === 'interne' ? 'Interne' : 'Externe'}${commercial.matricule ? '     Matricule : ' + commercial.matricule : ''}`);
+    doc.text(`BU : ${commercial.business_unit_nom || '—'}     Zone : ${commercial.zone_nom || '—'}`);
+    doc.text(`Période analysée : ${moisLabel}`);
+    doc.moveDown(0.8);
+
+    doc.fontSize(11).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Indicateurs du mois');
+    doc.moveDown(0.3).fontSize(10).font('Helvetica').fillColor('black');
+    doc.text(`Objectif : ${money(metrics.objectif)} GNF        Réalisé : ${money(metrics.realise)} GNF        Taux : ${metrics.taux == null ? '—' : metrics.taux + ' %'}`);
+    doc.text(`Écart : ${money(metrics.ecart)} GNF        Moyenne/jour : ${money(metrics.moyenne_jour)} GNF        Projection : ${money(metrics.projection)} GNF`);
+    doc.text(`Rang du mois : ${metrics.rang ? '#' + metrics.rang : '—'}        Statut : ${metrics.statut}`);
+    doc.moveDown(1);
+
+    doc.fontSize(11).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Historique mensuel');
+    doc.moveDown(0.3).fillColor('black');
+    simpleTable(doc, [
+      { key: 'mois', label: 'Mois', width: 70 },
+      { key: 'objectif', label: 'Objectif', width: 110, align: 'right' },
+      { key: 'realise', label: 'Réalisé', width: 110, align: 'right' },
+      { key: 'taux', label: '%', width: 55, align: 'right' },
+      { key: 'ecart', label: 'Écart', width: 110, align: 'right' },
+      { key: 'rang', label: 'Rang', width: 40, align: 'right' },
+    ], mensuel);
+    doc.moveDown(0.6);
+
+    doc.fontSize(11).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Historique journalier du mois');
+    doc.moveDown(0.3).fillColor('black');
+    simpleTable(doc, [
+      { key: 'date', label: 'Date', width: 70 },
+      { key: 'moyens', label: 'Moyens', width: 195, align: 'left' },
+      { key: 'total', label: 'Total', width: 120, align: 'right' },
+      { key: 'statut', label: 'Statut', width: 110 },
+    ], journalier);
+  });
+}
+
+module.exports = { generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf };
