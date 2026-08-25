@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from 'recharts';
@@ -149,7 +150,7 @@ export default function DashboardCommerce() {
                 {data.lignes.map(l => (
                   <tr key={l.commercial_id}>
                     <td>{l.rang || '—'}</td>
-                    <td>{l.code} — {l.prenom || ''} {l.nom || ''}</td>
+                    <td><Link to={`/commerce/commerciaux/${l.commercial_id}`}>{l.code} — {l.prenom || ''} {l.nom || ''}</Link></td>
                     <td>{l.business_unit_nom || '—'}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.objectif)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{money(l.realise)}</td>

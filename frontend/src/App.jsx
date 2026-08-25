@@ -48,6 +48,7 @@ import VersementForm from './pages/Commerce/VersementForm';
 import VersementDetail from './pages/Commerce/VersementDetail';
 import DashboardCommerce from './pages/Commerce/DashboardCommerce';
 import ObjectifsPage from './pages/Commerce/ObjectifsPage';
+import CommercialFiche from './pages/Commerce/CommercialFiche';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
 
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="commerce/versements/:id" element={<RequireModule subModule="commerce.versements"><VersementDetail /></RequireModule>} />
         <Route path="commerce/versements/:id/edit" element={<RequireModule subModule="commerce.versements" minNiveau="edition"><VersementForm /></RequireModule>} />
         <Route path="commerce/parametres" element={<RequireModule subModule="commerce.parametres"><CommerceParametres /></RequireModule>} />
+        <Route path="commerce/commerciaux/:id" element={<RequireModule subModule="commerce.commerciaux"><CommercialFiche /></RequireModule>} />
         <Route path="commerce/:type" element={<RequireModule subModule={['commerce.commerciaux', 'commerce.parametres']}><CommerceIndex /></RequireModule>} />
         <Route path="production/releve" element={<RequireModule subModule="production.releve"><ProductionReleve /></RequireModule>} />
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />

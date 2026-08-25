@@ -2,7 +2,7 @@ const express = require('express');
 const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
 const {
-  requireSubModuleWrite, visibleBusinessUnitIds, canWriteBusinessUnit,
+  requireSubModule, requireSubModuleWrite, visibleBusinessUnitIds, canWriteBusinessUnit,
 } = require('../../middleware/permissions');
 const { logAction } = require('../audit/audit.service');
 
@@ -126,6 +126,103 @@ router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {
     if (e.code === '23503') return res.status(409).json({ error: 'Impossible : des données (versements/affectations) référencent ce commercial.' });
     next(e);
   }
+});
+
+// Fiche individuelle : identité + indicateurs du mois + classement + historiques (journalier, mensuel).
+const statutDe = (taux) => (taux == null ? 'Sans objectif' : taux >= 100 ? 'Objectif dépassé' : taux >= 80 ? 'Objectif atteint' : taux >= 50 ? 'À surveiller' : 'En retard');
+
+router.get('/:id/fiche', requireAuth, requireSubModule('commerce.commerciaux'), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const mois = /^\d{4}-\d{2}$/.test(req.query.mois || '') ? req.query.mois : new Date().toISOString().slice(0, 7);
+    const [year, month] = mois.split('-').map(Number);
+    const periode = `${mois}-01`;
+    const joursMois = new Date(year, month, 0).getDate();
+    const monthEnd = `${mois}-${String(joursMois).padStart(2, '0')}`;
+    const now = new Date();
+    let joursEcoules = joursMois;
+    if (year === now.getFullYear() && month === now.getMonth() + 1) joursEcoules = now.getDate();
+    else if (year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1)) joursEcoules = 0;
+
+    const commercial = await one(BASE_SELECT + ' WHERE c.id = $1', [id]);
+    if (!commercial) return res.status(404).json({ error: 'Commercial introuvable.' });
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible && commercial.business_unit_id && !visible.includes(commercial.business_unit_id)) {
+      return res.status(404).json({ error: 'Commercial introuvable.' });
+    }
+
+    const affectations = await all(`
+      SELECT a.*, bu.nom AS bu_nom, p.designation AS product_nom, z.nom AS zone_nom
+        FROM commercial_assignments a
+        LEFT JOIN business_units bu ON bu.id = a.business_unit_id
+        LEFT JOIN products p ON p.id = a.product_id
+        LEFT JOIN zones_commerciales z ON z.id = a.zone_id
+       WHERE a.commercial_id = $1 ORDER BY a.actif DESC, a.date_debut DESC`, [id]);
+
+    const obj = Number((await one(`SELECT COALESCE(SUM(objectif_montant),0) AS o FROM commercial_objectifs
+        WHERE commercial_id = $1 AND periode = $2 AND product_id IS NULL AND actif`, [id, periode])).o);
+    const rea = Number((await one(`SELECT COALESCE(SUM(total_amount),0) AS r FROM commercial_payments
+        WHERE commercial_id = $1 AND status = 'valide' AND payment_date >= $2 AND payment_date <= $3`, [id, periode, monthEnd])).r);
+    const taux = obj > 0 ? (rea / obj) * 100 : null;
+    const moyJour = joursEcoules > 0 ? rea / joursEcoules : 0;
+    const metrics = {
+      mois, objectif: obj, realise: rea, ecart: rea - obj,
+      taux: taux == null ? null : Math.round(taux * 10) / 10,
+      objectif_jour: obj > 0 ? Math.round(obj / joursMois) : 0,
+      moyenne_jour: Math.round(moyJour), projection: Math.round(moyJour * joursMois),
+      statut: statutDe(taux), joursMois, joursEcoules, rang: null,
+    };
+
+    // Rang global du mois parmi les commerciaux visibles.
+    const rangParams = [periode, monthEnd];
+    let rangWhere = '';
+    if (visible) { rangParams.push(visible); rangWhere = ' AND c.business_unit_id = ANY($3)'; }
+    const board = await all(`SELECT c.id, COALESCE(r.rea, 0) AS rea FROM commerciaux c
+        LEFT JOIN (SELECT commercial_id, SUM(total_amount) AS rea FROM commercial_payments
+                    WHERE status = 'valide' AND payment_date >= $1 AND payment_date <= $2 GROUP BY 1) r ON r.commercial_id = c.id
+       WHERE c.statut = 'actif'${rangWhere}`, rangParams);
+    board.sort((a, b) => Number(b.rea) - Number(a.rea));
+    const idx = board.findIndex(x => x.id === id);
+    if (idx >= 0 && Number(board[idx].rea) > 0) metrics.rang = idx + 1;
+
+    // Historique journalier (versements du mois) — moyens listés.
+    const journalier = await all(`
+      SELECT cp.id, TO_CHAR(cp.payment_date,'YYYY-MM-DD') AS payment_date, cp.reference, cp.total_amount, cp.status,
+             STRING_AGG(pm.libelle, ', ' ORDER BY pm.ordre) AS moyens
+        FROM commercial_payments cp
+        LEFT JOIN commercial_payment_details d ON d.commercial_payment_id = cp.id
+        LEFT JOIN payment_methods pm ON pm.id = d.payment_method_id
+       WHERE cp.commercial_id = $1 AND cp.payment_date >= $2 AND cp.payment_date <= $3
+       GROUP BY cp.id ORDER BY cp.payment_date DESC, cp.id DESC`, [id, periode, monthEnd]);
+
+    // Historique mensuel de l'année (objectif, réalisé, taux, écart, rang mensuel).
+    const yStart = `${year}-01-01`, yEnd = `${year}-12-31`;
+    const realByMonth = await all(
+      `SELECT cp.commercial_id, TO_CHAR(cp.payment_date,'YYYY-MM') AS mois, SUM(cp.total_amount) AS rea
+         FROM commercial_payments cp ${visible ? 'JOIN commerciaux c ON c.id = cp.commercial_id' : ''}
+        WHERE cp.status = 'valide' AND cp.payment_date >= $1 AND cp.payment_date <= $2
+        ${visible ? 'AND c.business_unit_id = ANY($3)' : ''}
+        GROUP BY 1, 2`, visible ? [yStart, yEnd, visible] : [yStart, yEnd]);
+    const objByMonth = await all(
+      `SELECT TO_CHAR(periode,'YYYY-MM') AS mois, SUM(objectif_montant) AS o FROM commercial_objectifs
+        WHERE commercial_id = $1 AND product_id IS NULL AND actif AND periode >= $2 AND periode <= $3 GROUP BY 1`,
+      [id, yStart, `${year}-12-01`]);
+    const objMap = Object.fromEntries(objByMonth.map(r => [r.mois, Number(r.o)]));
+    const perMonth = {};
+    for (const row of realByMonth) { (perMonth[row.mois] ||= []).push({ id: row.commercial_id, rea: Number(row.rea) }); }
+    const mensuel = [];
+    for (let m = 1; m <= 12; m++) {
+      const key = `${year}-${String(m).padStart(2, '0')}`;
+      const arr = (perMonth[key] || []).sort((a, b) => b.rea - a.rea);
+      const mine = arr.find(x => x.id === id);
+      const r = mine ? mine.rea : 0;
+      const o = objMap[key] || 0;
+      if (r === 0 && o === 0) continue;
+      mensuel.push({ mois: key, objectif: o, realise: r, taux: o > 0 ? Math.round((r / o) * 1000) / 10 : null, ecart: r - o, rang: mine && mine.rea > 0 ? arr.findIndex(x => x.id === id) + 1 : null });
+    }
+
+    res.json({ commercial, affectations, metrics, journalier, mensuel });
+  } catch (e) { next(e); }
 });
 
 module.exports = router;
