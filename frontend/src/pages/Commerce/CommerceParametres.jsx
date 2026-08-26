@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import CommerceSubnav, { firstCommerceTarget } from './CommerceSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Paramètres Commerce — workflow de validation OPTIONNEL (global + surcharge par BU).
 // Désactivé par défaut : la saisie d'un versement vaut enregistrement immédiat (reprise Excel).
@@ -11,6 +12,7 @@ const KEY = 'workflow_actif';
 
 export default function CommerceParametres() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [settings, setSettings] = useState([]);
   const [bus, setBus] = useState([]);
   const [msg, setMsg] = useState('');
@@ -26,7 +28,7 @@ export default function CommerceParametres() {
 
   if (!hasSubModuleLevel(user, 'commerce.parametres')) {
     const target = firstCommerceTarget(user);
-    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>Accès non accordé.</p>;
+    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>{t('com.access.denied')}</p>;
   }
 
   // Valeur effective : override BU si présent, sinon valeur globale.
@@ -39,28 +41,26 @@ export default function CommerceParametres() {
   async function save(buId, valeur) {
     setMsg('');
     await client.put('/commerce/settings', { business_unit_id: buId, cle: KEY, valeur: String(valeur) });
-    setMsg('Enregistré.');
+    setMsg(t('com.param.saved'));
     load();
   }
 
   return (
     <div>
       <CommerceSubnav />
-      <h1 className="page-title">Paramètres Commerce</h1>
+      <h1 className="page-title">{t('com.param.title')}</h1>
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 680, marginTop: 0 }}>
-        Le <strong>workflow de validation des versements est optionnel</strong>. Désactivé, la saisie
-        vaut enregistrement immédiat (le versement alimente aussitôt réalisé, dashboard, objectifs).
-        Activé, un versement passe par Brouillon → Soumis → Validé. Réglable globalement ou par BU.
+        {t('com.param.introLead')}<strong>{t('com.param.introStrong')}</strong>{t('com.param.introRest')}
       </p>
       {msg && <div className="alert alert-success" style={{ maxWidth: 680 }}>{msg}</div>}
 
       <section className="card" style={{ maxWidth: 680 }}>
-        <h2 style={{ marginTop: 0 }}>Workflow de validation</h2>
+        <h2 style={{ marginTop: 0 }}>{t('com.param.workflowTitle')}</h2>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
-          <div><strong>Global (défaut)</strong><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>S'applique à toutes les BU sans réglage propre.</div></div>
+          <div><strong>{t('com.param.globalDefault')}</strong><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.param.globalDesc')}</div></div>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={globalVal} disabled={!canEdit} onChange={e => save(null, e.target.checked)} />
-            {globalVal ? 'Activé' : 'Désactivé'}
+            {globalVal ? t('com.param.enabled') : t('com.param.disabled')}
           </label>
         </div>
         {bus.map(bu => {
@@ -70,13 +70,13 @@ export default function CommerceParametres() {
               <div>{bu.nom} <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>({bu.code})</span></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                  {v === null ? `hérite (${globalVal ? 'activé' : 'désactivé'})` : (v ? 'activé' : 'désactivé')}
+                  {v === null ? t('com.param.inherit', { v: globalVal ? t('com.param.enabledLc') : t('com.param.disabledLc') }) : (v ? t('com.param.enabledLc') : t('com.param.disabledLc'))}
                 </span>
                 <select value={v === null ? '' : String(v)} disabled={!canEdit}
                   onChange={e => save(bu.id, e.target.value === 'true')}>
-                  <option value="">Hériter du global</option>
-                  <option value="true">Activé</option>
-                  <option value="false">Désactivé</option>
+                  <option value="">{t('com.param.inheritGlobal')}</option>
+                  <option value="true">{t('com.param.enabled')}</option>
+                  <option value="false">{t('com.param.disabled')}</option>
                 </select>
               </div>
             </div>

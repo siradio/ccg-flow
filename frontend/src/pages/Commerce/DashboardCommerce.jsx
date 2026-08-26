@@ -6,6 +6,7 @@ import {
 import client from '../../api/client';
 import CommerceSubnav from './CommerceSubnav';
 import { ExportButtons } from '../../utils/exportData';
+import { useI18n } from '../../i18n/I18nContext';
 
 const money = (n) => (Number(n) || 0).toLocaleString('fr-FR') + ' GNF';
 const short = (n) => {
@@ -33,6 +34,7 @@ function Kpi({ label, value, accent }) {
 }
 
 export default function DashboardCommerce() {
+  const { t } = useI18n();
   const [mois, setMois] = useState(curMonth());
   const [bus, setBus] = useState([]);
   const [buId, setBuId] = useState('');
@@ -48,7 +50,7 @@ export default function DashboardCommerce() {
     setError('');
     const p = new URLSearchParams({ mois });
     if (buId) p.append('business_unit_id', buId);
-    client.get('/commerce/dashboard?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
+    client.get('/commerce/dashboard?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || t('com.dash.error')));
   }, [mois, buId]);
 
   useEffect(() => {
@@ -76,11 +78,11 @@ export default function DashboardCommerce() {
     <div>
       <CommerceSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Tableau de bord commercial</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>{t('com.dash.title')}</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
           <select value={buId} onChange={e => setBuId(e.target.value)}>
-            <option value="">Toutes les BU</option>
+            <option value="">{t('com.dash.allBu')}</option>
             {bus.map(b => <option key={b.id} value={String(b.id)}>{b.nom}</option>)}
           </select>
         </div>
@@ -90,19 +92,19 @@ export default function DashboardCommerce() {
       {k && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '14px 0' }}>
-            <Kpi label="Objectif total" value={money(k.objectif_total)} />
-            <Kpi label="Réalisé" value={money(k.realise_total)} accent="#128a54" />
-            <Kpi label="Écart" value={money(k.ecart)} accent={k.ecart < 0 ? '#dc2626' : '#128a54'} />
-            <Kpi label="% réalisation" value={pct(k.taux)} />
-            <Kpi label="Projection fin de mois" value={money(k.projection_total)} />
-            <Kpi label="Reste à faire" value={money(k.reste)} />
-            <Kpi label="Commerciaux actifs" value={k.commerciaux_actifs} />
+            <Kpi label={t('com.dash.objectifTotal')} value={money(k.objectif_total)} />
+            <Kpi label={t('com.dash.realise')} value={money(k.realise_total)} accent="#128a54" />
+            <Kpi label={t('com.dash.ecart')} value={money(k.ecart)} accent={k.ecart < 0 ? '#dc2626' : '#128a54'} />
+            <Kpi label={t('com.dash.tauxRealisation')} value={pct(k.taux)} />
+            <Kpi label={t('com.dash.projection')} value={money(k.projection_total)} />
+            <Kpi label={t('com.dash.reste')} value={money(k.reste)} />
+            <Kpi label={t('com.dash.commerciauxActifs')} value={k.commerciaux_actifs} />
           </div>
 
           <div className="card" style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 15 }}>Évolution mensuelle — Objectif vs Réalisé ({annee})</h2>
-              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{data.joursEcoules} / {data.joursMois} jours écoulés (mois sélectionné)</span>
+              <h2 style={{ margin: 0, fontSize: 15 }}>{t('com.dash.evoTitle', { annee })}</h2>
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.dash.daysElapsed', { ecoules: data.joursEcoules, total: data.joursMois })}</span>
             </div>
             <div style={{ width: '100%', height: 300, marginTop: 10 }}>
               <ResponsiveContainer>
@@ -112,25 +114,25 @@ export default function DashboardCommerce() {
                   <YAxis tickFormatter={short} width={64} tick={{ fontSize: 12 }} />
                   <Tooltip formatter={(v) => money(v)} />
                   <Legend />
-                  <Line type="monotone" dataKey="Réalisé" stroke="#128a54" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="Objectif" stroke="#2554e0" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                  <Line type="monotone" dataKey="Réalisé" name={t('com.serie.realise')} stroke="#128a54" strokeWidth={2.5} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Objectif" name={t('com.serie.objectif')} stroke="#2554e0" strokeWidth={2} strokeDasharray="5 4" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 15 }}>Performance & classement — {MOIS_COURT[Number(mois.slice(5, 7)) - 1]} {annee}</h2>
+            <h2 style={{ margin: 0, fontSize: 15 }}>{t('com.dash.perfTitle', { mois: MOIS_COURT[Number(mois.slice(5, 7)) - 1], annee })}</h2>
             <ExportButtons filename={`dashboard_commerce_${mois}`} columns={exportCols} rows={exportRows} />
           </div>
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table className="table" style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Rang</th><th>Commercial</th><th>BU</th>
-                  <th style={{ textAlign: 'right' }}>Objectif</th><th style={{ textAlign: 'right' }}>Réalisé</th>
-                  <th style={{ textAlign: 'right' }}>%</th><th style={{ textAlign: 'right' }}>Écart</th>
-                  <th style={{ textAlign: 'right' }}>Moy/jour</th><th style={{ textAlign: 'right' }}>Projection</th><th>Statut</th>
+                  <th>{t('com.dash.thRang')}</th><th>{t('com.dash.thCommercial')}</th><th>{t('com.dash.thBu')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('com.dash.thObjectif')}</th><th style={{ textAlign: 'right' }}>{t('com.dash.thRealise')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('com.dash.thTaux')}</th><th style={{ textAlign: 'right' }}>{t('com.dash.thEcart')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('com.dash.thMoyJour')}</th><th style={{ textAlign: 'right' }}>{t('com.dash.thProjection')}</th><th>{t('com.dash.thStatut')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,10 +147,10 @@ export default function DashboardCommerce() {
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: l.ecart < 0 ? '#dc2626' : '#128a54' }}>{money(l.ecart)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.moyenne_jour)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.projection)}</td>
-                    <td><span className="badge" style={{ background: STATUT_COLOR[l.statut], color: '#fff' }}>{l.statut}</span></td>
+                    <td><span className="badge" style={{ background: STATUT_COLOR[l.statut], color: '#fff' }}>{t('com.perfStatut.' + l.statut)}</span></td>
                   </tr>
                 ))}
-                {data.lignes.length === 0 && <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>Aucun commercial.</td></tr>}
+                {data.lignes.length === 0 && <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>{t('com.dash.empty')}</td></tr>}
               </tbody>
             </table>
           </div>

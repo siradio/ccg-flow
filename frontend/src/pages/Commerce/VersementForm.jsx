@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import CommerceSubnav from './CommerceSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Saisie rapide d'un versement commercial. Un montant par moyen de versement (modèle normalisé).
 // La BU est récupérée du commercial. Le total est calculé automatiquement. Les boutons s'adaptent
@@ -14,6 +15,7 @@ export default function VersementForm() {
   const { id } = useParams();
   const editing = !!id;
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   const [commerciaux, setCommerciaux] = useState([]);
@@ -43,7 +45,7 @@ export default function VersementForm() {
         const a = {}; const br = {};
         for (const l of v.lines) { a[l.payment_method_id] = l.amount; if (l.bank_id || l.transaction_reference) br[l.payment_method_id] = { bank_id: l.bank_id || '', transaction_reference: l.transaction_reference || '', transaction_date: l.transaction_date?.slice(0, 10) || '' }; }
         setAmounts(a); setBankRows(br); setExistingAtts(v.attachments || []);
-      }).catch(() => setError('Versement introuvable.'));
+      }).catch(() => setError(t('com.ver.notFound')));
     }
   }, [id, editing]);
 
@@ -71,9 +73,9 @@ export default function VersementForm() {
 
   async function save(soumettre) {
     setError('');
-    if (!form.commercial_id) { setError('Sélectionnez un commercial.'); return; }
+    if (!form.commercial_id) { setError(t('com.ver.selectCommercial')); return; }
     const lines = buildLines();
-    if (!lines.length) { setError('Renseignez au moins un montant.'); return; }
+    if (!lines.length) { setError(t('com.ver.atLeastAmount')); return; }
     setBusy(true);
     try {
       const payload = { ...form, lines, soumettre };
@@ -88,7 +90,7 @@ export default function VersementForm() {
       }
       navigate(`/commerce/versements/${vid}`);
     } catch (e) {
-      setError(e.response?.data?.error || 'Erreur à l’enregistrement.');
+      setError(e.response?.data?.error || t('com.ver.saveError'));
     } finally { setBusy(false); }
   }
 
@@ -98,38 +100,38 @@ export default function VersementForm() {
       const url = URL.createObjectURL(res.data);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch { setError('Ouverture impossible.'); }
+    } catch { setError(t('com.ver.openError')); }
   }
   async function delExistingAtt(attId) {
-    if (!window.confirm('Supprimer ce justificatif ?')) return;
+    if (!window.confirm(t('com.ver.confirmDeleteAtt'))) return;
     try { await client.delete(`/commerce/versements/attachments/${attId}`); setExistingAtts(a => a.filter(x => x.id !== attId)); }
-    catch (e) { setError(e.response?.data?.error || 'Suppression impossible.'); }
+    catch (e) { setError(e.response?.data?.error || t('com.ver.deleteError')); }
   }
 
   return (
     <div>
       <CommerceSubnav />
-      <h1 className="page-title">{editing ? 'Modifier le versement' : 'Nouveau versement'}</h1>
+      <h1 className="page-title">{editing ? t('com.ver.editTitle') : t('com.ver.newTitle')}</h1>
       {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
 
       <section className="card" style={{ maxWidth: 720 }}>
         <div className="form-grid" style={{ maxWidth: 'none' }}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <label className="field" style={{ flex: '1 1 200px' }}>Date
+            <label className="field" style={{ flex: '1 1 200px' }}>{t('com.ver.date')}
               <input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
             </label>
-            <label className="field" style={{ flex: '2 1 260px' }}>Commercial
+            <label className="field" style={{ flex: '2 1 260px' }}>{t('com.ver.commercial')}
               <select value={form.commercial_id} onChange={e => setForm(f => ({ ...f, commercial_id: e.target.value }))} required>
-                <option value="" disabled>Sélectionner…</option>
+                <option value="" disabled>{t('com.ver.selectPlaceholder')}</option>
                 {commerciaux.map(c => <option key={c.id} value={c.id}>{c.code} — {c.prenom_affiche || ''} {c.nom_affiche || ''}</option>)}
               </select>
             </label>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="field" style={{ flex: '1 1 200px' }}>BU
+            <div className="field" style={{ flex: '1 1 200px' }}>{t('com.ver.bu')}
               <div style={{ padding: '8px 0', fontWeight: 600 }}>{commercial ? (commercial.business_unit_nom || '—') : '—'}</div>
             </div>
-            <label className="field" style={{ flex: '2 1 260px' }}>Produit / activité (facultatif)
+            <label className="field" style={{ flex: '2 1 260px' }}>{t('com.ver.product')}
               <select value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}>
                 <option value="">—</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
@@ -138,7 +140,7 @@ export default function VersementForm() {
           </div>
         </div>
 
-        <h2 style={{ fontSize: 15, marginTop: 18 }}>Moyens de versement</h2>
+        <h2 style={{ fontSize: 15, marginTop: 18 }}>{t('com.ver.methods')}</h2>
         <div style={{ display: 'grid', gap: 8 }}>
           {methods.map(m => (
             <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -148,16 +150,16 @@ export default function VersementForm() {
               </label>
               {m.code === 'banque' && Number(amounts[m.id]) > 0 && (
                 <div style={{ display: 'flex', gap: 8, flex: '2 1 380px', flexWrap: 'wrap' }}>
-                  <label className="field" style={{ flex: '1 1 130px' }}>Banque
+                  <label className="field" style={{ flex: '1 1 130px' }}>{t('com.ver.bank')}
                     <select value={(bankRows[m.id]?.bank_id) || ''} onChange={e => setBankRows(br => ({ ...br, [m.id]: { ...br[m.id], bank_id: e.target.value } }))}>
                       <option value="">—</option>
                       {banks.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
                     </select>
                   </label>
-                  <label className="field" style={{ flex: '1 1 130px' }}>Référence
+                  <label className="field" style={{ flex: '1 1 130px' }}>{t('com.ver.reference')}
                     <input value={(bankRows[m.id]?.transaction_reference) || ''} onChange={e => setBankRows(br => ({ ...br, [m.id]: { ...br[m.id], transaction_reference: e.target.value } }))} />
                   </label>
-                  <label className="field" style={{ flex: '1 1 130px' }}>Date
+                  <label className="field" style={{ flex: '1 1 130px' }}>{t('com.ver.date')}
                     <input type="date" value={(bankRows[m.id]?.transaction_date) || ''} onChange={e => setBankRows(br => ({ ...br, [m.id]: { ...br[m.id], transaction_date: e.target.value } }))} />
                   </label>
                 </div>
@@ -167,49 +169,49 @@ export default function VersementForm() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, padding: '10px 12px', background: 'var(--color-hover)', borderRadius: 8 }}>
-          <strong>TOTAL</strong>
+          <strong>{t('com.ver.total')}</strong>
           <strong style={{ fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</strong>
         </div>
 
-        <label className="field" style={{ marginTop: 12 }}>Référence générale (facultatif)
-          <input value={form.reference_generale} onChange={e => setForm(f => ({ ...f, reference_generale: e.target.value }))} placeholder="Ex. Caisse, recouvrement…" />
+        <label className="field" style={{ marginTop: 12 }}>{t('com.ver.refGenerale')}
+          <input value={form.reference_generale} onChange={e => setForm(f => ({ ...f, reference_generale: e.target.value }))} placeholder={t('com.ver.refGeneralePlaceholder')} />
         </label>
-        <label className="field">Commentaire
+        <label className="field">{t('com.ver.comment')}
           <textarea rows={2} value={form.commentaire} onChange={e => setForm(f => ({ ...f, commentaire: e.target.value }))} />
         </label>
 
-        <h2 style={{ fontSize: 15, marginTop: 18 }}>Justificatifs</h2>
+        <h2 style={{ fontSize: 15, marginTop: 18 }}>{t('com.ver.attachments')}</h2>
         {editing && existingAtts.map(a => (
           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
             <button type="button" className="link-button" onClick={() => openAtt(a.id)}>{a.filename}</button>
-            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round((a.taille || 0) / 1024)} Ko</span>
-            <button type="button" className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => delExistingAtt(a.id)}>Supprimer</button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round((a.taille || 0) / 1024)} {t('com.ver.kb')}</span>
+            <button type="button" className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }} onClick={() => delExistingAtt(a.id)}>{t('com.ver.delete')}</button>
           </div>
         ))}
         {stagedFiles.map((f, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
             <span>📎 {f.name}</span>
-            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round(f.size / 1024)} Ko — à téléverser</span>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setStagedFiles(fs => fs.filter((_, j) => j !== i))}>Retirer</button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{Math.round(f.size / 1024)} {t('com.ver.kb')} — {t('com.ver.toUpload')}</span>
+            <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setStagedFiles(fs => fs.filter((_, j) => j !== i))}>{t('com.ver.remove')}</button>
           </div>
         ))}
         <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', marginTop: 6 }}>
-          + Ajouter un justificatif
+          {t('com.ver.addAttachment')}
           <input type="file" accept=".pdf,image/png,image/jpeg" multiple style={{ display: 'none' }}
             onChange={e => { setStagedFiles(fs => [...fs, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
         </label>
-        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>PDF, JPG ou PNG — bordereau, reçu bancaire, reçu Orange Money, reçu caisse…</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{t('com.ver.attachmentHint')}</div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           {workflowActif ? (
             <>
-              <button className="btn btn-secondary" disabled={busy || !canAdd} onClick={() => save(false)}>Enregistrer brouillon</button>
-              <button className="btn btn-primary" disabled={busy || !canAdd} onClick={() => save(true)}>Soumettre</button>
+              <button className="btn btn-secondary" disabled={busy || !canAdd} onClick={() => save(false)}>{t('com.ver.saveDraft')}</button>
+              <button className="btn btn-primary" disabled={busy || !canAdd} onClick={() => save(true)}>{t('com.ver.submit')}</button>
             </>
           ) : (
-            <button className="btn btn-primary" disabled={busy || !canAdd} onClick={() => save(false)}>Enregistrer</button>
+            <button className="btn btn-primary" disabled={busy || !canAdd} onClick={() => save(false)}>{t('com.ver.save')}</button>
           )}
-          <button className="btn btn-secondary" onClick={() => navigate('/commerce/versements')}>Annuler</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/commerce/versements')}>{t('com.ver.cancel')}</button>
         </div>
       </section>
     </div>

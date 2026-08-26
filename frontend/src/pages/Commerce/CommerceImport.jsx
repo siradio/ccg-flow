@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import CommerceSubnav from './CommerceSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Import Excel des versements saisis à la main (utile en cas de coupure internet).
 // Colonnes du modèle → une ligne = un versement ; les colonnes de montant deviennent les moyens.
@@ -32,6 +33,7 @@ function isoDate(v) {
 
 export default function CommerceImport() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [commerciaux, setCommerciaux] = useState([]);
   const [rows, setRows] = useState([]);      // lignes mappées prêtes à envoyer
   const [fileName, setFileName] = useState('');
@@ -66,7 +68,7 @@ export default function CommerceImport() {
         const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
         const ws = wb.Sheets[wb.SheetNames.find(n => /versement/i.test(n)) || wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
-        if (!raw.length) { setError('Feuille vide.'); return; }
+        if (!raw.length) { setError(t('com.imp.sheetEmpty')); return; }
         // Auto-mapping en-tête → champ
         const headers = Object.keys(raw[0]);
         const map = {};
@@ -81,7 +83,7 @@ export default function CommerceImport() {
           return o;
         }).filter(o => o.code_commercial || COLS.slice(2, 7).some(c => Number(String(o[c.key]).replace(/[^\d.-]/g, '')) > 0));
         setRows(mapped);
-      } catch (err) { setError('Fichier illisible : ' + (err.message || '')); }
+      } catch (err) { setError(t('com.imp.unreadable', { err: err.message || '' })); }
     };
     reader.readAsArrayBuffer(file);
   }
@@ -92,7 +94,7 @@ export default function CommerceImport() {
       const res = await client.post('/commerce/versements/import', { rows });
       setReport(res.data);
       setRows([]); setFileName('');
-    } catch (e) { setError(e.response?.data?.error || 'Import impossible.'); }
+    } catch (e) { setError(e.response?.data?.error || t('com.imp.importError')); }
     finally { setBusy(false); }
   }
 
@@ -101,34 +103,32 @@ export default function CommerceImport() {
   return (
     <div>
       <CommerceSubnav />
-      <h1 className="page-title">Import des versements (Excel)</h1>
+      <h1 className="page-title">{t('com.imp.title')}</h1>
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', maxWidth: 720, marginTop: 0 }}>
-        En cas de coupure internet, saisissez les versements dans le modèle Excel, puis importez-le ici.
-        Une ligne = un versement ; les colonnes Espèces / Orange Money / Banque / Crédit / Autres-Écart
-        deviennent les moyens. Le code commercial doit exister (voir la feuille « Commerciaux » du modèle).
+        {t('com.imp.intro')}
       </p>
       {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
 
       <section className="card" style={{ maxWidth: 720 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={downloadTemplate}>⬇️ Télécharger le modèle Excel</button>
+          <button className="btn btn-secondary" onClick={downloadTemplate}>{t('com.imp.downloadTemplate')}</button>
           <label className="btn btn-primary" style={{ cursor: canAdd ? 'pointer' : 'not-allowed', opacity: canAdd ? 1 : 0.5 }}>
-            📄 Choisir un fichier rempli
+            {t('com.imp.chooseFile')}
             <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} disabled={!canAdd} onChange={onFile} />
           </label>
-          {fileName && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{fileName} — {rows.length} ligne(s)</span>}
+          {fileName && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{t('com.imp.fileLines', { file: fileName, n: rows.length })}</span>}
         </div>
       </section>
 
       {rows.length > 0 && (
         <section className="card" style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 15 }}>Prévisualisation ({rows.length} lignes — total {money(total)} GNF)</h2>
-            <button className="btn btn-primary" disabled={busy} onClick={doImport}>{busy ? 'Import…' : `Importer ${rows.length} versement(s)`}</button>
+            <h2 style={{ margin: 0, fontSize: 15 }}>{t('com.imp.previewTitle', { n: rows.length, total: money(total) })}</h2>
+            <button className="btn btn-primary" disabled={busy} onClick={doImport}>{busy ? t('com.imp.importing') : t('com.imp.importBtn', { n: rows.length })}</button>
           </div>
           <div style={{ overflowX: 'auto', marginTop: 10 }}>
             <table className="table" style={{ width: '100%', fontSize: 13 }}>
-              <thead><tr><th>Date</th><th>Code</th><th style={{ textAlign: 'right' }}>Espèces</th><th style={{ textAlign: 'right' }}>Orange</th><th style={{ textAlign: 'right' }}>Banque</th><th style={{ textAlign: 'right' }}>Crédit</th><th style={{ textAlign: 'right' }}>Autres/Écart</th><th>Réf.</th></tr></thead>
+              <thead><tr><th>{t('com.imp.thDate')}</th><th>{t('com.imp.thCode')}</th><th style={{ textAlign: 'right' }}>{t('com.imp.thEspeces')}</th><th style={{ textAlign: 'right' }}>{t('com.imp.thOrange')}</th><th style={{ textAlign: 'right' }}>{t('com.imp.thBanque')}</th><th style={{ textAlign: 'right' }}>{t('com.imp.thCredit')}</th><th style={{ textAlign: 'right' }}>{t('com.imp.thAutres')}</th><th>{t('com.imp.thRef')}</th></tr></thead>
               <tbody>
                 {rows.slice(0, 12).map((r, i) => (
                   <tr key={i}>
@@ -140,23 +140,23 @@ export default function CommerceImport() {
                 ))}
               </tbody>
             </table>
-            {rows.length > 12 && <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>… et {rows.length - 12} autre(s) ligne(s).</p>}
+            {rows.length > 12 && <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.imp.moreLines', { n: rows.length - 12 })}</p>}
           </div>
         </section>
       )}
 
       {report && (
         <section className="card" style={{ marginTop: 14 }}>
-          <h2 style={{ marginTop: 0, fontSize: 15 }}>Rapport d'import</h2>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('com.imp.reportTitle')}</h2>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Total lignes</div><div style={{ fontSize: 20, fontWeight: 700 }}>{report.total}</div></div>
-            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Importées</div><div style={{ fontSize: 20, fontWeight: 700, color: '#128a54' }}>{report.inserted}</div></div>
-            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Ignorées (vides)</div><div style={{ fontSize: 20, fontWeight: 700, color: '#6b7280' }}>{report.skipped}</div></div>
-            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Erreurs</div><div style={{ fontSize: 20, fontWeight: 700, color: report.errors.length ? '#dc2626' : '#128a54' }}>{report.errors.length}</div></div>
+            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.imp.totalLines')}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{report.total}</div></div>
+            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.imp.imported')}</div><div style={{ fontSize: 20, fontWeight: 700, color: '#128a54' }}>{report.inserted}</div></div>
+            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.imp.skippedEmpty')}</div><div style={{ fontSize: 20, fontWeight: 700, color: '#6b7280' }}>{report.skipped}</div></div>
+            <div className="card" style={{ flex: '1 1 120px' }}><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('com.imp.errors')}</div><div style={{ fontSize: 20, fontWeight: 700, color: report.errors.length ? '#dc2626' : '#128a54' }}>{report.errors.length}</div></div>
           </div>
           {report.errors.length > 0 && (
             <table className="table" style={{ width: '100%', marginTop: 12 }}>
-              <thead><tr><th>Ligne</th><th>Erreur</th></tr></thead>
+              <thead><tr><th>{t('com.imp.thLine')}</th><th>{t('com.imp.thError')}</th></tr></thead>
               <tbody>{report.errors.map((e, i) => <tr key={i}><td>{e.ligne}</td><td style={{ color: '#dc2626' }}>{e.message}</td></tr>)}</tbody>
             </table>
           )}

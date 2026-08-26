@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import CommerceSubnav from './CommerceSubnav';
 import { ExportButtons } from '../../utils/exportData';
+import { useI18n } from '../../i18n/I18nContext';
 
 const curMonth = () => new Date().toISOString().slice(0, 7);
 const monthStart = (m) => `${m}-01`;
@@ -20,6 +21,7 @@ const REPORTS = [
 ];
 
 export default function RapportsPage() {
+  const { t } = useI18n();
   const [type, setType] = useState('versements_commercial');
   const [mois, setMois] = useState(curMonth());
   const [df, setDf] = useState(monthStart(curMonth()));
@@ -37,7 +39,7 @@ export default function RapportsPage() {
     if (periodMode === 'month') p.append('mois', mois);
     else { p.append('date_from', df); p.append('date_to', dt); }
     if (buId) p.append('business_unit_id', buId);
-    client.get('/commerce/rapports?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
+    client.get('/commerce/rapports?' + p.toString()).then(r => setData(r.data)).catch(e => setError(e.response?.data?.error || t('com.rap.error')));
   }, [type, mois, df, dt, buId, periodMode]);
 
   function fmt(col, v) {
@@ -52,12 +54,12 @@ export default function RapportsPage() {
   // Totaux des colonnes monétaires.
   const totals = useMemo(() => {
     if (!data) return {};
-    const t = {};
+    const acc = {};
     for (const c of data.columns) {
-      if (c.type === 'number' && !['nb', 'taux'].includes(c.key)) t[c.key] = data.rows.reduce((s, r) => s + (Number(r[c.key]) || 0), 0);
-      if (c.key === 'nb') t[c.key] = data.rows.reduce((s, r) => s + (Number(r[c.key]) || 0), 0);
+      if (c.type === 'number' && !['nb', 'taux'].includes(c.key)) acc[c.key] = data.rows.reduce((s, r) => s + (Number(r[c.key]) || 0), 0);
+      if (c.key === 'nb') acc[c.key] = data.rows.reduce((s, r) => s + (Number(r[c.key]) || 0), 0);
     }
-    return t;
+    return acc;
   }, [data]);
   const hasTotals = data && Object.keys(totals).length > 0;
 
@@ -65,27 +67,27 @@ export default function RapportsPage() {
     <div>
       <CommerceSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Rapports commerciaux</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>{t('com.rap.title')}</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {data && <ExportButtons filename={type + (periodMode === 'month' ? '_' + mois : '')} columns={data.columns} rows={data.rows} />}
-          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>🖨️ Imprimer</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>{t('com.rap.print')}</button>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '14px 0' }}>
         <select value={type} onChange={e => setType(e.target.value)} style={{ minWidth: 240 }}>
-          {REPORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          {REPORTS.map(([k]) => <option key={k} value={k}>{t('com.rap.type.' + k)}</option>)}
         </select>
         {periodMode === 'month' ? (
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
         ) : (
           <>
-            <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Du <input type="date" value={df} onChange={e => setDf(e.target.value)} /></label>
-            <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Au <input type="date" value={dt} onChange={e => setDt(e.target.value)} /></label>
+            <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{t('com.rap.from')} <input type="date" value={df} onChange={e => setDf(e.target.value)} /></label>
+            <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{t('com.rap.to')} <input type="date" value={dt} onChange={e => setDt(e.target.value)} /></label>
           </>
         )}
         <select value={buId} onChange={e => setBuId(e.target.value)}>
-          <option value="">Toutes les BU</option>
+          <option value="">{t('com.rap.allBu')}</option>
           {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
         </select>
       </div>
@@ -93,7 +95,7 @@ export default function RapportsPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       {data && (
         <>
-          <h2 style={{ fontSize: 15 }}>{data.title} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>— {data.rows.length} ligne(s)</span></h2>
+          <h2 style={{ fontSize: 15 }}>{data.title} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{t('com.rap.lineCount', { n: data.rows.length })}</span></h2>
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table className="table" style={{ width: '100%' }}>
               <thead>
@@ -105,14 +107,14 @@ export default function RapportsPage() {
                     {data.columns.map(c => <td key={c.key} style={{ textAlign: c.type === 'number' ? 'right' : 'left', fontVariantNumeric: c.type === 'number' ? 'tabular-nums' : undefined }}>{fmt(c, r[c.key])}</td>)}
                   </tr>
                 ))}
-                {data.rows.length === 0 && <tr><td colSpan={data.columns.length} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>Aucune donnée pour ces critères.</td></tr>}
+                {data.rows.length === 0 && <tr><td colSpan={data.columns.length} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>{t('com.rap.empty')}</td></tr>}
               </tbody>
               {hasTotals && data.rows.length > 0 && (
                 <tfoot>
                   <tr>
                     {data.columns.map((c, idx) => (
                       <td key={c.key} style={{ fontWeight: 700, textAlign: c.type === 'number' ? 'right' : 'left', fontVariantNumeric: c.type === 'number' ? 'tabular-nums' : undefined }}>
-                        {idx === 0 ? 'TOTAL' : (totals[c.key] != null ? fmt(c, totals[c.key]) : '')}
+                        {idx === 0 ? t('com.rap.total') : (totals[c.key] != null ? fmt(c, totals[c.key]) : '')}
                       </td>
                     ))}
                   </tr>

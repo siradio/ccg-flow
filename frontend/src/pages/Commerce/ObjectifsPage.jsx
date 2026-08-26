@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import CommerceSubnav from './CommerceSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 const money = (n) => (Number(n) || 0).toLocaleString('fr-FR') + ' GNF';
 const curMonth = () => new Date().toISOString().slice(0, 7);
@@ -9,6 +10,7 @@ const curMonth = () => new Date().toISOString().slice(0, 7);
 // Saisie des objectifs par mois : une ligne par commercial (visible), objectif éditable, upsert en lot.
 export default function ObjectifsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [mois, setMois] = useState(curMonth());
   const [bus, setBus] = useState([]);
   const [buId, setBuId] = useState('');
@@ -36,9 +38,9 @@ export default function ObjectifsPage() {
         mois,
         lines: rows.map(r => ({ commercial_id: r.commercial_id, business_unit_id: r.business_unit_id, objectif_montant: Number(r.objectif_montant) || 0 })),
       });
-      setMsg('Objectifs enregistrés.');
+      setMsg(t('com.obj.saved'));
       load();
-    } catch (e) { setMsg(e.response?.data?.error || 'Erreur.'); }
+    } catch (e) { setMsg(e.response?.data?.error || t('com.obj.error')); }
     finally { setBusy(false); }
   }
 
@@ -46,11 +48,11 @@ export default function ObjectifsPage() {
     <div>
       <CommerceSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Objectifs commerciaux</h1>
+        <h1 className="page-title" style={{ margin: 0 }}>{t('com.obj.title')}</h1>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" value={mois} onChange={e => setMois(e.target.value)} />
           <select value={buId} onChange={e => setBuId(e.target.value)}>
-            <option value="">Toutes les BU</option>
+            <option value="">{t('com.obj.allBu')}</option>
             {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
           </select>
         </div>
@@ -59,7 +61,7 @@ export default function ObjectifsPage() {
 
       <div className="card" style={{ padding: 0, overflowX: 'auto', marginTop: 12 }}>
         <table className="table" style={{ width: '100%' }}>
-          <thead><tr><th>Commercial</th><th>BU</th><th style={{ textAlign: 'right', width: 260 }}>Objectif mensuel (GNF)</th></tr></thead>
+          <thead><tr><th>{t('com.obj.thCommercial')}</th><th>{t('com.obj.thBu')}</th><th style={{ textAlign: 'right', width: 260 }}>{t('com.obj.thObjectif')}</th></tr></thead>
           <tbody>
             {rows.map(r => (
               <tr key={r.commercial_id}>
@@ -72,15 +74,15 @@ export default function ObjectifsPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>Aucun commercial.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 20 }}>{t('com.obj.empty')}</td></tr>}
           </tbody>
-          {rows.length > 0 && <tfoot><tr><td colSpan={2} style={{ fontWeight: 700 }}>Total objectifs</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
+          {rows.length > 0 && <tfoot><tr><td colSpan={2} style={{ fontWeight: 700 }}>{t('com.obj.totalObjectifs')}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
         </table>
       </div>
 
       {canEdit && rows.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" disabled={busy} onClick={save}>Enregistrer les objectifs</button>
+          <button className="btn btn-primary" disabled={busy} onClick={save}>{t('com.obj.save')}</button>
         </div>
       )}
     </div>

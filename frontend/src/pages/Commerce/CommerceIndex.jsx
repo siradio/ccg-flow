@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ReferentialPage from '../Referentials/ReferentialPage';
 import CommerceSubnav, { firstCommerceTarget } from './CommerceSubnav';
+import { useI18n } from '../../i18n/I18nContext';
 
 // Module Commerce — Phase D. Réutilise la page CRUD générique des référentiels sous une sous-nav
 // propre. Les commerciaux réutilisent le référentiel Employés (interne) et les BU/produits existants.
@@ -84,6 +85,7 @@ const CONFIGS = {
 export default function CommerceIndex() {
   const { type } = useParams();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [employees, setEmployees] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
   const [zones, setZones] = useState([]);
@@ -105,24 +107,32 @@ export default function CommerceIndex() {
   const config = CONFIGS[type];
   if (!config) {
     const target = firstCommerceTarget(user);
-    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>Accès Commerce non accordé.</p>;
+    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>{t('com.access.commerceDenied')}</p>;
   }
   if (!hasSubModuleLevel(user, config.subModuleKey)) {
     const target = firstCommerceTarget(user);
-    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>Accès non accordé.</p>;
+    return target ? <Navigate to={target} replace /> : <p style={{ padding: 16 }}>{t('com.access.denied')}</p>;
   }
+
+  // Traduction à la volée : libellés de champ (via `com.f.<type>.<key>`) et libellés d'options de
+  // select (via `com.opt.<key>.<valeur>`). Les valeurs stockées restent inchangées.
+  const tFields = config.fields.map(f => ({
+    ...f,
+    label: t(`com.f.${type}.${f.key}`),
+    ...(f.optionLabels ? { optionLabels: Object.fromEntries(Object.keys(f.optionLabels).map(o => [o, t(`com.opt.${f.key}.${o}`)])) } : {}),
+  }));
 
   return (
     <div>
       <CommerceSubnav />
       <ReferentialPage
-        key={type} title={config.title} endpoint={config.endpoint} fields={config.fields}
+        key={type} title={t(`com.title.${type}`)} endpoint={config.endpoint} fields={tFields}
         filters={config.filters || []}
         lists={lists}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
         rowLink={type === 'commerciaux' ? (item) => `/commerce/commerciaux/${item.id}` : null}
-        rowLinkLabel="Fiche"
+        rowLinkLabel={t('com.rowLink.fiche')}
       />
     </div>
   );
