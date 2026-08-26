@@ -1,6 +1,16 @@
 const { all } = require('../../db');
 const { renderPdf, renderLetterhead, simpleTable, BRAND_NAVY } = require('../../utils/pdf');
 const { drawLineChart, drawBarChart } = require('./report-chart');
+const { chartLinePng, chartBarPng } = require('./report-svg');
+
+// Ajoute l'image du graphique (PNG inline via CID) au corps du mail, sous le tableau.
+async function withChartImg(bodyHtml, attachments, pngPromise, title) {
+  const png = await pngPromise;
+  if (!png) return bodyHtml;
+  attachments.push({ filename: 'graphique.png', content: png, cid: 'chart', contentType: 'image/png' });
+  return bodyHtml + `<h3 style="font-size:15px;color:#1d2b53;margin:16px 0 6px">${title}</h3>`
+    + `<img src="cid:chart" alt="${title}" style="max-width:100%;height:auto;border:1px solid #eee;border-radius:6px"/>`;
+}
 
 // Génération des rapports : chaque type renvoie { subject, bodyHtml, attachments }.
 // Données par SQL direct (filtre BU optionnel via la planification). Documents en français.
@@ -61,9 +71,8 @@ async function production_bu(schedule) {
   const grand = totals.reduce((s, t) => s + t.total, 0);
   const periodStr = `${fmtDate(from)} au ${fmtDate(to)}`;
 
-  const bodyHtml = `<p style="font-size:13px;color:#374151">Période : <strong>${periodStr}</strong> — granularité : ${granLabel}.</p>`
-    + tableHtml('Production par BU', ['BU', 'Quantité produite'], totals.map(t => [t.bu, qty(t.total)]), ['TOTAL', qty(grand)])
-    + `<p style="font-size:12px;color:#6b7280">La courbe d'évolution par BU figure dans le PDF joint.</p>`;
+  let bodyHtml = `<p style="font-size:13px;color:#374151">Période : <strong>${periodStr}</strong> — granularité : ${granLabel}.</p>`
+    + tableHtml('Production par BU', ['BU', 'Quantité produite'], totals.map(t => [t.bu, qty(t.total)]), ['TOTAL', qty(grand)]);
 
   const attachments = [];
   if (schedule.format === 'pdf') {
@@ -80,6 +89,8 @@ async function production_bu(schedule) {
     });
     attachments.push({ filename: `Rapport_Production_${to}.pdf`, content: buf, contentType: 'application/pdf' });
   }
+  if (series.length) bodyHtml = await withChartImg(bodyHtml, attachments, chartLinePng({ series, labels }), "Évolution de la production par BU");
+  bodyHtml += `<p style="font-size:12px;color:#6b7280;margin-top:10px">Rapport complet en PDF joint.</p>`;
   return { subject: `Rapport Production — ${periodStr}`, bodyHtml, attachments };
 }
 
@@ -101,7 +112,7 @@ async function stock_bu(schedule) {
   const items = rows.map(r => ({ label: r.bu_nom, value: Number(r.quantite) }));
   const grand = rows.reduce((s, r) => s + Number(r.quantite), 0);
 
-  const bodyHtml = `<p style="font-size:13px;color:#374151">Situation au <strong>${fmtDate(to)}</strong> (dernier relevé par produit).</p>`
+  let bodyHtml = `<p style="font-size:13px;color:#374151">Situation au <strong>${fmtDate(to)}</strong> (dernier relevé par produit).</p>`
     + tableHtml('État du stock par BU', ['BU', 'Quantité en stock', 'Références'], rows.map(r => [r.bu_nom, qty(r.quantite), r.refs]), ['TOTAL', qty(grand), '']);
 
   const attachments = [];
@@ -118,6 +129,8 @@ async function stock_bu(schedule) {
     });
     attachments.push({ filename: `Rapport_Stock_${to}.pdf`, content: buf, contentType: 'application/pdf' });
   }
+  if (items.length) bodyHtml = await withChartImg(bodyHtml, attachments, chartBarPng({ items }), 'Stock par BU');
+  bodyHtml += `<p style="font-size:12px;color:#6b7280;margin-top:10px">Rapport complet en PDF joint.</p>`;
   return { subject: `Rapport Stock — ${fmtDate(to)}`, bodyHtml, attachments };
 }
 
@@ -130,7 +143,7 @@ async function achats(schedule) {
   const periodStr = `${fmtDate(from)} au ${fmtDate(to)}`;
   const sLabel = (s) => STATUT_ACHAT[s] || s;
 
-  const bodyHtml = `<p style="font-size:13px;color:#374151">Période : <strong>${periodStr}</strong>.</p>`
+  let bodyHtml = `<p style="font-size:13px;color:#374151">Période : <strong>${periodStr}</strong>.</p>`
     + tableHtml("Demandes d'achat par statut", ['Statut', 'Nombre', 'Montant final'], byStatus.map(r => [sLabel(r.status), r.n, qty(r.montant) + ' GNF']))
     + tableHtml('Par entité', ['Entité', 'Nombre'], byEntity.map(r => [r.code, r.n]))
     + tableHtml('Bons de commande par devise', ['Devise', 'Montant'], byDevise.map(r => [r.devise, qty(r.total)]));
@@ -152,6 +165,8 @@ async function achats(schedule) {
     });
     attachments.push({ filename: `Rapport_Achats_${to}.pdf`, content: buf, contentType: 'application/pdf' });
   }
+  if (items.length) bodyHtml = await withChartImg(bodyHtml, attachments, chartBarPng({ items }), "Demandes d'achat par statut");
+  bodyHtml += `<p style="font-size:12px;color:#6b7280;margin-top:10px">Rapport complet en PDF joint.</p>`;
   return { subject: `Rapport Achats — ${periodStr}`, bodyHtml, attachments };
 }
 

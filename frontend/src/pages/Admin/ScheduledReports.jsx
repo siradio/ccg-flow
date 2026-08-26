@@ -34,6 +34,10 @@ export default function ScheduledReports() {
     setForm({ ...EMPTY, ...s, business_unit_id: s.business_unit_id || '', jour_semaine: s.jour_semaine || 1, jour_mois: s.jour_mois || 1, heure: (s.heure || '07:00').slice(0, 5) });
     setEditingId(s.id); setShowForm(true); setMsg('');
   }
+  function startDuplicate(s) {
+    setForm({ ...EMPTY, ...s, id: undefined, libelle: `${s.libelle || ''} (copie)`, business_unit_id: s.business_unit_id || '', jour_semaine: s.jour_semaine || 1, jour_mois: s.jour_mois || 1, heure: (s.heure || '07:00').slice(0, 5) });
+    setEditingId(null); setShowForm(true); setMsg('');
+  }
 
   async function save() {
     setMsg('');
@@ -85,6 +89,7 @@ export default function ScheduledReports() {
                   <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} onClick={() => runNow(s.id)}>Envoyer</button>
                   <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => openRuns(s.id)}>Historique</button>
                   <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => startEdit(s)}>Éditer</button>
+                  <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => startDuplicate(s)}>Dupliquer</button>
                   <button className="btn btn-danger btn-sm" onClick={() => del(s.id)}>Suppr.</button>
                 </td>
               </tr>
