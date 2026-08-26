@@ -72,6 +72,7 @@ app.use('/api/commerce/objectifs', require('./modules/commerce/objectifs.routes'
 app.use('/api/commerce/dashboard', require('./modules/commerce/dashboard.routes'));
 app.use('/api/commerce/commissions', require('./modules/commerce/commissions.routes'));
 app.use('/api/commerce/rapports', require('./modules/commerce/rapports.routes'));
+app.use('/api/reporting', require('./modules/reporting/reporting.routes'));
 app.use('/api/commerce/settings', require('./modules/commerce/settings.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
@@ -107,6 +108,8 @@ async function start() {
     require('./modules/logistique/echeance-alerts').startEcheanceAlerts();
     // Planificateur des alertes de péremption des lots (refonte Stock).
     require('./modules/stock/peremption-alerts').startPeremptionAlerts();
+    // Scheduler des rapports planifiés (production/stock/achats par e-mail).
+    require('./modules/reporting/scheduler').startReportScheduler();
   });
 }
 

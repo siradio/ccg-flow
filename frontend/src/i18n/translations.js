@@ -35,6 +35,7 @@ export const translations = {
     'nav.email': 'Email (SMTP)',
     'nav.branding': 'Branding',
     'nav.loginBg': 'Habillage connexion',
+    'nav.scheduledReports': 'Rapports planifiés',
     'nav.testData': 'Données de test',
     // Barre du haut / actions communes
     'common.logout': 'Déconnexion',
@@ -1819,6 +1820,7 @@ export const translations = {
     'nav.email': 'Email (SMTP)',
     'nav.branding': 'Branding',
     'nav.loginBg': 'Login backdrop',
+    'nav.scheduledReports': 'Scheduled reports',
     'nav.testData': 'Test data',
     'common.logout': 'Log out',
     'common.openMenu': 'Open menu',

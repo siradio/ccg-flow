@@ -292,4 +292,9 @@ async function generateCommercialFichePdf({ commercial, metrics, mensuel, journa
   });
 }
 
-module.exports = { generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf };
+module.exports = {
+  generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf,
+  // Helpers réutilisables (ex. module Reporting) :
+  renderPdf, renderLetterhead, simpleTable, money,
+  BRAND_BLUE, BRAND_NAVY, MUTED_GRAY, PAGE_WIDTH,
+};
