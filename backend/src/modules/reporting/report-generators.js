@@ -1,7 +1,7 @@
 const { all } = require('../../db');
 const { renderPdf, renderLetterhead, simpleTable, BRAND_NAVY } = require('../../utils/pdf');
 const { drawLineChart, drawBarChart } = require('./report-chart');
-const { chartLinePng, chartBarPng } = require('./report-svg');
+const { chartLinePng, chartBarPng } = require('./report-chart-img');
 
 // Ajoute l'image du graphique (PNG inline via CID) au corps du mail, sous le tableau.
 async function withChartImg(bodyHtml, attachments, pngPromise, title) {
@@ -33,7 +33,8 @@ const bucketLabel = (unit) => (b) => { const [y, m, d] = b.split('-'); return un
 
 const STATUT_ACHAT = {
   brouillon: 'Brouillon', soumise: 'Soumise', en_analyse_achat: 'En analyse achat', devis_en_cours: 'Devis en cours',
-  devis_selectionne: 'Devis sélectionné', en_validation: 'En validation', validee: 'Validée', rejetee: 'Rejetée',
+  devis_selectionne: 'Devis sélectionné', en_validation: 'En validation', en_attente_validation: 'En attente de validation',
+  validee: 'Validée', rejetee: 'Rejetée', refusee: 'Refusée', commandee: 'Commandée', recue: 'Reçue', cloturee: 'Clôturée',
   bon_commande_genere: 'Bon de commande généré',
 };
 
