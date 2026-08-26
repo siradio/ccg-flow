@@ -49,6 +49,11 @@ export default function ScheduledReports() {
     } catch (e) { setMsg(e.response?.data?.error || 'Erreur à l’enregistrement.'); }
   }
   async function del(id) { if (window.confirm('Supprimer cette planification ?')) { await client.delete(`/reporting/${id}`); load(); } }
+  async function toggleActif(s) {
+    setMsg('');
+    try { await client.put(`/reporting/${s.id}`, { actif: !s.actif }); setMsg(s.actif ? 'Planification mise en pause.' : 'Planification réactivée.'); load(); }
+    catch (e) { setMsg(e.response?.data?.error || 'Action impossible.'); }
+  }
   async function runNow(id) {
     setMsg('Envoi en cours…');
     try { const r = await client.post(`/reporting/${id}/run`); setMsg(`Résultat : ${r.data.statut} — ${r.data.message}`); load(); if (runsFor === id) openRuns(id); }
@@ -83,10 +88,11 @@ export default function ScheduledReports() {
                 <td>{(s.heure || '').slice(0, 5)}</td>
                 <td>{s.business_unit_nom || 'Toutes'}</td>
                 <td style={{ fontSize: 12, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.destinataires}</td>
-                <td>{s.actif ? 'Oui' : 'Non'}</td>
+                <td><span className="badge" style={{ background: s.actif ? '#128a54' : '#b45309', color: '#fff' }}>{s.actif ? 'Actif' : 'En pause'}</span></td>
                 <td style={{ fontSize: 12 }}>{s.last_run_at ? <span><span className="badge" style={{ background: STATUT_COLOR[s.last_status] || '#6b7280', color: '#fff' }}>{s.last_status}</span> {dfmt(s.last_run_at)}</span> : '—'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} onClick={() => runNow(s.id)}>Envoyer</button>
+                  <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => toggleActif(s)}>{s.actif ? 'Pause' : 'Reprendre'}</button>
                   <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => openRuns(s.id)}>Historique</button>
                   <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => startEdit(s)}>Éditer</button>
                   <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => startDuplicate(s)}>Dupliquer</button>
