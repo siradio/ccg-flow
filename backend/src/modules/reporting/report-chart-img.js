@@ -1,12 +1,17 @@
 // Graphiques rastérisés (PNG) pour le CORPS de l'e-mail — les clients mail ne rendent pas le SVG.
 // Rendu via @napi-rs/canvas avec une police TTF EMBARQUÉE (DejaVu Sans) : indépendant des polices
 // système, donc identique en dev (Windows) et en prod (conteneur Linux Azure, sans police système).
-const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
 const { colorAt, short } = require('./report-chart');
 
-// Enregistre la police une seule fois, sous un nom stable réutilisé dans tous les ctx.font.
+// Chargement DÉFENSIF du moteur natif : si @napi-rs/canvas ne se charge pas (binaire absent
+// pour la plateforme), on désactive seulement l'image du mail — jamais de crash de la route.
+let createCanvas = null;
+try {
+  const canvas = require('@napi-rs/canvas');
+  createCanvas = canvas.createCanvas;
+  canvas.GlobalFonts.registerFromPath(require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf'), 'CCGChart');
+} catch (e) { console.error('canvas indisponible, images de rapport désactivées:', e.message); }
 const FONT = 'CCGChart';
-try { GlobalFonts.registerFromPath(require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf'), FONT); } catch (e) { /* fallback système */ }
 const f = (size, weight) => `${weight ? weight + ' ' : ''}${size}px ${FONT}`;
 
 const SCALE = 2; // rendu 2× pour un PNG net (l'e-mail l'affiche en max-width:100%)
@@ -115,7 +120,7 @@ function barChart({ items, width = 760, height = 320 }) {
 }
 
 // Signatures async (await conservé côté générateurs) ; renvoie null si le rendu échoue → mail sans image.
-const chartLinePng = async (opts) => { try { return lineChart(opts); } catch (e) { console.error('lineChart failed:', e.message); return null; } };
-const chartBarPng = async (opts) => { try { return barChart(opts); } catch (e) { console.error('barChart failed:', e.message); return null; } };
+const chartLinePng = async (opts) => { if (!createCanvas) return null; try { return lineChart(opts); } catch (e) { console.error('lineChart failed:', e.message); return null; } };
+const chartBarPng = async (opts) => { if (!createCanvas) return null; try { return barChart(opts); } catch (e) { console.error('barChart failed:', e.message); return null; } };
 
 module.exports = { chartLinePng, chartBarPng };
