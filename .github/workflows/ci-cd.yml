@@ -1,0 +1,201 @@
+# CI/CD — validation puis livraison, dans un seul workflow.
+#
+# Les jobs de deploiement declarent `needs: [test-backend, build-frontend]` :
+# un test en echec arrete tout, y compris sur un declenchement manuel. C'est ce
+# que la protection de branche ne couvre pas.
+#
+# Les noms `test-backend` et `build-frontend` sont les controles de statut
+# exiges par la protection de main. Les changer suppose de les mettre a jour
+# cote GitHub.
+#
+# develop -> ccgflow-dev (direct).
+# main    -> emplacement staging de ccgflow-prod, verification, puis bascule.
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  # requis pour l'authentification Azure OIDC (pas de secret longue duree)
+  id-token: write
+  contents: read
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: erp_user
+          POSTGRES_PASSWORD: erp_password
+          POSTGRES_DB: erp_ccg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Run e2e test suite
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgres://erp_user:erp_password@localhost:5432/erp_ccg_test
+          JWT_SECRET: ci-test-secret
+        run: npm test
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+  deploy-dev:
+    needs: [test-backend, build-frontend]
+    if: github.event_name != 'pull_request' && github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    # Pas de `environment:` : ce champ changerait le "sub" du token OIDC envoye a Azure
+    # (repo:...:environment:X au lieu de repo:...:ref:refs/heads/develop), qui ne
+    # correspondrait plus a l'identifiant federe "Branch"/develop cote Azure AD.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        working-directory: frontend
+        # VITE_API_URL en chemin relatif : le frontend est servi par le meme backend Express
+        # (backend/public), donc meme origine — sans ca, Vite inline le fallback de dev
+        # en dur dans le bundle, et l'app deployee appelle le backend local de quiconque
+        # la teste au lieu du backend reellement deploye.
+        env:
+          VITE_API_URL: /api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assembler le paquet de déploiement (backend autonome)
+        run: |
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public/
+
+      - name: Installer les dépendances backend (production uniquement)
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Connexion Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Un Web App dedie par environnement (ccgflow-dev), pas un slot : le slot
+      # sert de sas de livraison en production, pas a separer les environnements.
+      - name: Déployer sur ccgflow-dev
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ccgflow-dev
+          package: backend
+
+  deploy-prod:
+    needs: [test-backend, build-frontend]
+    if: github.event_name != 'pull_request' && github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    env:
+      RG: rg-shared-apps
+      APP: ccgflow-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: /api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assembler le paquet de déploiement (backend autonome)
+        run: |
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public/
+
+      - name: Installer les dépendances backend (production uniquement)
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Connexion Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # L'emplacement staging n'est pas un environnement : c'est le sas par lequel
+      # passe chaque livraison pour que la bascule se fasse sans coupure.
+      - name: Déployer sur l'emplacement staging
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ccgflow-prod
+          slot-name: staging
+          package: backend
+
+      # L'adresse du staging porte un suffixe aleatoire : on la demande a Azure.
+      - name: Adresse de l'emplacement staging
+        id: slot
+        run: |
+          h=$(az webapp deployment slot list -n "$APP" -g "$RG" --query "[0].defaultHostName" -o tsv)
+          echo "host=$h" >> "$GITHUB_OUTPUT"
+
+      - name: Vérifier que le staging répond
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://${{ steps.slot.outputs.host }}/" || echo 000)
+            echo "  essai $i : $code"
+            case "$code" in 200|301|302|307|308|401|403) echo "staging opérationnel"; exit 0;; esac
+            sleep 15
+          done
+          echo "Le staging ne répond pas — bascule annulée, la production est intacte."
+          exit 1
+
+      - name: Basculer staging vers production
+        run: |
+          az webapp deployment slot swap -n "$APP" -g "$RG" --slot staging --target-slot production
+          echo "Bascule effectuée. L'ancienne production est dans staging,"
+          echo "prête à être rebasculée en cas de problème."
