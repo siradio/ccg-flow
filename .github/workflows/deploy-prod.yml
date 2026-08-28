@@ -53,10 +53,37 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Infra partagée (§ SPEC.md déploiement Azure) : un Web App dédié par environnement
-      # (ccgflow-prod), pas un slot sur une ressource unique — nom en dur plutôt qu'une variable
-      # GitHub, puisque ce fichier ne sert jamais qu'à cet environnement.
-      - name: Déployer sur ccgflow-prod
+      # (ccgflow-prod), pas un slot pour séparer dev et prod — nom en dur plutôt qu'une
+      # variable GitHub, puisque ce fichier ne sert jamais qu'à cet environnement.
+      # L'emplacement staging ci-dessous n'est pas un environnement : c'est le sas par
+      # lequel passe chaque livraison pour que la bascule se fasse sans coupure.
+      - name: Déployer sur l'emplacement staging de ccgflow-prod
         uses: azure/webapps-deploy@v3
         with:
           app-name: ccgflow-prod
+          slot-name: staging
           package: backend
+
+      # L'adresse du staging porte un suffixe aléatoire : on la demande à Azure.
+      - name: Adresse de l'emplacement staging
+        id: slot
+        run: |
+          h=$(az webapp deployment slot list -n ccgflow-prod -g rg-shared-apps                 --query "[0].defaultHostName" -o tsv)
+          echo "host=$h" >> "$GITHUB_OUTPUT"
+
+      - name: Vérifier que le staging répond
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20                    "https://${{ steps.slot.outputs.host }}/" || echo 000)
+            echo "  essai $i : $code"
+            case "$code" in 200|301|302|307|308|401|403) echo "staging opérationnel"; exit 0;; esac
+            sleep 15
+          done
+          echo "Le staging ne répond pas — bascule annulée, la production est intacte."
+          exit 1
+
+      - name: Basculer staging vers production
+        run: |
+          az webapp deployment slot swap -n ccgflow-prod -g rg-shared-apps             --slot staging --target-slot production
+          echo "Bascule effectuée. L'ancienne production est dans staging,"
+          echo "prête à être rebasculée en cas de problème."
