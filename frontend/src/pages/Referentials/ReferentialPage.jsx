@@ -26,6 +26,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
+  // Tri par colonne (clic sur l'en-tête) : 1er clic = croissant, 2e = décroissant, 3e = tri d'origine.
+  const [sort, setSort] = useState({ key: null, dir: 'asc' });
 
   // Filtres = sous-ensemble des champs déclaré par référentiel (voir CONFIGS.filters). On récupère
   // la définition complète du champ pour connaître sa source d'options (entités, sites, liste FK,
@@ -112,6 +114,28 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
     setFilterValues({});
   }
 
+  // Colonnes triables : tout sauf photo et listes d'entités (pas d'ordre naturel pertinent).
+  const isSortable = (f) => !['photo', 'multiEntity'].includes(f.type);
+  function toggleSort(f) {
+    if (!isSortable(f)) return;
+    setSort(s => s.key !== f.key ? { key: f.key, dir: 'asc' }
+      : s.dir === 'asc' ? { key: f.key, dir: 'desc' }
+      : { key: null, dir: 'asc' }); // 3e clic : retour au tri d'origine (ordre API)
+  }
+  // Tri appliqué après filtrage. `numeric: true` classe correctement les codes alphanumériques
+  // (C0020 avant C0110) et les nombres ; valeurs vides toujours en dernier.
+  const sortField = sort.key ? fields.find(f => f.key === sort.key) : null;
+  const sortedItems = !sortField ? visibleItems : [...visibleItems].sort((a, b) => {
+    const va = a[sortField.key], vb = b[sortField.key];
+    const ea = va === null || va === undefined || va === '', eb = vb === null || vb === undefined || vb === '';
+    if (ea && eb) return 0; if (ea) return 1; if (eb) return -1;
+    let r;
+    if (sortField.type === 'number') r = Number(va) - Number(vb);
+    else if (sortField.type === 'checkbox') r = (va ? 1 : 0) - (vb ? 1 : 0);
+    else r = String(va).localeCompare(String(vb), undefined, { numeric: true });
+    return sort.dir === 'asc' ? r : -r;
+  });
+
   return (
     <div>
       <h1 className="page-title" style={{ marginBottom: 20 }}>{title}</h1>
@@ -151,12 +175,20 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
           <table>
             <thead>
               <tr>
-                {fields.map(f => <th key={f.key}>{fieldLabel(f, t)}</th>)}
+                {fields.map(f => (
+                  <th key={f.key}
+                    onClick={() => toggleSort(f)}
+                    style={{ cursor: isSortable(f) ? 'pointer' : 'default', whiteSpace: 'nowrap', userSelect: 'none' }}
+                    title={isSortable(f) ? t('ref.sortHint') : undefined}>
+                    {fieldLabel(f, t)}
+                    {sort.key === f.key && <span style={{ marginLeft: 4 }}>{sort.dir === 'asc' ? '▲' : '▼'}</span>}
+                  </th>
+                ))}
                 {(canEdit || (canAdd && duplicable) || rowLink) && <th className="sticky-col" />}
               </tr>
             </thead>
             <tbody>
-              {visibleItems.map(item => (
+              {sortedItems.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint, t)}</td>)}
                   {(canEdit || (canAdd && duplicable) || rowLink) && (

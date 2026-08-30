@@ -34,6 +34,7 @@ const CONFIGS = {
       { key: 'site_id', label: 'Site', type: 'fkSelect', listKey: 'sites' },
       { key: 'statut', label: 'Statut', type: 'select', options: STATUTS, default: 'Disponible' },
       { key: 'compteur_km', label: 'Compteur (km)', type: 'number' },
+      { key: 'capacite_reservoir', label: 'Capacité réservoir (L)', type: 'number' },
       { key: 'date_mise_circulation', label: 'Mise en circulation', type: 'date' },
       { key: 'date_acquisition', label: "Date d'acquisition", type: 'date' },
       { key: 'photo', label: 'Photo', type: 'photo' },

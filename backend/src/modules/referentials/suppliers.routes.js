@@ -63,8 +63,8 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
         `UPDATE suppliers SET
            nom=$1, contact_nom=$2, contact_email=$3, contact_tel=$4, adresse=$5, actif=$6,
            code=$7, origine=$8, pays=$9, categorie=$10, produits_offres=$11, mode_paiement=$12,
-           conditions_paiement=$13, a_contrat=$14, commentaires=$15
-         WHERE id=$16 RETURNING *`,
+           conditions_paiement=$13, a_contrat=$14, commentaires=$15, date_engagement=$16
+         WHERE id=$17 RETURNING *`,
         [
           b.nom === undefined ? existing.nom : b.nom, // nom obligatoire : jamais mis à NULL
           field('contact_nom'), field('contact_email'), field('contact_tel'), field('adresse'),
@@ -72,7 +72,7 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
           field('code'), field('origine'), field('pays'), field('categorie'), field('produits_offres'),
           field('mode_paiement'), field('conditions_paiement'),
           b.a_contrat === undefined ? existing.a_contrat : b.a_contrat,
-          field('commentaires'),
+          field('commentaires'), field('date_engagement'),
           req.params.id,
         ]
       );
