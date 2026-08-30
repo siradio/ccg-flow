@@ -6,6 +6,7 @@ import NotificationBell from './NotificationBell';
 import ThemeSwitcher from './ThemeSwitcher';
 import InstallPWA from './InstallPWA';
 import LanguageSwitcher from './LanguageSwitcher';
+import IdleTimeout from './IdleTimeout';
 import { useI18n } from '../i18n/I18nContext';
 import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
@@ -81,6 +82,7 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      <IdleTimeout />
       {navOpen && <div className="sidebar-backdrop" onClick={closeNav} />}
       <aside className={`sidebar${navOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-brand">
