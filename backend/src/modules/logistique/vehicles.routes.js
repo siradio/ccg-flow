@@ -12,7 +12,7 @@ const router = simpleCrudRouter({
   table: 'vehicles',
   columns: [
     'immatriculation', 'type_id', 'marque', 'modele', 'annee',
-    'entity_id', 'site_id', 'statut', 'compteur_km',
+    'entity_id', 'site_id', 'statut', 'compteur_km', 'capacite_reservoir',
     'date_mise_circulation', 'date_acquisition',
   ],
   filterColumn: 'type_id',
