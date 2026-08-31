@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useSort } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 // Libellé d'un champ : traduit si le champ porte une `labelKey`, sinon libellé brut (français) —
@@ -26,8 +27,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
-  // Tri par colonne (clic sur l'en-tête) : 1er clic = croissant, 2e = décroissant, 3e = tri d'origine.
-  const [sort, setSort] = useState({ key: null, dir: 'asc' });
+  // Tri par colonne (clic sur l'en-tête) via la primitive partagée useSort (même comportement partout).
+  const { sort, by, apply } = useSort();
 
   // Filtres = sous-ensemble des champs déclaré par référentiel (voir CONFIGS.filters). On récupère
   // la définition complète du champ pour connaître sa source d'options (entités, sites, liste FK,
@@ -116,25 +117,14 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
   // Colonnes triables : tout sauf photo et listes d'entités (pas d'ordre naturel pertinent).
   const isSortable = (f) => !['photo', 'multiEntity'].includes(f.type);
-  function toggleSort(f) {
-    if (!isSortable(f)) return;
-    setSort(s => s.key !== f.key ? { key: f.key, dir: 'asc' }
-      : s.dir === 'asc' ? { key: f.key, dir: 'desc' }
-      : { key: null, dir: 'asc' }); // 3e clic : retour au tri d'origine (ordre API)
-  }
-  // Tri appliqué après filtrage. `numeric: true` classe correctement les codes alphanumériques
-  // (C0020 avant C0110) et les nombres ; valeurs vides toujours en dernier.
-  const sortField = sort.key ? fields.find(f => f.key === sort.key) : null;
-  const sortedItems = !sortField ? visibleItems : [...visibleItems].sort((a, b) => {
-    const va = a[sortField.key], vb = b[sortField.key];
-    const ea = va === null || va === undefined || va === '', eb = vb === null || vb === undefined || vb === '';
-    if (ea && eb) return 0; if (ea) return 1; if (eb) return -1;
-    let r;
-    if (sortField.type === 'number') r = Number(va) - Number(vb);
-    else if (sortField.type === 'checkbox') r = (va ? 1 : 0) - (vb ? 1 : 0);
-    else r = String(va).localeCompare(String(vb), undefined, { numeric: true });
-    return sort.dir === 'asc' ? r : -r;
-  });
+  // Accesseur de tri : pour un nombre stocké en texte (NUMERIC pg), on force la comparaison numérique
+  // (les valeurs vides restent nulles → classées en dernier par useSort).
+  const sortGet = (f) => (row) => {
+    const v = row[f.key];
+    if (f.type === 'number') return (v === '' || v == null) ? null : Number(v);
+    return v;
+  };
+  const sortedItems = apply(visibleItems);
 
   return (
     <div>
@@ -177,7 +167,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
               <tr>
                 {fields.map(f => (
                   <th key={f.key}
-                    onClick={() => toggleSort(f)}
+                    onClick={() => isSortable(f) && by(f.key, sortGet(f))}
                     style={{ cursor: isSortable(f) ? 'pointer' : 'default', whiteSpace: 'nowrap', userSelect: 'none' }}
                     title={isSortable(f) ? t('ref.sortHint') : undefined}>
                     {fieldLabel(f, t)}
