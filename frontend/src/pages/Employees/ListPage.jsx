@@ -4,12 +4,14 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { StatutBadge } from './statutBadge.jsx';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
+import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 export default function ListPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const canWrite = hasSubModuleLevel(user, 'rh', 'ajout');
+  const { sort, by, apply } = useSort();
   const [employees, setEmployees] = useState([]);
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
@@ -77,20 +79,20 @@ export default function ListPage() {
           <table>
             <thead>
               <tr>
-                <th>{t('emp.th.matricule')}</th>
-                <th>{t('refx.f.nom')}</th>
-                <th>{t('emp.th.poste')}</th>
-                <th>{t('emp.th.departement')}</th>
-                <th>{t('emp.th.entity')}</th>
-                <th>{t('stockreleve.bu')}</th>
-                <th>{t('emp.th.site')}</th>
-                <th>{t('emp.th.statut')}</th>
-                <th>{t('emp.th.seniority')}</th>
+                <SortTh label={t('emp.th.matricule')} colKey="matricule" get={r => r.matricule} sort={sort} by={by} />
+                <SortTh label={t('refx.f.nom')} colKey="nom" get={r => `${r.prenom || ''} ${r.nom || ''}`.trim()} sort={sort} by={by} />
+                <SortTh label={t('emp.th.poste')} colKey="poste" get={r => r.poste} sort={sort} by={by} />
+                <SortTh label={t('emp.th.departement')} colKey="departement" get={r => r.departement} sort={sort} by={by} />
+                <SortTh label={t('emp.th.entity')} colKey="entity" get={r => r.entity_code} sort={sort} by={by} />
+                <SortTh label={t('stockreleve.bu')} colKey="bu" get={r => r.business_unit_nom} sort={sort} by={by} />
+                <SortTh label={t('emp.th.site')} colKey="site" get={r => r.site_nom} sort={sort} by={by} />
+                <SortTh label={t('emp.th.statut')} colKey="statut" get={r => r.statut} sort={sort} by={by} />
+                <SortTh label={t('emp.th.seniority')} colKey="seniority" get={r => (r.anciennete_annees == null ? null : Number(r.anciennete_annees))} sort={sort} by={by} />
                 {canWrite && <th />}
               </tr>
             </thead>
             <tbody>
-              {employees.map(emp => (
+              {apply(employees).map(emp => (
                 <tr key={emp.id}>
                   <td>{emp.matricule || '—'}</td>
                   <td>{emp.prenom} {emp.nom}</td>

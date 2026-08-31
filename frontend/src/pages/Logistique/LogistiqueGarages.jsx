@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import LogistiqueSubnav from './LogistiqueSubnav';
+import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const emptyForm = () => ({ id: null, nom: '', ville: '', sous_contrat: false, specialites: '', efficacite_pct: '', telephone: '', notes: '', actif: true });
@@ -10,6 +11,7 @@ const nb = (n, lang) => (n == null ? '—' : Number(n).toLocaleString(lang === '
 export default function LogistiqueGarages() {
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const { sort, by, apply } = useSort();
   const canView = hasSubModuleLevel(user, 'logistique.maintenance');
   const canAdd = hasSubModuleLevel(user, 'logistique.maintenance', 'ajout');
   const canEdit = hasSubModuleLevel(user, 'logistique.maintenance', 'edition');
@@ -79,9 +81,18 @@ export default function LogistiqueGarages() {
       <div className="card" style={{ padding: 0, marginBottom: 20 }}>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>{t('log.garage')}</th><th>{t('log.gar.city')}</th><th>{t('log.gar.contract')}</th><th>{t('log.gar.inRepair')}</th><th>{t('log.gar.avgDuration')}</th><th>{t('log.gar.totalCostShort')}</th><th>{t('log.gar.efficiency')}</th>{canEdit && <th className="sticky-col" />}</tr></thead>
+            <thead><tr>
+              <SortTh label={t('log.garage')} colKey="nom" get={r => r.nom} sort={sort} by={by} />
+              <SortTh label={t('log.gar.city')} colKey="ville" get={r => r.ville} sort={sort} by={by} />
+              <SortTh label={t('log.gar.contract')} colKey="contrat" get={r => (r.sous_contrat ? 1 : 0)} sort={sort} by={by} />
+              <SortTh label={t('log.gar.inRepair')} colKey="enrep" get={r => Number(r.en_reparation) || 0} sort={sort} by={by} />
+              <SortTh label={t('log.gar.avgDuration')} colKey="duree" get={r => (r.duree_moy_jours == null ? null : Number(r.duree_moy_jours))} sort={sort} by={by} />
+              <SortTh label={t('log.gar.totalCostShort')} colKey="cout" get={r => (r.cout_total == null ? null : Number(r.cout_total))} sort={sort} by={by} />
+              <SortTh label={t('log.gar.efficiency')} colKey="eff" get={r => (r.efficacite_pct == null ? null : Number(r.efficacite_pct))} sort={sort} by={by} />
+              {canEdit && <th className="sticky-col" />}
+            </tr></thead>
             <tbody>
-              {garages.map(g => (
+              {apply(garages).map(g => (
                 <tr key={g.id}>
                   <td><strong>{g.nom}</strong>{g.specialites ? <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{g.specialites}</div> : null}</td>
                   <td>{g.ville || '—'}</td>

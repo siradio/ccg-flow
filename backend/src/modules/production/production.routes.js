@@ -109,6 +109,28 @@ router.get('/dashboard', requireSubModule('production.suivi'), async (req, res, 
   } catch (e) { next(e); }
 });
 
+// Détail par jour de saisie et par produit sur une période (pour l'export « détaillé » : une ligne
+// par produit et par jour, permet de comparer jour à jour en cas d'anomalie). Mêmes filtres BU /
+// visibilité / type d'article que le suivi cumulé.
+router.get('/detail', requireSubModule('production.suivi'), async (req, res, next) => {
+  try {
+    const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : new Date().toISOString().slice(0, 8) + '01';
+    const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'"];
+    const params = [from, to];
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
+    res.json(await all(
+      `SELECT pe.date_production AS date, p.code, p.designation, p.unite, bu.nom AS bu_nom, pe.quantite AS qty
+       FROM production_entries pe
+       JOIN products p ON p.id = pe.product_id
+       LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       WHERE ${where.join(' AND ')}
+       ORDER BY bu.nom NULLS LAST, p.code, p.designation, pe.date_production`, params));
+  } catch (e) { next(e); }
+});
+
 // Évolution de la production d'un produit (pour un graphique).
 router.get('/series', requireSubModule('production.suivi'), async (req, res, next) => {
   try {

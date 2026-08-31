@@ -6,6 +6,7 @@ import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const DEVISES = ['GNF', 'USD', 'EUR'];
@@ -17,6 +18,7 @@ function today() {
 export default function HistoryPage() {
   const confirm = useConfirm();
   const { t, lang } = useI18n();
+  const { sort, by, apply } = useSort();
   const loc = lang === 'en' ? 'en-US' : 'fr-FR';
   const { user } = useAuth();
   const canAdd = hasSubModuleLevel(user, 'referentiels.prix', 'ajout');
@@ -187,17 +189,17 @@ export default function HistoryPage() {
             <table>
               <thead>
                 <tr>
-                  <th>{t('prix.th.effectiveDate')}</th>
-                  <th>{t('cockpit.th.product')}</th>
-                  <th>{t('stockreleve.bu')}</th>
-                  <th>{t('prix.th.price')}</th>
-                  <th>{t('fields.comment')}</th>
-                  <th>{t('prix.th.author')}</th>
+                  <SortTh label={t('prix.th.effectiveDate')} colKey="date" get={r => r.date_effet} sort={sort} by={by} />
+                  <SortTh label={t('cockpit.th.product')} colKey="product" get={r => r.product_designation} sort={sort} by={by} />
+                  <SortTh label={t('stockreleve.bu')} colKey="bu" get={r => r.business_unit_nom} sort={sort} by={by} />
+                  <SortTh label={t('prix.th.price')} colKey="prix" get={r => (r.prix == null ? null : Number(r.prix))} sort={sort} by={by} />
+                  <SortTh label={t('fields.comment')} colKey="comment" get={r => r.commentaire} sort={sort} by={by} />
+                  <SortTh label={t('prix.th.author')} colKey="author" get={r => `${r.created_by_prenom || ''} ${r.created_by_nom || ''}`.trim()} sort={sort} by={by} />
                   {canEdit && <th />}
                 </tr>
               </thead>
               <tbody>
-                {entries.map(e => (
+                {apply(entries).map(e => (
                   <tr key={e.id}>
                     <td>{new Date(e.date_effet).toLocaleDateString(loc)}</td>
                     <td>{e.product_designation}{e.product_code ? ` (${e.product_code})` : ''}</td>

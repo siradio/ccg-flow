@@ -4,12 +4,13 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import StockSectionNav from './StockSectionNav';
-import { ExportButtons } from '../../utils/exportData';
+import { ExportButtons, DetailExportButtons } from '../../utils/exportData';
 import { useI18n } from '../../i18n/I18nContext';
 
 // Refonte Stock — « Relevé du jour » (produits finis). Grille rapide du matin (une ligne par produit,
 // une colonne quantité) + suivi Direction comparant le relevé au stock théorique du grand livre.
 const today = () => new Date().toISOString().slice(0, 10);
+const monthStart = () => today().slice(0, 8) + '01';
 const fmt = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 }));
 const ecartColor = e => (e == null ? 'inherit' : e === 0 ? '#15803d' : e > 0 ? '#1d4ed8' : '#b91c1c');
 
@@ -17,13 +18,6 @@ const SAISIE_COLS = [
   { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' },
   { key: 'releve', label: 'Stock du jour', type: 'number' },
 ];
-const SUIVI_COLS = [
-  { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
-  { key: 'releve', label: 'Dernier relevé', type: 'number' }, { key: 'date_stock', label: 'Date', type: 'date' },
-  { key: 'saisi_par', label: 'Par' },
-  { key: 'theorique', label: 'Théorique', type: 'number' }, { key: 'ecart', label: 'Écart', type: 'number' },
-];
-
 function Segmented({ tab, setTab }) {
   const { t } = useI18n();
   const tabs = [['saisie', t('stockreleve.tab.saisie')], ['suivi', t('stockreleve.tab.suivi')]];
@@ -58,6 +52,9 @@ export default function StockReleveJour() {
   const [suiviDate, setSuiviDate] = useState(today());
   const [suiviBu, setSuiviBu] = useState('');
   const [dash, setDash] = useState([]);
+  // Plage du…au utilisée UNIQUEMENT pour l'export détaillé « par jour de saisie » (l'écran, lui,
+  // reste une situation à une date). Harmonisé avec l'export détaillé de la production.
+  const [expRange, setExpRange] = useState({ from: monthStart(), to: today() });
   // Évolution : granularité (semaine/mois/perso), produit (vide = total BU), plage perso.
   const [evoGran, setEvoGran] = useState('semaine');
   const [evoProduct, setEvoProduct] = useState('');
@@ -145,8 +142,16 @@ export default function StockReleveJour() {
           <h1 className="page-title" style={{ margin: '0 0 4px' }}>{t('stockreleve.title')}</h1>
           <p className="page-subtitle" style={{ margin: '0 0 8px' }}>{t('stockreleve.subtitle')}</p>
         </div>
-        <ExportButtons filename={tab === 'saisie' ? `releve_${date}` : `suivi_releve_${suiviDate}`}
-          columns={tab === 'saisie' ? SAISIE_COLS : SUIVI_COLS} rows={tab === 'saisie' ? saisieExport : dash} />
+        {tab === 'saisie' ? (
+          <ExportButtons filename={`releve_${date}`} columns={SAISIE_COLS} rows={saisieExport} />
+        ) : (
+          <DetailExportButtons
+            filename={`releve_detail_${expRange.from}_${expRange.to}`}
+            valueLabel="Relevé"
+            disabled={!canView || !expRange.from || !expRange.to}
+            emptyMsg={t('stockreleve.noReadingInPeriod')}
+            fetchRows={() => client.get(`/stock-releve/detail?date_from=${expRange.from}&date_to=${expRange.to}${suiviBu ? `&business_unit_id=${suiviBu}` : ''}`).then(r => r.data)} />
+        )}
       </div>
       <Segmented tab={tab} setTab={setTab} />
 
@@ -220,6 +225,12 @@ export default function StockReleveJour() {
               </select>
             </label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('stockreleve.lastKnownHint')}</div>
+          </div>
+          {/* Plage pour l'export détaillé « par jour de saisie » (indépendante de la situation affichée). */}
+          <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', alignSelf: 'center' }}>{t('stockreleve.exportDetailRange')}</span>
+            <label className="field">{t('mvt.from')}<input type="date" value={expRange.from} onChange={e => setExpRange(r => ({ ...r, from: e.target.value }))} /></label>
+            <label className="field">{t('mvt.to')}<input type="date" value={expRange.to} onChange={e => setExpRange(r => ({ ...r, to: e.target.value }))} /></label>
           </div>
           <section className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>

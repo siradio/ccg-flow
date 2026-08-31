@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import client from '../../../api/client';
 import { useConfirm } from '../../../components/ConfirmProvider.jsx';
 import { useI18n } from '../../../i18n/I18nContext';
+import { useSort, SortTh } from '../../../components/useSort.jsx';
 import { ROLE_CODES, userStatus, STATUS_META, StatusBadge } from './shared.jsx';
 
 const PAGE_SIZE = 20;
@@ -10,6 +11,7 @@ const PAGE_SIZE = 20;
 export default function ListPage() {
   const confirm = useConfirm();
   const { t } = useI18n();
+  const { sort, by, apply } = useSort();
   const [users, setUsers] = useState([]);
   const [moduleCatalog, setModuleCatalog] = useState([]);
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', password: '', notify: true });
@@ -42,7 +44,8 @@ export default function ListPage() {
     return matchesSearch && matchesRole && matchesStatus;
   });
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Tri appliqué à la liste filtrée AVANT la pagination (le tri porte sur tout le jeu, pas la page).
+  const pagedUsers = apply(filteredUsers).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Un filtre plus restrictif peut faire disparaître la page courante (ex. page 3 sur un filtre qui
   // ne laisse qu'une page) — on revient sur la dernière page valide plutôt que d'afficher un tableau vide.
@@ -271,11 +274,11 @@ export default function ListPage() {
           <table>
             <thead>
               <tr>
-                <th>{t('adm.users.col.nom')}</th>
-                <th>{t('adm.users.col.prenoms')}</th>
-                <th>{t('adm.users.col.role')}</th>
-                <th>{t('adm.users.col.profil')}</th>
-                <th>{t('adm.users.col.module')}</th>
+                <SortTh label={t('adm.users.col.nom')} colKey="nom" get={u => u.nom} sort={sort} by={by} />
+                <SortTh label={t('adm.users.col.prenoms')} colKey="prenom" get={u => u.prenom} sort={sort} by={by} />
+                <SortTh label={t('adm.users.col.role')} colKey="role" get={u => roleSummary(u)} sort={sort} by={by} />
+                <SortTh label={t('adm.users.col.profil')} colKey="profil" get={u => userStatus(u)} sort={sort} by={by} />
+                <SortTh label={t('adm.users.col.module')} colKey="module" get={u => moduleSummary(u)} sort={sort} by={by} />
                 <th>{t('adm.users.col.action')}</th>
               </tr>
             </thead>
