@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
-import { ExportButtons } from '../../utils/exportData';
+import { ExportButtons, DetailExportButtons } from '../../utils/exportData';
 import { useI18n } from '../../i18n/I18nContext';
 
 // Module Production — relevé de production journalière (flux) + suivi cumulé sur une période.
@@ -13,11 +13,6 @@ const fmt = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-F
 const d10 = v => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');
 
 const SAISIE_COLS = [{ key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'produit', label: 'Produit ce jour', type: 'number' }];
-const SUIVI_COLS = [
-  { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
-  { key: 'total_produit', label: 'Total produit', type: 'number' }, { key: 'jours_saisis', label: 'Jours saisis', type: 'number' },
-  { key: 'dernier_jour', label: 'Dernier jour', type: 'date' }, { key: 'saisi_par', label: 'Par' },
-];
 
 function Segmented({ tab, setTab }) {
   const { t } = useI18n();
@@ -123,8 +118,16 @@ export default function ProductionReleve() {
           <h1 className="page-title" style={{ margin: '0 0 4px' }}>{t('prodrel.title')}</h1>
           <p className="page-subtitle" style={{ margin: '0 0 8px' }}>{t('prodrel.subtitle')}</p>
         </div>
-        <ExportButtons filename={tab === 'saisie' ? `production_${date}` : `production_${period.from}_${period.to}`}
-          columns={tab === 'saisie' ? SAISIE_COLS : SUIVI_COLS} rows={tab === 'saisie' ? saisieExport : suivi} />
+        {tab === 'saisie' ? (
+          <ExportButtons filename={`production_${date}`} columns={SAISIE_COLS} rows={saisieExport} />
+        ) : (
+          <DetailExportButtons
+            filename={`production_detail_${period.from}_${period.to}`}
+            valueLabel="Quantité produite"
+            disabled={!canSuivi || suivi.length === 0}
+            emptyMsg={t('prodrel.noneInPeriod')}
+            fetchRows={() => client.get(`/production/detail?date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}`).then(r => r.data)} />
+        )}
       </div>
       <Segmented tab={tab} setTab={setTab} />
 

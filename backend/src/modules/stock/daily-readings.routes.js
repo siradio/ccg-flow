@@ -149,4 +149,27 @@ router.get('/dashboard', requireSubModule('stock.releve_jour'), async (req, res,
   } catch (e) { next(e); }
 });
 
+// Détail par jour de saisie et par produit sur une période (pour l'export « détaillé » du relevé :
+// une ligne par produit et par jour de relevé, pour comparer jour à jour en cas d'anomalie).
+// L'écran reste une « situation à une date » ; seul l'export utilise une plage du…au.
+router.get('/detail', requireSubModule('stock.releve_jour'), async (req, res, next) => {
+  try {
+    const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : null;
+    const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    if (!from) return res.status(400).json({ error: 'date_from requis.' });
+    const where = ['se.date_stock BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'", 'p.actif = true'];
+    const params = [from, to];
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
+    res.json(await all(
+      `SELECT se.date_stock AS date, p.code, p.designation, p.unite, bu.nom AS bu_nom, se.quantite AS qty
+       FROM stock_entries se
+       JOIN products p ON p.id = se.product_id
+       LEFT JOIN business_units bu ON bu.id = p.business_unit_id
+       WHERE ${where.join(' AND ')}
+       ORDER BY bu.nom NULLS LAST, p.code, p.designation, se.date_stock`, params));
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
