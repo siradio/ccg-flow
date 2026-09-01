@@ -36,6 +36,9 @@ async function getById(id) {
 const WRITABLE_FIELDS = [
   'matricule', 'nom', 'prenom', 'poste', 'departement', 'entity_id', 'site_id', 'business_unit_id',
   'manager', 'date_embauche', 'type_contrat', 'statut', 'salaire_mensuel', 'telephone', 'email',
+  // RH complémentaires (migration 067)
+  'date_naissance', 'nationalite', 'numero_cnss', 'situation_familiale',
+  'contact_urgence_nom', 'contact_urgence_tel', 'permis_travail', 'permis_travail_expiration',
 ];
 
 async function create(body) {
