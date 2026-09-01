@@ -73,7 +73,7 @@ async function listPendingAction(roleEntityPairs, { page = 1, pageSize = 20 } = 
       // (nouveau statut, pas piloté par current_step_id) et, si elle existe encore dans le circuit
       // configuré, l'étape de validation finale — voir submit()/validateStep().
       params.push(entityId, roleCode);
-      clauses.push(`(pr.entity_id = $${params.length - 1} AND (pr.status = 'en_attente_validation_besoin' OR (pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})))`);
+      clauses.push(`(pr.entity_id = $${params.length - 1} AND (pr.status = 'en_attente_validation_besoin' OR pr.status = 'en_validation_dga' OR (pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})))`);
     } else {
       params.push(entityId, roleCode);
       clauses.push(`(pr.entity_id = $${params.length - 1} AND pr.status = 'en_validation' AND ws.role_code_requis = $${params.length})`);

@@ -366,7 +366,7 @@ async function reopenConsultation(user, prId, commentaire) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'rouvrir la consultation');
-  if (!['devis_selectionne', 'en_validation', 'bon_commande_genere'].includes(pr.status)) {
+  if (!['devis_selectionne', 'en_validation', 'en_validation_dga', 'bon_commande_genere'].includes(pr.status)) {
     throw httpError(400, `Réouverture impossible depuis le statut "${pr.status}".`);
   }
   // Motif obligatoire : la réouverture annule un bon de commande / une sélection déjà validés —
@@ -449,6 +449,15 @@ async function validateStep(user, prId, commentaire) {
     return getFullDetail(prId);
   }
 
+  if (pr.status === 'en_validation_dga') {
+    // Validation DGA FINALE (après génération du BC) : approuve → clôture (le BC reste définitif).
+    await assertRole(user, 'validateur_besoin', pr.entity_id, 'valider (DGA) le bon de commande');
+    await repo.updateStatusAndStep(prId, 'bon_commande_genere', null);
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'validation_dga', userId: user.id, details: { commentaire } });
+    await notifications.notify(pr.requester_user_id, 'Demande validée par la DGA', `Votre demande ${pr.numero} a été validée par la DGA. Le bon de commande est définitif.`, `/purchase-requests/${prId}`);
+    return getFullDetail(prId);
+  }
+
   throw httpError(400, `Aucune validation possible depuis le statut "${pr.status}".`);
 }
 
@@ -467,6 +476,22 @@ async function rejectStep(user, prId, commentaire) {
       pr.requester_user_id, 'Expression de besoin refusée',
       `Votre demande ${pr.numero} a été refusée par la DGA : ${commentaire}`, `/purchase-requests/${prId}`
     );
+    return getFullDetail(prId);
+  }
+
+  if (pr.status === 'en_validation_dga') {
+    // Refus DGA après génération du BC : commentaire obligatoire, le BC est ANNULÉ et la demande
+    // repart à la Finances pour re-validation (qui régénérera le BC puis repassera en validation DGA).
+    await assertRole(user, 'validateur_besoin', pr.entity_id, 'refuser (DGA) le bon de commande');
+    if (!commentaire || !commentaire.trim()) throw httpError(400, 'Un commentaire est obligatoire pour refuser à la validation DGA.');
+    const template = await workflowEngine.getTemplate(MODULE_CODE);
+    const financesStep = await workflowEngine.getStepByCode(template.id, 'finances');
+    if (!financesStep) throw httpError(500, 'Étape "finances" non configurée.');
+    await poRepo.deleteByPurchaseRequestId(prId);          // le bon de commande généré est annulé
+    await repo.updateStatusAndStep(prId, 'en_validation', financesStep.id);
+    await repo.createApproval(prId, financesStep.id);        // la Finances doit re-valider
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'refus_validation_dga', userId: user.id, details: { commentaire } });
+    await notifications.notifyRoleOnEntity(pr.entity_id, 'finances', 'Demande renvoyée par la DGA', `La demande ${pr.numero} a été renvoyée par la DGA : ${commentaire}. Le bon de commande a été annulé, merci de revoir et re-valider.`, `/purchase-requests/${prId}`);
     return getFullDetail(prId);
   }
 
@@ -513,9 +538,21 @@ async function generatePurchaseOrder(prId, userId) {
     purchaseRequestId: prId, numero: `PENDING-${prId}`, supplierId, montant: pr.montant_final, devise: pr.devise,
   });
   po = await poRepo.setNumero(po.id, numbering.formatOrderNumber(pr.entity_code, po.id));
-  await repo.updateStatusAndStep(prId, 'bon_commande_genere', null);
   await audit.logAction({ tableName: 'purchase_orders', recordId: po.id, purchaseRequestId: prId, action: 'bon_commande_genere', userId, details: { numero: po.numero } });
-  await notifications.notify(pr.requester_user_id, 'Bon de commande généré', `Votre demande ${pr.numero} est validée : bon de commande ${po.numero} généré.`, `/purchase-requests/${prId}`);
+
+  // Le BC est généré dès la validation Finances, MAIS la demande passe ensuite en validation DGA
+  // finale (approuve/refuse). Repli sur l'ancien comportement (terminal) si l'étape décorative
+  // validation_dga n'est pas configurée (déploiement avant migration 066).
+  const template = await workflowEngine.getTemplate(MODULE_CODE);
+  const dgaStep = await workflowEngine.getStepByCode(template.id, 'validation_dga');
+  if (dgaStep) {
+    await repo.updateStatusAndStep(prId, 'en_validation_dga', dgaStep.id);
+    await notifications.notify(pr.requester_user_id, 'Bon de commande généré', `Votre demande ${pr.numero} : bon de commande ${po.numero} généré, en attente de la validation finale de la DGA.`, `/purchase-requests/${prId}`);
+    await notifications.notifyRoleOnEntity(pr.entity_id, 'validateur_besoin', 'Validation DGA requise', `La demande ${pr.numero} (bon de commande ${po.numero}) attend votre validation finale.`, `/purchase-requests/${prId}`);
+  } else {
+    await repo.updateStatusAndStep(prId, 'bon_commande_genere', null);
+    await notifications.notify(pr.requester_user_id, 'Bon de commande généré', `Votre demande ${pr.numero} est validée : bon de commande ${po.numero} généré.`, `/purchase-requests/${prId}`);
+  }
   return getFullDetail(prId);
 }
 

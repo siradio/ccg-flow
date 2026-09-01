@@ -32,7 +32,7 @@ async function getPendingAction(user) {
       const row = await one(
         `SELECT COUNT(*)::int AS count FROM purchase_requests pr
          LEFT JOIN workflow_steps ws ON ws.id = pr.current_step_id
-         WHERE pr.entity_id = $1 AND (pr.status = 'en_attente_validation_besoin' OR (pr.status = 'en_validation' AND ws.role_code_requis = $2))`,
+         WHERE pr.entity_id = $1 AND (pr.status = 'en_attente_validation_besoin' OR pr.status = 'en_validation_dga' OR (pr.status = 'en_validation' AND ws.role_code_requis = $2))`,
         [r.entity_id, r.role_code]
       );
       count = row.count;

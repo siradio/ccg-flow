@@ -6,6 +6,7 @@ export const STATUS_LABELS = {
   devis_en_cours: 'Devis en cours',
   devis_selectionne: 'Devis sélectionné',
   en_validation: 'En validation',
+  en_validation_dga: 'En validation DGA (après Finances)',
   validee: 'Validée',
   rejetee: 'Refusée',
   bon_commande_genere: 'Bon de commande généré',
@@ -13,7 +14,7 @@ export const STATUS_LABELS = {
 
 export const STATUS_ORDER = [
   'brouillon', 'en_attente_validation_besoin', 'soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne',
-  'en_validation', 'validee', 'bon_commande_genere', 'rejetee',
+  'en_validation', 'en_validation_dga', 'validee', 'bon_commande_genere', 'rejetee',
 ];
 
 // Renvoie vers les tokens --status-* (index.css), theme-aware (clair/sombre) — plutôt que des
@@ -26,6 +27,7 @@ export const STATUS_COLORS = {
   devis_en_cours: { bg: 'var(--status-amber-bg)', fg: 'var(--status-amber-fg)' },
   devis_selectionne: { bg: 'var(--status-amber-bg)', fg: 'var(--status-amber-fg)' },
   en_validation: { bg: 'var(--status-indigo-bg)', fg: 'var(--status-indigo-fg)' },
+  en_validation_dga: { bg: 'var(--status-violet-bg)', fg: 'var(--status-violet-fg)' },
   validee: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
   rejetee: { bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
   bon_commande_genere: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },

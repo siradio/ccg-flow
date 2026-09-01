@@ -616,9 +616,10 @@ function ValidationSection({ pr, refresh, showToast }) {
   if (pr.status === 'en_attente_validation_besoin') requiredRole = 'validateur_besoin';
   else if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
   else if (pr.status === 'en_validation') requiredRole = pr.current_step_role;
+  else if (pr.status === 'en_validation_dga') requiredRole = 'validateur_besoin';
 
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
-  const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin';
+  const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga';
 
   // Retour visuel géré localement (près des boutons) + anti double-clic : tant qu'un appel est en
   // cours, les boutons sont désactivés, ce qui évite les clics répétés et les erreurs en cascade.
