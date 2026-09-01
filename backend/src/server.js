@@ -108,6 +108,8 @@ async function start() {
     require('./modules/logistique/echeance-alerts').startEcheanceAlerts();
     // Planificateur des alertes de péremption des lots (refonte Stock).
     require('./modules/stock/peremption-alerts').startPeremptionAlerts();
+    // Planificateur des alertes d'expiration du permis de travail des employés (RH).
+    require('./modules/employees/permis-alerts').startPermisAlerts();
     // Scheduler des rapports planifiés (production/stock/achats par e-mail).
     require('./modules/reporting/scheduler').startReportScheduler();
   });
