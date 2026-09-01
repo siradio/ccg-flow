@@ -21,7 +21,9 @@ export default function WorkflowTimeline({ pr, steps }) {
   const sorted = [...steps].sort((a, b) => a.ordre - b.ordre);
 
   let currentOrdre;
-  if (pr.status === 'en_validation' || pr.status === 'rejetee') {
+  if (pr.status === 'en_validation' || pr.status === 'en_validation_dga' || pr.status === 'rejetee') {
+    // en_validation_dga : current_step_code vaut 'validation_dga' (étape finale, après generation_bc,
+    // qui apparaît donc « faite » = BC généré, la DGA étant l'étape courante).
     const cs = sorted.find(s => s.code === pr.current_step_code);
     currentOrdre = cs ? cs.ordre : sorted[sorted.length - 1].ordre + 1;
   } else {

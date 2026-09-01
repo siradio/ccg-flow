@@ -33,7 +33,7 @@ const bucketLabel = (unit) => (b) => { const [y, m, d] = b.split('-'); return un
 
 const STATUT_ACHAT = {
   brouillon: 'Brouillon', soumise: 'Soumise', en_analyse_achat: 'En analyse achat', devis_en_cours: 'Devis en cours',
-  devis_selectionne: 'Devis sélectionné', en_validation: 'En validation', en_attente_validation: 'En attente de validation',
+  devis_selectionne: 'Devis sélectionné', en_validation: 'En validation', en_validation_dga: 'En validation DGA', en_attente_validation: 'En attente de validation',
   validee: 'Validée', rejetee: 'Rejetée', refusee: 'Refusée', commandee: 'Commandée', recue: 'Reçue', cloturee: 'Clôturée',
   bon_commande_genere: 'Bon de commande généré',
 };
