@@ -1,18 +1,38 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSubModule, requireSubModuleWrite, requireSuperAdmin } = require('../../middleware/permissions');
+const { requireSubModule, requireSubModuleWrite } = require('../../middleware/permissions');
 const service = require('./employees.service');
 const permisAlerts = require('./permis-alerts');
+const settings = require('../settings/settings.service');
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireSubModule('rh'));
 const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('rh');
 
-// Envoi immédiat du récap des permis de travail à renouveler (test / relance manuelle), aux
-// destinataires configurés ou, à défaut, à l'utilisateur connecté. Réservé au super_admin.
-// Défini AVANT /:id pour ne pas être capté par la route dynamique.
-router.post('/permis-alert/test-alert', requireSuperAdmin, async (req, res, next) => {
+// Configuration de l'alerte d'expiration des permis de travail. Lecture ouverte à tout accès RH ;
+// modification et envoi manuel réservés au niveau ÉDITION du sous-module RH (droit d'ajout/suppression).
+// Définis AVANT /:id pour ne pas être captés par la route dynamique.
+router.get('/permis-alert/config', async (req, res, next) => {
+  try {
+    const actif = String(await settings.getValue('permis_alert_actif', 'false')) === 'true';
+    const jours = await settings.getIntValue('permis_alert_jours', 30);
+    const raw = String((await settings.getValue('permis_alert_emails', '')) || '');
+    res.json({ actif, jours, emails: raw === '—' ? '' : raw }); // '—' = placeholder d'enregistrement vide
+  } catch (e) { next(e); }
+});
+router.put('/permis-alert/config', requireEdit, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    await settings.setValue('permis_alert_actif', b.actif ? 'true' : 'false');
+    await settings.setValue('permis_alert_jours', String(b.jours || '30'));
+    await settings.setValue('permis_alert_emails', b.emails || '—');
+    res.json(await permisAlerts.getConfig());
+  } catch (e) { next(e); }
+});
+// Envoi immédiat du récap (test / relance manuelle), aux destinataires configurés ou, à défaut, à
+// l'utilisateur connecté. Niveau édition RH.
+router.post('/permis-alert/test-alert', requireEdit, async (req, res, next) => {
   try {
     const { jours, emails } = await permisAlerts.getConfig();
     const to = emails.length ? emails : [req.user.email].filter(Boolean);

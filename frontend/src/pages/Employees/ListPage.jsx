@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
-import { useAuth, hasSubModuleLevel, isSuperAdmin } from '../../auth/AuthContext';
+import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { StatutBadge } from './statutBadge.jsx';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import { useSort, SortTh } from '../../components/useSort.jsx';
@@ -11,7 +11,8 @@ export default function ListPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const canWrite = hasSubModuleLevel(user, 'rh', 'ajout');
-  const admin = isSuperAdmin(user);
+  // La planification de l'alerte est gérée par le RH ayant le niveau ÉDITION (droit d'ajout/suppression).
+  const canManageAlert = hasSubModuleLevel(user, 'rh', 'edition');
   const { sort, by, apply } = useSort();
   const [employees, setEmployees] = useState([]);
   const [entities, setEntities] = useState([]);
@@ -24,21 +25,19 @@ export default function ListPage() {
   useEffect(() => {
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
-    if (admin) {
-      client.get('/settings').then(r => setAlertCfg({
-        actif: String(r.data.permis_alert_actif) === 'true',
-        jours: r.data.permis_alert_jours || '30',
-        emails: r.data.permis_alert_emails || '',
+    if (canManageAlert) {
+      client.get('/employees/permis-alert/config').then(r => setAlertCfg({
+        actif: !!r.data.actif,
+        jours: r.data.jours || '30',
+        emails: r.data.emails || '',
       })).catch(() => {});
     }
-  }, [admin]);
+  }, [canManageAlert]);
 
   async function saveAlertCfg() {
     setAlertMsg('');
     try {
-      await client.put('/settings/permis_alert_actif', { value: alertCfg.actif ? 'true' : 'false' });
-      await client.put('/settings/permis_alert_jours', { value: String(alertCfg.jours || '30') });
-      await client.put('/settings/permis_alert_emails', { value: alertCfg.emails || '—' });
+      await client.put('/employees/permis-alert/config', { actif: alertCfg.actif, jours: alertCfg.jours || '30', emails: alertCfg.emails || '' });
       setAlertMsg(t('emp.alert.saved'));
     } catch (err) { setAlertMsg(err.response?.data?.error || t('emp.alert.saveFailed')); }
   }
@@ -141,7 +140,7 @@ export default function ListPage() {
         </div>
       </div>
 
-      {admin && (
+      {canManageAlert && (
         <section className="card" style={{ marginTop: 16, maxWidth: 720 }}>
           <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('emp.alert.title')}</h2>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('emp.alert.intro')}</p>
