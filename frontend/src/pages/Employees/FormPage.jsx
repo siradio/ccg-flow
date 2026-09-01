@@ -9,6 +9,9 @@ const EMPTY_FORM = {
   entity_id: '', business_unit_id: '', site_id: '', manager: '',
   date_embauche: '', type_contrat: '', statut: 'actif',
   salaire_mensuel: '', telephone: '', email: '',
+  // RH complémentaires
+  date_naissance: '', nationalite: '', numero_cnss: '', situation_familiale: '',
+  contact_urgence_nom: '', contact_urgence_tel: '', permis_travail: false, permis_travail_expiration: '',
 };
 
 export default function FormPage() {
@@ -43,6 +46,10 @@ export default function FormPage() {
         manager: e.manager || '', date_embauche: e.date_embauche ? e.date_embauche.slice(0, 10) : '',
         type_contrat: e.type_contrat || '', statut: e.statut || 'actif',
         salaire_mensuel: e.salaire_mensuel ?? '', telephone: e.telephone || '', email: e.email || '',
+        date_naissance: e.date_naissance ? e.date_naissance.slice(0, 10) : '',
+        nationalite: e.nationalite || '', numero_cnss: e.numero_cnss || '', situation_familiale: e.situation_familiale || '',
+        contact_urgence_nom: e.contact_urgence_nom || '', contact_urgence_tel: e.contact_urgence_tel || '',
+        permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
       });
       setLoaded(true);
     });
@@ -73,6 +80,14 @@ export default function FormPage() {
       type_contrat: form.type_contrat || null,
       telephone: form.telephone || null,
       email: form.email || null,
+      date_naissance: form.date_naissance || null,
+      nationalite: form.nationalite || null,
+      numero_cnss: form.numero_cnss || null,
+      situation_familiale: form.situation_familiale || null,
+      contact_urgence_nom: form.contact_urgence_nom || null,
+      contact_urgence_tel: form.contact_urgence_tel || null,
+      permis_travail: !!form.permis_travail,
+      permis_travail_expiration: (form.permis_travail && form.permis_travail_expiration) ? form.permis_travail_expiration : null,
     };
     try {
       if (isNew) {
@@ -168,6 +183,38 @@ export default function FormPage() {
             <label className="field">{t('login.email')}
               <input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
             </label>
+            <label className="field">{t('emp.birthDate')}
+              <input type="date" value={form.date_naissance} onChange={e => set('date_naissance', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.nationality')}
+              <input value={form.nationalite} onChange={e => set('nationalite', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.cnss')}
+              <input value={form.numero_cnss} onChange={e => set('numero_cnss', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.maritalStatus')}
+              <select value={form.situation_familiale} onChange={e => set('situation_familiale', e.target.value)}>
+                <option value="">—</option>
+                <option value="Célibataire">{t('emp.marital.single')}</option>
+                <option value="Marié(e)">{t('emp.marital.married')}</option>
+                <option value="Divorcé(e)">{t('emp.marital.divorced')}</option>
+                <option value="Veuf(ve)">{t('emp.marital.widowed')}</option>
+              </select>
+            </label>
+            <label className="field">{t('emp.emergencyName')}
+              <input value={form.contact_urgence_nom} onChange={e => set('contact_urgence_nom', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.emergencyPhone')}
+              <input value={form.contact_urgence_tel} onChange={e => set('contact_urgence_tel', e.target.value)} />
+            </label>
+            <label className="field" style={{ alignSelf: 'end' }}>
+              <span><input type="checkbox" checked={form.permis_travail} onChange={e => set('permis_travail', e.target.checked)} /> {t('emp.workPermit')}</span>
+            </label>
+            {form.permis_travail && (
+              <label className="field">{t('emp.workPermitExpiry')}
+                <input type="date" value={form.permis_travail_expiration} onChange={e => set('permis_travail_expiration', e.target.value)} />
+              </label>
+            )}
           </div>
 
           {error && <div className="alert alert-danger">{error}</div>}
