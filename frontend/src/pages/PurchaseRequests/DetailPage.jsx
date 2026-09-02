@@ -8,6 +8,7 @@ import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
 import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import { CURRENCIES } from '../../config/currencies';
 
 // Les téléchargements passent par l'API JWT : un <a href> direct n'enverrait pas le header
 // d'autorisation, d'où un fetch authentifié suivi de l'ouverture d'une blob URL.
@@ -96,6 +97,10 @@ export default function DetailPage() {
   }
 
   if (!pr) return <p>{t('prd.loading')}</p>;
+
+  // Le service achat peut ajuster la devise du bon de commande (reprise du devis, modifiable) tant que
+  // le BC n'est pas généré (statuts devis_selectionne / en_validation).
+  const canEditDevise = hasRoleOnEntity(user, 'service_achat', pr.entity_id) && ['devis_selectionne', 'en_validation'].includes(pr.status);
   const isRequester = pr.requester_user_id === user.id;
 
   return (
@@ -128,7 +133,19 @@ export default function DetailPage() {
         )}
         <p><strong>{t('prd.requester')} :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
         {pr.justification && <p><strong>{t('prc.justification')} :</strong> {pr.justification}</p>}
-        <p style={{ marginBottom: 0 }}><strong>{t('prd.finalAmount')} :</strong> {pr.montant_final ? `${pr.montant_final} ${pr.devise}` : '—'}</p>
+        <p style={{ marginBottom: 0 }}><strong>{t('prd.finalAmount')} :</strong>{' '}
+          {pr.montant_final ? (
+            <>
+              {pr.montant_final}{' '}
+              {canEditDevise ? (
+                <select value={pr.devise} style={{ padding: '2px 6px' }}
+                  onChange={e => guarded(() => client.put(`/purchase-requests/${pr.id}/devise`, { devise: e.target.value }), t('prd.deviseUpdated'))}>
+                  {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+                </select>
+              ) : pr.devise}
+            </>
+          ) : '—'}
+        </p>
       </section>
 
       {pr.attachments?.length > 0 && (
@@ -480,7 +497,7 @@ function QuotesSection({ pr, guarded }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
-  const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', notes: '', file: null });
+  const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', devise: pr.devise || 'GNF', notes: '', file: null });
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
@@ -494,10 +511,10 @@ function QuotesSection({ pr, guarded }) {
     const data = new FormData();
     data.append('quoteRequestSupplierId', form.quoteRequestSupplierId);
     data.append('montant', form.montant);
-    data.append('devise', pr.devise);
+    data.append('devise', form.devise || 'GNF');
     if (form.file) data.append('file', form.file);
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
-      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', notes: '', file: null }); });
+      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', devise: pr.devise || 'GNF', notes: '', file: null }); });
   }
 
   return (
@@ -538,6 +555,12 @@ function QuotesSection({ pr, guarded }) {
             {withoutQuote.map(s => <option key={s.id} value={s.id}>{s.supplier_nom}</option>)}
           </select>
           <input placeholder={t('prd.amount')} type="number" required value={form.montant} onChange={e => setForm({ ...form, montant: e.target.value })} style={{ width: 140 }} />
+          <label className="field" style={{ minWidth: 120 }}>
+            {t('prd.currency')}
+            <select value={form.devise} onChange={e => setForm({ ...form, devise: e.target.value })}>
+              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </label>
           <label className="field" style={{ minWidth: 220 }}>
             {t('prd.quoteFileLabel')}
             <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />

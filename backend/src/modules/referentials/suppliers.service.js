@@ -14,7 +14,7 @@ async function createSupplier(fields) {
   const {
     nom, contact_nom, contact_email, contact_tel, adresse, actif,
     code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
-    date_engagement,
+    date_engagement, devises,
   } = fields;
   if (!nom) throw httpError(400, 'nom obligatoire.');
 
@@ -23,15 +23,15 @@ async function createSupplier(fields) {
       `INSERT INTO suppliers
          (nom, contact_nom, contact_email, contact_tel, adresse, actif,
           code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
-          date_engagement)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          date_engagement, devises)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
       [
         nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
         actif === undefined ? true : actif,
         code || null, origine || null, pays || null, categorie || null, produits_offres || null,
         mode_paiement || null, conditions_paiement || null,
         a_contrat === undefined ? null : a_contrat, commentaires || null,
-        date_engagement || null,
+        date_engagement || null, Array.isArray(devises) ? devises : null,
       ]
     );
   } catch (e) {

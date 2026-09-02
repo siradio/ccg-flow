@@ -8,8 +8,9 @@ import EmptyState from '../../components/EmptyState';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import { CURRENCY_CODES } from '../../config/currencies';
 
-const DEVISES = ['GNF', 'USD', 'EUR'];
+const DEVISES = CURRENCY_CODES;
 
 function today() {
   return new Date().toISOString().slice(0, 10);

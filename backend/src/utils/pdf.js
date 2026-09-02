@@ -220,6 +220,11 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
     doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
       .text(`Montant total : ${money(purchaseOrder.montant)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
     doc.fillColor('black');
+    if (purchaseOrder.mode_paiement || purchaseOrder.conditions_paiement) {
+      doc.moveDown(0.8).fontSize(10).font('Helvetica');
+      if (purchaseOrder.mode_paiement) doc.text(`Mode de paiement : ${purchaseOrder.mode_paiement}`);
+      if (purchaseOrder.conditions_paiement) doc.text(`Conditions de paiement : ${purchaseOrder.conditions_paiement}`);
+    }
     renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom });
   });
 }

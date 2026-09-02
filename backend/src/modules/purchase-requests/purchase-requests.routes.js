@@ -117,6 +117,12 @@ router.post('/:id/quotes/:quoteId/select', requireAuth, async (req, res, next) =
   catch (e) { next(e); }
 });
 
+// Devise du bon de commande : reprise du devis retenu, modifiable par le service achat avant génération.
+router.put('/:id/devise', requireAuth, async (req, res, next) => {
+  try { res.json(await service.updateDevise(req.user, Number(req.params.id), (req.body || {}).devise)); }
+  catch (e) { next(e); }
+});
+
 router.post('/:id/validate-step', requireAuth, async (req, res, next) => {
   try { res.json(await service.validateStep(req.user, Number(req.params.id), (req.body || {}).comment)); }
   catch (e) { next(e); }

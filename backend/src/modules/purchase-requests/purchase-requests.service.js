@@ -534,8 +534,12 @@ async function generatePurchaseOrder(prId, userId) {
   const supplierId = lines.find(l => l.fournisseur_retenu_id)?.fournisseur_retenu_id;
   if (!supplierId) throw httpError(500, 'Aucun fournisseur retenu sur cette demande.');
 
+  // Instantané du mode & des conditions de paiement du fournisseur, repris sur le bon de commande.
+  const sup = await one('SELECT mode_paiement, conditions_paiement FROM suppliers WHERE id = $1', [supplierId]);
+
   let po = await poRepo.create({
     purchaseRequestId: prId, numero: `PENDING-${prId}`, supplierId, montant: pr.montant_final, devise: pr.devise,
+    modePaiement: sup?.mode_paiement || null, conditionsPaiement: sup?.conditions_paiement || null,
   });
   po = await poRepo.setNumero(po.id, numbering.formatOrderNumber(pr.entity_code, po.id));
   await audit.logAction({ tableName: 'purchase_orders', recordId: po.id, purchaseRequestId: prId, action: 'bon_commande_genere', userId, details: { numero: po.numero } });
@@ -553,6 +557,22 @@ async function generatePurchaseOrder(prId, userId) {
     await repo.updateStatusAndStep(prId, 'bon_commande_genere', null);
     await notifications.notify(pr.requester_user_id, 'Bon de commande généré', `Votre demande ${pr.numero} est validée : bon de commande ${po.numero} généré.`, `/purchase-requests/${prId}`);
   }
+  return getFullDetail(prId);
+}
+
+// Modifie la devise du bon de commande (reprise du devis retenu, ajustable par le service achat
+// tant que le BC n'est pas généré). Pas de conversion : la devise est une étiquette.
+const DEVISES_AUTORISEES = ['GNF', 'USD', 'EUR', 'XOF'];
+async function updateDevise(user, prId, devise) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'modifier la devise');
+  if (!DEVISES_AUTORISEES.includes(devise)) throw httpError(400, 'Devise invalide.');
+  if (!['devis_selectionne', 'en_validation'].includes(pr.status)) {
+    throw httpError(400, `La devise n'est plus modifiable depuis le statut "${pr.status}".`);
+  }
+  await one('UPDATE purchase_requests SET devise = $1, updated_at = now() WHERE id = $2', [devise, prId]);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'changement_devise', userId: user.id, details: { devise } });
   return getFullDetail(prId);
 }
 
@@ -589,6 +609,6 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
-  markSupplierConsulted, reopenConsultation,
+  markSupplierConsulted, reopenConsultation, updateDevise,
   validateStep, rejectStep, listForUser,
 };
