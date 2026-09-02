@@ -182,7 +182,7 @@ export default function DetailPage() {
 
       <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} entities={entities} />
       <QuotesSection pr={pr} guarded={guarded} suppliers={suppliers} />
-      <ValidationSection pr={pr} refresh={refresh} showToast={showToast} />
+      <ValidationSection pr={pr} refresh={refresh} showToast={showToast} steps={steps} />
 
       {pr.purchase_order && (
         <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
@@ -668,12 +668,14 @@ function PurchaseOrderSection({ po, canSend }) {
   );
 }
 
-function ValidationSection({ pr, refresh, showToast }) {
+function ValidationSection({ pr, refresh, showToast, steps = [] }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState(null); // 'validate' | 'reject' | null — désactive les boutons pendant l'appel
-  const [msg, setMsg] = useState(null);   // { type: 'success' | 'error', text } — retour affiché SOUS les boutons
+  const [busy, setBusy] = useState(null); // 'validate' | 'reject' | 'complement' | null
+  const [msg, setMsg] = useState(null);   // { type, text } — retour affiché sous les boutons
+  const [complement, setComplement] = useState(false); // panneau « renvoyer pour complément »
+  const [targetStep, setTargetStep] = useState('');
 
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
@@ -686,19 +688,36 @@ function ValidationSection({ pr, refresh, showToast }) {
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
   const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga';
 
-  // Retour visuel géré localement (près des boutons) + anti double-clic : tant qu'un appel est en
-  // cours, les boutons sont désactivés, ce qui évite les clics répétés et les erreurs en cascade.
+  // Étapes AMONT sélectionnables pour un renvoi pour complément (ordre inférieur à l'étape courante,
+  // hors étapes système/BC). L'ordre courant dépend du statut (le circuit est semi-codé en dur).
+  const byCode = (c) => steps.find(s => s.code === c);
+  let currentOrdre = null;
+  if (pr.status === 'en_validation') currentOrdre = steps.find(s => s.code === pr.current_step_code)?.ordre ?? null;
+  else if (pr.status === 'en_validation_dga') currentOrdre = byCode('validation_dga')?.ordre ?? Infinity;
+  else if (pr.status === 'devis_selectionne') currentOrdre = byCode('validation_achat')?.ordre ?? null;
+  else if (pr.status === 'en_attente_validation_besoin') currentOrdre = byCode('expression_besoin')?.ordre ?? null;
+  const targets = (currentOrdre == null) ? []
+    : steps.filter(s => s.ordre < currentOrdre && s.role_code_requis && !['generation_bc', 'validation_dga'].includes(s.code))
+      .sort((a, b) => a.ordre - b.ordre);
+  const canRequestChanges = targets.length > 0;
+
+  // Retour visuel local + anti double-clic : les boutons sont désactivés pendant l'appel.
   async function act(kind) {
     if (busy) return;
-    const path = kind === 'reject' ? 'reject-step' : 'validate-step';
-    const successText = kind === 'reject' ? t('prd.requestRejected') : t('prd.stepValidated');
+    if (kind === 'complement' && (!targetStep || !comment.trim())) {
+      setMsg({ type: 'error', text: t('prd.complementNeed') });
+      return;
+    }
+    const path = kind === 'reject' ? 'reject-step' : kind === 'complement' ? 'request-changes' : 'validate-step';
+    const successText = kind === 'reject' ? t('prd.requestRejected') : kind === 'complement' ? t('prd.complementSent') : t('prd.stepValidated');
     setBusy(kind);
     setMsg(null);
     try {
-      await client.post(`/purchase-requests/${pr.id}/${path}`, { comment });
+      const body = kind === 'complement' ? { comment, targetStepCode: targetStep } : { comment };
+      await client.post(`/purchase-requests/${pr.id}/${path}`, body);
       setMsg({ type: 'success', text: successText });
       showToast(successText);
-      await refresh(); // le statut avance : cette section peut alors disparaître (ce n'est plus notre tour)
+      await refresh(); // le statut change : cette section peut alors disparaître (plus notre tour)
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.error || t('prd.genericError') });
     } finally {
@@ -706,22 +725,48 @@ function ValidationSection({ pr, refresh, showToast }) {
     }
   }
 
+  const showComment = canReject || complement;
   return (
     <section className="card">
       <h2>{t('prd.validation')}</h2>
-      {canReject && (
-        <textarea placeholder={t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
+      {showComment && (
+        <textarea placeholder={complement ? t('prd.complementPlaceholder') : t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
           disabled={!!busy}
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
+      {complement && (
+        <label className="field" style={{ display: 'block', marginBottom: 10, maxWidth: 420 }}>
+          {t('prd.complementTarget')}
+          <select value={targetStep} onChange={e => setTargetStep(e.target.value)}>
+            <option value="">{t('prd.complementTargetDots')}</option>
+            {targets.map(s => <option key={s.code} value={s.code}>{s.nom}</option>)}
+          </select>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
-          {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
-        </button>
-        {canReject && (
-          <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
-            {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}
-          </button>
+        {complement ? (
+          <>
+            <button className="btn btn-primary" disabled={!!busy || !targetStep || !comment.trim()} onClick={() => act('complement')}>
+              {busy === 'complement' ? t('prd.sending') : t('prd.complementSend')}
+            </button>
+            <button className="btn btn-secondary" disabled={!!busy} onClick={() => { setComplement(false); setTargetStep(''); }}>{t('common.cancel')}</button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
+              {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
+            </button>
+            {canReject && (
+              <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
+                {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}
+              </button>
+            )}
+            {canRequestChanges && (
+              <button className="btn btn-secondary" disabled={!!busy} onClick={() => { setComplement(true); setMsg(null); }}>
+                {t('prd.requestChanges')}
+              </button>
+            )}
+          </>
         )}
       </div>
       {msg && (

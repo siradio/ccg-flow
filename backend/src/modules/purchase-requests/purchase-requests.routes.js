@@ -135,6 +135,15 @@ router.post('/:id/reject-step', requireAuth, async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+// Renvoyer pour complément à une étape amont choisie (demande de modification non bloquante, avec
+// commentaire obligatoire et notification des titulaires de l'étape cible).
+router.post('/:id/request-changes', requireAuth, async (req, res, next) => {
+  try {
+    const { comment, targetStepCode } = req.body || {};
+    res.json(await service.requestChanges(req.user, Number(req.params.id), { targetStepCode, comment }));
+  } catch (e) { next(e); }
+});
+
 // Rouvre la consultation (annule le bon de commande / la sélection) pour poursuivre le choix du fournisseur.
 router.post('/:id/reopen-consultation', requireAuth, async (req, res, next) => {
   try { res.json(await service.reopenConsultation(req.user, Number(req.params.id), (req.body || {}).comment)); }
