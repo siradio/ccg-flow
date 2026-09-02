@@ -24,7 +24,7 @@ export const SUPPLIER_FIELDS = [
   { key: 'conditions_paiement', labelKey: 'refx.f.conditions_paiement' },
   { key: 'a_contrat', labelKey: 'refx.f.a_contrat', type: 'checkbox' },
   { key: 'date_engagement', labelKey: 'refx.f.date_engagement', type: 'date' },
-  { key: 'devises', labelKey: 'refx.f.devises', type: 'multiCheck', options: ['GNF', 'USD', 'EUR', 'XOF'], optionNs: 'cur' },
+  { key: 'devises', labelKey: 'refx.f.devises', type: 'multiCheck', options: ['GNF', 'USD', 'EUR', 'XOF'], optionNs: 'cur', default: ['GNF', 'USD', 'EUR', 'XOF'] },
   { key: 'actif', labelKey: 'refx.f.actif', type: 'checkbox', default: true },
   { key: 'commentaires', labelKey: 'refx.f.commentaires', type: 'textarea' },
   { key: 'entity_ids', labelKey: 'refx.f.entity_ids', type: 'multiEntity', defaultAll: true },

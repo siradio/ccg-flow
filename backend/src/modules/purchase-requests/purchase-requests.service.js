@@ -304,15 +304,29 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo });
 }
 
-async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }, file) {
+async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes, lignes }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
   if (pr.status !== 'devis_en_cours') throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
-  if (!montant) throw httpError(400, 'montant requis.');
 
-  const quote = await repo.createQuote(quoteRequestSupplierId, montant, devise || pr.devise, notes);
-  await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant, devise } });
+  // Nouveau modèle : prix unitaire par ligne → montant = somme(quantité × prix). Repli sur le
+  // montant global (ancien client) si aucune ligne n'est fournie.
+  let total = Number(montant) || 0;
+  let lignesRows = null;
+  if (Array.isArray(lignes) && lignes.length) {
+    const prLines = await repo.getLines(prId);
+    const byId = new Map(prLines.map(l => [l.id, l]));
+    lignesRows = lignes
+      .filter(x => byId.has(Number(x.lineId)))
+      .map(x => ({ lineId: Number(x.lineId), prixUnitaire: Number(x.prixUnitaire) || 0 }));
+    total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
+  }
+  if (!total) throw httpError(400, 'Saisissez au moins un prix de ligne (ou un montant).');
+
+  const quote = await repo.createQuote(quoteRequestSupplierId, total, devise || pr.devise, notes);
+  if (lignesRows) await repo.createQuoteLines(quote.id, lignesRows);
+  await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant: total, devise } });
   // Le devis PDF du fournisseur s'attache ici, directement au moment de la saisie du montant —
   // remplace l'ancien flux à deux étapes (saisir le devis, puis chercher la pièce jointe générique
   // plus bas sur la page) par un seul geste, et rattache le fichier à CE devis précis (quote_id),
@@ -336,8 +350,17 @@ async function selectQuote(user, prId, quoteId) {
   if (!selected) throw httpError(404, 'Devis introuvable.');
   const quote = await repo.getQuote(quoteId);
   await repo.setLinesFournisseurRetenu(prId, quote.supplier_id);
-  await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
-  await repo.setMontantFinal(prId, quote.montant, quote.devise);
+  // Nouveau modèle : on recopie les prix par ligne du devis retenu (plus de répartition à parts
+  // égales). Repli sur l'ancienne répartition si le devis n'a pas de détail ligne (ancien devis).
+  const quoteLines = await repo.getQuoteLines(quoteId);
+  let montantFinal;
+  if (quoteLines.length) {
+    montantFinal = await repo.applyQuoteLinesToPrLines(prId, quoteLines);
+  } else {
+    await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
+    montantFinal = quote.montant;
+  }
+  await repo.setMontantFinal(prId, montantFinal, quote.devise);
   await repo.updateStatusAndStep(prId, 'devis_selectionne', null);
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
   return getFullDetail(prId);

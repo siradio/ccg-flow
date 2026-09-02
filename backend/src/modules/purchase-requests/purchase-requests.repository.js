@@ -265,6 +265,35 @@ async function createQuote(quoteRequestSupplierId, montant, devise, notes) {
   );
 }
 
+// Prix par ligne d'un devis (nouveau modèle : un prix unitaire par article de la demande).
+async function createQuoteLines(quoteId, rows) {
+  for (const r of rows) {
+    await run(
+      `INSERT INTO quote_lines (quote_id, purchase_request_line_id, prix_unitaire) VALUES ($1,$2,$3)
+       ON CONFLICT (quote_id, purchase_request_line_id) DO UPDATE SET prix_unitaire = EXCLUDED.prix_unitaire`,
+      [quoteId, r.lineId, r.prixUnitaire]
+    );
+  }
+}
+
+async function getQuoteLines(quoteId) {
+  return all('SELECT purchase_request_line_id, prix_unitaire FROM quote_lines WHERE quote_id = $1', [quoteId]);
+}
+
+// Applique les prix par ligne du devis retenu sur les lignes de la demande (prix_unitaire_final)
+// et renvoie le montant final = somme(quantité × prix unitaire).
+async function applyQuoteLinesToPrLines(prId, quoteLines) {
+  const lines = await getLines(prId);
+  const priceByLine = new Map(quoteLines.map(q => [Number(q.purchase_request_line_id), Number(q.prix_unitaire)]));
+  let total = 0;
+  for (const line of lines) {
+    const pu = priceByLine.has(line.id) ? priceByLine.get(line.id) : 0;
+    total += pu * Number(line.quantite);
+    await run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [pu, line.id]);
+  }
+  return total;
+}
+
 async function getQuote(id) {
   return one(
     `SELECT q.*, qrs.quote_request_id, qrs.supplier_id, s.nom AS supplier_nom
@@ -381,6 +410,7 @@ module.exports = {
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,
   createQuote, getQuote, getQuotesForPR, selectQuote, getAttachments,
+  createQuoteLines, getQuoteLines, applyQuoteLinesToPrLines,
   createApproval, getPendingApproval, decideApproval, getApprovalsForPR,
   unselectAllQuotes, clearLinesSelection, clearMontantFinal, deletePendingApprovals,
 };

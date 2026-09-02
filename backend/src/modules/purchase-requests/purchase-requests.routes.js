@@ -108,7 +108,9 @@ router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, 
 router.post('/:id/quotes', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     const { quoteRequestSupplierId, montant, devise, notes } = req.body || {};
-    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes }, req.file));
+    let lignes = null;
+    try { lignes = req.body.lignes ? JSON.parse(req.body.lignes) : null; } catch { lignes = null; }
+    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes, lignes }, req.file));
   } catch (e) { next(e); }
 });
 
