@@ -1,10 +1,10 @@
 const { all, one, run } = require('../../db');
 
-async function create({ purchaseRequestId, numero, supplierId, montant, devise }) {
+async function create({ purchaseRequestId, numero, supplierId, montant, devise, modePaiement = null, conditionsPaiement = null }) {
   return one(
-    `INSERT INTO purchase_orders (purchase_request_id, numero, supplier_id, montant, devise)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [purchaseRequestId, numero, supplierId, montant, devise]
+    `INSERT INTO purchase_orders (purchase_request_id, numero, supplier_id, montant, devise, mode_paiement, conditions_paiement)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [purchaseRequestId, numero, supplierId, montant, devise, modePaiement, conditionsPaiement]
   );
 }
 
