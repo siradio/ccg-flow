@@ -188,12 +188,12 @@ async function setAccessStatus(id, status) {
   return loadUserWithRoles(id);
 }
 
-async function updateUser(id, { nom, prenom, email, actif, password, telephone, fonction }) {
+async function updateUser(id, { nom, prenom, email, actif, password, telephone, fonction, employeeId }) {
   const existing = await one('SELECT * FROM users WHERE id = $1', [id]);
   if (!existing) return null;
   const hash = password ? bcrypt.hashSync(password, 10) : existing.password_hash;
   await run(
-    'UPDATE users SET nom=$1, prenom=$2, email=$3, actif=$4, password_hash=$5, telephone=$6, fonction=$7 WHERE id=$8',
+    'UPDATE users SET nom=$1, prenom=$2, email=$3, actif=$4, password_hash=$5, telephone=$6, fonction=$7, employee_id=$8 WHERE id=$9',
     [
       nom ?? existing.nom,
       prenom ?? existing.prenom,
@@ -202,6 +202,7 @@ async function updateUser(id, { nom, prenom, email, actif, password, telephone, 
       hash,
       telephone === undefined ? existing.telephone : telephone,
       fonction === undefined ? existing.fonction : fonction,
+      employeeId === undefined ? existing.employee_id : (employeeId || null),
       id,
     ]
   );

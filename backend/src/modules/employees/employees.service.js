@@ -39,6 +39,8 @@ const WRITABLE_FIELDS = [
   // RH complémentaires (migration 067)
   'date_naissance', 'nationalite', 'numero_cnss', 'situation_familiale',
   'contact_urgence_nom', 'contact_urgence_tel', 'permis_travail', 'permis_travail_expiration',
+  // Responsable hiérarchique (module RH, Lot 0)
+  'manager_employee_id',
 ];
 
 async function create(body) {

@@ -20,6 +20,7 @@ async function requireAuth(req, res, next) {
       nom: full.nom,
       prenom: full.prenom,
       email: full.email,
+      employee_id: full.employee_id, // lien vers la fiche employé (module RH) — peut être null
       roles: full.roles.map(r => ({ entity_id: r.entity_id, entity_code: r.entity_code, role_code: r.role_code })),
       subModules: full.subModules,
       businessUnits: full.businessUnits,
