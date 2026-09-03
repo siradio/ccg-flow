@@ -108,7 +108,9 @@ router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, 
 router.post('/:id/quotes', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     const { quoteRequestSupplierId, montant, devise, notes } = req.body || {};
-    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes }, req.file));
+    let lignes = null;
+    try { lignes = req.body.lignes ? JSON.parse(req.body.lignes) : null; } catch { lignes = null; }
+    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes, lignes }, req.file));
   } catch (e) { next(e); }
 });
 
@@ -131,6 +133,15 @@ router.post('/:id/validate-step', requireAuth, async (req, res, next) => {
 router.post('/:id/reject-step', requireAuth, async (req, res, next) => {
   try { res.json(await service.rejectStep(req.user, Number(req.params.id), (req.body || {}).comment)); }
   catch (e) { next(e); }
+});
+
+// Renvoyer pour complément à une étape amont choisie (demande de modification non bloquante, avec
+// commentaire obligatoire et notification des titulaires de l'étape cible).
+router.post('/:id/request-changes', requireAuth, async (req, res, next) => {
+  try {
+    const { comment, targetStepCode } = req.body || {};
+    res.json(await service.requestChanges(req.user, Number(req.params.id), { targetStepCode, comment }));
+  } catch (e) { next(e); }
 });
 
 // Rouvre la consultation (annule le bon de commande / la sélection) pour poursuivre le choix du fournisseur.

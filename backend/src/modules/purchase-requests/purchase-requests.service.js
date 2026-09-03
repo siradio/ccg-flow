@@ -304,15 +304,29 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo });
 }
 
-async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes }, file) {
+async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes, lignes }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
   if (pr.status !== 'devis_en_cours') throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
-  if (!montant) throw httpError(400, 'montant requis.');
 
-  const quote = await repo.createQuote(quoteRequestSupplierId, montant, devise || pr.devise, notes);
-  await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant, devise } });
+  // Nouveau modèle : prix unitaire par ligne → montant = somme(quantité × prix). Repli sur le
+  // montant global (ancien client) si aucune ligne n'est fournie.
+  let total = Number(montant) || 0;
+  let lignesRows = null;
+  if (Array.isArray(lignes) && lignes.length) {
+    const prLines = await repo.getLines(prId);
+    const byId = new Map(prLines.map(l => [l.id, l]));
+    lignesRows = lignes
+      .filter(x => byId.has(Number(x.lineId)))
+      .map(x => ({ lineId: Number(x.lineId), prixUnitaire: Number(x.prixUnitaire) || 0 }));
+    total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
+  }
+  if (!total) throw httpError(400, 'Saisissez au moins un prix de ligne (ou un montant).');
+
+  const quote = await repo.createQuote(quoteRequestSupplierId, total, devise || pr.devise, notes);
+  if (lignesRows) await repo.createQuoteLines(quote.id, lignesRows);
+  await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant: total, devise } });
   // Le devis PDF du fournisseur s'attache ici, directement au moment de la saisie du montant —
   // remplace l'ancien flux à deux étapes (saisir le devis, puis chercher la pièce jointe générique
   // plus bas sur la page) par un seul geste, et rattache le fichier à CE devis précis (quote_id),
@@ -336,8 +350,17 @@ async function selectQuote(user, prId, quoteId) {
   if (!selected) throw httpError(404, 'Devis introuvable.');
   const quote = await repo.getQuote(quoteId);
   await repo.setLinesFournisseurRetenu(prId, quote.supplier_id);
-  await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
-  await repo.setMontantFinal(prId, quote.montant, quote.devise);
+  // Nouveau modèle : on recopie les prix par ligne du devis retenu (plus de répartition à parts
+  // égales). Repli sur l'ancienne répartition si le devis n'a pas de détail ligne (ancien devis).
+  const quoteLines = await repo.getQuoteLines(quoteId);
+  let montantFinal;
+  if (quoteLines.length) {
+    montantFinal = await repo.applyQuoteLinesToPrLines(prId, quoteLines);
+  } else {
+    await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
+    montantFinal = quote.montant;
+  }
+  await repo.setMontantFinal(prId, montantFinal, quote.devise);
   await repo.updateStatusAndStep(prId, 'devis_selectionne', null);
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
   return getFullDetail(prId);
@@ -560,6 +583,60 @@ async function generatePurchaseOrder(prId, userId) {
   return getFullDetail(prId);
 }
 
+// Renvoyer pour complément à une étape AMONT choisie : demande de modification non bloquante (≠ refus),
+// avec commentaire obligatoire, notification des titulaires de l'étape cible. Le circuit étant
+// semi-codé en dur, on mappe l'étape cible vers le statut adéquat.
+async function requestChanges(user, prId, { targetStepCode, comment }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (!comment || !comment.trim()) throw httpError(400, 'Un commentaire est obligatoire pour une demande de complément.');
+  const template = await workflowEngine.getTemplate(MODULE_CODE);
+  const steps = await workflowEngine.getSteps(template.id);
+
+  // Étape courante (ordre + rôle requis) selon le statut — même gating que validate/reject.
+  let currentOrdre = null, currentRole = null;
+  if (pr.status === 'en_validation' && pr.current_step_id) {
+    const cur = steps.find(s => s.id === pr.current_step_id);
+    currentOrdre = cur ? cur.ordre : null; currentRole = cur ? cur.role_code_requis : null;
+  } else if (pr.status === 'en_validation_dga') {
+    currentOrdre = steps.find(s => s.code === 'validation_dga')?.ordre ?? Infinity; currentRole = 'validateur_besoin';
+  } else if (pr.status === 'devis_selectionne') {
+    currentOrdre = steps.find(s => s.code === 'validation_achat')?.ordre ?? null; currentRole = 'service_achat';
+  } else if (pr.status === 'en_attente_validation_besoin') {
+    currentOrdre = steps.find(s => s.code === 'expression_besoin')?.ordre ?? null; currentRole = 'validateur_besoin';
+  } else {
+    throw httpError(400, `Aucune demande de complément possible depuis le statut "${pr.status}".`);
+  }
+  if (!currentRole) throw httpError(400, 'Étape courante indéterminée.');
+  await assertRole(user, currentRole, pr.entity_id, 'renvoyer pour complément');
+
+  const target = steps.find(s => s.code === targetStepCode);
+  if (!target) throw httpError(400, 'Étape cible inconnue.');
+  if (!target.role_code_requis || ['generation_bc', 'validation_dga'].includes(target.code)) throw httpError(400, 'Étape cible invalide.');
+  if (currentOrdre != null && !(Number(target.ordre) < Number(currentOrdre))) throw httpError(400, 'On ne peut renvoyer que vers une étape en amont.');
+
+  // Un bon de commande déjà généré (renvoi depuis la validation DGA) est annulé : on repart en amont.
+  if (['en_validation_dga', 'bon_commande_genere'].includes(pr.status)) await poRepo.deleteByPurchaseRequestId(prId);
+  await repo.deletePendingApprovals(prId); // les validations en attente en cours sont abandonnées
+
+  const role = target.role_code_requis;
+  let newStatus, newStepId = null, notifyRole = null, notifyRequester = false;
+  if (target.code === 'expression_besoin') { newStatus = 'en_attente_validation_besoin'; notifyRole = 'validateur_besoin'; }
+  else if (role === 'demandeur' || target.code === 'soumission') { newStatus = 'brouillon'; notifyRequester = true; }
+  else if (role === 'service_achat') { newStatus = 'devis_en_cours'; notifyRole = 'service_achat'; }
+  else { newStatus = 'en_validation'; newStepId = target.id; notifyRole = role; }
+
+  await repo.updateStatusAndStep(prId, newStatus, newStepId);
+  if (newStatus === 'en_validation') await repo.createApproval(prId, target.id);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'demande_complement', userId: user.id, details: { commentaire: comment, etape_cible: target.nom } });
+
+  const link = `/purchase-requests/${prId}`;
+  const message = `La demande ${pr.numero} vous est renvoyée pour complément (${target.nom}) : ${comment}`;
+  if (notifyRequester) await notifications.notify(pr.requester_user_id, 'Demande de complément', message, link);
+  if (notifyRole) await notifications.notifyRoleOnEntity(pr.entity_id, notifyRole, 'Demande de complément', message, link);
+  return getFullDetail(prId);
+}
+
 // Modifie la devise du bon de commande (reprise du devis retenu, ajustable par le service achat
 // tant que le BC n'est pas généré). Pas de conversion : la devise est une étiquette.
 const DEVISES_AUTORISEES = ['GNF', 'USD', 'EUR', 'XOF'];
@@ -610,5 +687,5 @@ module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
-  validateStep, rejectStep, listForUser,
+  validateStep, rejectStep, requestChanges, listForUser,
 };

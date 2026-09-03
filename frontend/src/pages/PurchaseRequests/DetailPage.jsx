@@ -181,8 +181,8 @@ export default function DetailPage() {
       )}
 
       <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} entities={entities} />
-      <QuotesSection pr={pr} guarded={guarded} />
-      <ValidationSection pr={pr} refresh={refresh} showToast={showToast} />
+      <QuotesSection pr={pr} guarded={guarded} suppliers={suppliers} />
+      <ValidationSection pr={pr} refresh={refresh} showToast={showToast} steps={steps} />
 
       {pr.purchase_order && (
         <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
@@ -212,6 +212,8 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   const { t } = useI18n();
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const editable = pr.status === 'brouillon' && isRequester;
+  const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
+  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR');
 
   async function addLine(e) {
     e.preventDefault();
@@ -228,7 +230,9 @@ function LinesSection({ pr, products, isRequester, guarded }) {
       <div className="table-wrap" style={{ marginBottom: editable ? 12 : 0 }}>
         <table>
           <thead><tr>
-            <th>{t('prd.designation')}</th><th>{t('prd.quantity')}</th><th>{t('prd.unit')}</th><th>{t('prd.selectedSupplier')}</th>{editable && <th />}
+            <th>{t('prd.designation')}</th><th>{t('prd.quantity')}</th><th>{t('prd.unit')}</th>
+            {showPrices && <><th className="num">{t('prd.unitPrice')}</th><th className="num">{t('prd.lineTotal')}</th></>}
+            <th>{t('prd.selectedSupplier')}</th>{editable && <th />}
           </tr></thead>
           <tbody>
             {pr.lines.map(l => (
@@ -236,6 +240,10 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                 <td>{l.designation || l.description_libre}</td>
                 <td>{l.quantite}</td>
                 <td>{l.unite}</td>
+                {showPrices && <>
+                  <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{l.prix_unitaire_final != null ? `${money(l.prix_unitaire_final)} ${pr.devise}` : '—'}</td>
+                  <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{l.prix_unitaire_final != null ? `${money(Number(l.prix_unitaire_final) * Number(l.quantite))} ${pr.devise}` : '—'}</td>
+                </>}
                 <td>{l.fournisseur_retenu_id ? '✓' : '—'}</td>
                 {editable && (
                   <td>
@@ -247,7 +255,7 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                 )}
               </tr>
             ))}
-            {pr.lines.length === 0 && <tr><td className="empty-row" colSpan={editable ? 5 : 4}>{t('prd.noLines')}</td></tr>}
+            {pr.lines.length === 0 && <tr><td className="empty-row" colSpan={(editable ? 5 : 4) + (showPrices ? 2 : 0)}>{t('prd.noLines')}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -493,29 +501,41 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   );
 }
 
-function QuotesSection({ pr, guarded }) {
+function QuotesSection({ pr, guarded, suppliers = [] }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
-  const [form, setForm] = useState({ quoteRequestSupplierId: '', montant: '', devise: pr.devise || 'GNF', notes: '', file: null });
+  const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {} };
+  const [form, setForm] = useState(emptyQuoteForm);
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
   const canAddQuote = canAct && pr.status === 'devis_en_cours';
   const canSelect = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
+  const lines = pr.lines || [];
+
+  // Devises proposées : celles déclarées par le fournisseur choisi (référentiel), sinon les 4 par
+  // défaut. GNF reste la valeur par défaut de la liste.
+  const chosen = withoutQuote.find(s => String(s.id) === String(form.quoteRequestSupplierId));
+  const chosenSupplier = chosen && suppliers.find(x => x.id === chosen.supplier_id);
+  const deviseOptions = (chosenSupplier?.devises?.length ? chosenSupplier.devises : CURRENCIES.map(c => c.code));
+
+  const quoteTotal = lines.reduce((s, l) => s + (Number(form.prices[l.id]) || 0) * Number(l.quantite || 0), 0);
 
   if (pr.quotes.length === 0 && withoutQuote.length === 0) return null;
 
   function submitQuote(e) {
     e.preventDefault();
+    const lignes = lines.map(l => ({ lineId: l.id, prixUnitaire: Number(form.prices[l.id]) || 0 }));
     const data = new FormData();
     data.append('quoteRequestSupplierId', form.quoteRequestSupplierId);
-    data.append('montant', form.montant);
     data.append('devise', form.devise || 'GNF');
+    data.append('lignes', JSON.stringify(lignes));
     if (form.file) data.append('file', form.file);
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
-      .then(ok => { if (ok) setForm({ quoteRequestSupplierId: '', montant: '', devise: pr.devise || 'GNF', notes: '', file: null }); });
+      .then(ok => { if (ok) setForm(emptyQuoteForm); });
   }
+  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR');
 
   return (
     <section className="card">
@@ -549,23 +569,45 @@ function QuotesSection({ pr, guarded }) {
         </table>
       </div>
       {canAddQuote && withoutQuote.length > 0 && (
-        <form onSubmit={submitQuote} className="form-inline">
-          <select required value={form.quoteRequestSupplierId} onChange={e => setForm({ ...form, quoteRequestSupplierId: e.target.value })}>
-            <option value="">{t('prd.supplierDots')}</option>
-            {withoutQuote.map(s => <option key={s.id} value={s.id}>{s.supplier_nom}</option>)}
-          </select>
-          <input placeholder={t('prd.amount')} type="number" required value={form.montant} onChange={e => setForm({ ...form, montant: e.target.value })} style={{ width: 140 }} />
-          <label className="field" style={{ minWidth: 120 }}>
-            {t('prd.currency')}
-            <select value={form.devise} onChange={e => setForm({ ...form, devise: e.target.value })}>
-              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
-            </select>
-          </label>
-          <label className="field" style={{ minWidth: 220 }}>
-            {t('prd.quoteFileLabel')}
-            <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
-          </label>
-          <button type="submit" className="btn btn-primary">{t('prd.saveQuote')}</button>
+        <form onSubmit={submitQuote}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+            <label className="field" style={{ minWidth: 200 }}>{t('prd.supplier')}
+              <select required value={form.quoteRequestSupplierId} onChange={e => { const s = withoutQuote.find(x => String(x.id) === e.target.value); const sup = s && suppliers.find(y => y.id === s.supplier_id); const opts = sup?.devises?.length ? sup.devises : CURRENCIES.map(c => c.code); setForm({ ...form, quoteRequestSupplierId: e.target.value, devise: opts.includes('GNF') ? 'GNF' : opts[0] }); }}>
+                <option value="">{t('prd.supplierDots')}</option>
+                {withoutQuote.map(s => <option key={s.id} value={s.id}>{s.supplier_nom}</option>)}
+              </select>
+            </label>
+            <label className="field" style={{ minWidth: 130 }}>{t('prd.currency')}
+              <select value={form.devise} onChange={e => setForm({ ...form, devise: e.target.value })}>
+                {deviseOptions.map(code => { const c = CURRENCIES.find(x => x.code === code); return <option key={code} value={code}>{c ? c.label : code}</option>; })}
+              </select>
+            </label>
+            <label className="field" style={{ minWidth: 220 }}>{t('prd.quoteFileLabel')}
+              <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
+            </label>
+          </div>
+          {form.quoteRequestSupplierId && (
+            <div className="table-wrap" style={{ marginBottom: 12 }}>
+              <table>
+                <thead><tr><th>{t('prd.designation')}</th><th className="num">{t('prd.quantity')}</th><th className="num">{t('prd.unitPrice')}</th><th className="num">{t('prd.lineTotal')}</th></tr></thead>
+                <tbody>
+                  {lines.map(l => (
+                    <tr key={l.id}>
+                      <td>{l.designation || l.description_libre}</td>
+                      <td className="num">{l.quantite} {l.unite || ''}</td>
+                      <td className="num">
+                        <input type="number" min="0" step="0.01" style={{ width: 130, textAlign: 'right' }}
+                          value={form.prices[l.id] ?? ''} onChange={e => setForm(f => ({ ...f, prices: { ...f.prices, [l.id]: e.target.value } }))} />
+                      </td>
+                      <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{money((Number(form.prices[l.id]) || 0) * Number(l.quantite || 0))} {form.devise}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.quoteTotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(quoteTotal)} {form.devise}</td></tr></tfoot>
+              </table>
+            </div>
+          )}
+          <button type="submit" className="btn btn-primary" disabled={!form.quoteRequestSupplierId || quoteTotal <= 0}>{t('prd.saveQuote')}</button>
         </form>
       )}
     </section>
@@ -626,12 +668,14 @@ function PurchaseOrderSection({ po, canSend }) {
   );
 }
 
-function ValidationSection({ pr, refresh, showToast }) {
+function ValidationSection({ pr, refresh, showToast, steps = [] }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState(null); // 'validate' | 'reject' | null — désactive les boutons pendant l'appel
-  const [msg, setMsg] = useState(null);   // { type: 'success' | 'error', text } — retour affiché SOUS les boutons
+  const [busy, setBusy] = useState(null); // 'validate' | 'reject' | 'complement' | null
+  const [msg, setMsg] = useState(null);   // { type, text } — retour affiché sous les boutons
+  const [complement, setComplement] = useState(false); // panneau « renvoyer pour complément »
+  const [targetStep, setTargetStep] = useState('');
 
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
@@ -644,19 +688,36 @@ function ValidationSection({ pr, refresh, showToast }) {
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
   const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga';
 
-  // Retour visuel géré localement (près des boutons) + anti double-clic : tant qu'un appel est en
-  // cours, les boutons sont désactivés, ce qui évite les clics répétés et les erreurs en cascade.
+  // Étapes AMONT sélectionnables pour un renvoi pour complément (ordre inférieur à l'étape courante,
+  // hors étapes système/BC). L'ordre courant dépend du statut (le circuit est semi-codé en dur).
+  const byCode = (c) => steps.find(s => s.code === c);
+  let currentOrdre = null;
+  if (pr.status === 'en_validation') currentOrdre = steps.find(s => s.code === pr.current_step_code)?.ordre ?? null;
+  else if (pr.status === 'en_validation_dga') currentOrdre = byCode('validation_dga')?.ordre ?? Infinity;
+  else if (pr.status === 'devis_selectionne') currentOrdre = byCode('validation_achat')?.ordre ?? null;
+  else if (pr.status === 'en_attente_validation_besoin') currentOrdre = byCode('expression_besoin')?.ordre ?? null;
+  const targets = (currentOrdre == null) ? []
+    : steps.filter(s => s.ordre < currentOrdre && s.role_code_requis && !['generation_bc', 'validation_dga'].includes(s.code))
+      .sort((a, b) => a.ordre - b.ordre);
+  const canRequestChanges = targets.length > 0;
+
+  // Retour visuel local + anti double-clic : les boutons sont désactivés pendant l'appel.
   async function act(kind) {
     if (busy) return;
-    const path = kind === 'reject' ? 'reject-step' : 'validate-step';
-    const successText = kind === 'reject' ? t('prd.requestRejected') : t('prd.stepValidated');
+    if (kind === 'complement' && (!targetStep || !comment.trim())) {
+      setMsg({ type: 'error', text: t('prd.complementNeed') });
+      return;
+    }
+    const path = kind === 'reject' ? 'reject-step' : kind === 'complement' ? 'request-changes' : 'validate-step';
+    const successText = kind === 'reject' ? t('prd.requestRejected') : kind === 'complement' ? t('prd.complementSent') : t('prd.stepValidated');
     setBusy(kind);
     setMsg(null);
     try {
-      await client.post(`/purchase-requests/${pr.id}/${path}`, { comment });
+      const body = kind === 'complement' ? { comment, targetStepCode: targetStep } : { comment };
+      await client.post(`/purchase-requests/${pr.id}/${path}`, body);
       setMsg({ type: 'success', text: successText });
       showToast(successText);
-      await refresh(); // le statut avance : cette section peut alors disparaître (ce n'est plus notre tour)
+      await refresh(); // le statut change : cette section peut alors disparaître (plus notre tour)
     } catch (err) {
       setMsg({ type: 'error', text: err.response?.data?.error || t('prd.genericError') });
     } finally {
@@ -664,22 +725,48 @@ function ValidationSection({ pr, refresh, showToast }) {
     }
   }
 
+  const showComment = canReject || complement;
   return (
     <section className="card">
       <h2>{t('prd.validation')}</h2>
-      {canReject && (
-        <textarea placeholder={t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
+      {showComment && (
+        <textarea placeholder={complement ? t('prd.complementPlaceholder') : t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
           disabled={!!busy}
           style={{ display: 'block', width: '100%', marginBottom: 10 }} />
       )}
+      {complement && (
+        <label className="field" style={{ display: 'block', marginBottom: 10, maxWidth: 420 }}>
+          {t('prd.complementTarget')}
+          <select value={targetStep} onChange={e => setTargetStep(e.target.value)}>
+            <option value="">{t('prd.complementTargetDots')}</option>
+            {targets.map(s => <option key={s.code} value={s.code}>{s.nom}</option>)}
+          </select>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
-          {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
-        </button>
-        {canReject && (
-          <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
-            {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}
-          </button>
+        {complement ? (
+          <>
+            <button className="btn btn-primary" disabled={!!busy || !targetStep || !comment.trim()} onClick={() => act('complement')}>
+              {busy === 'complement' ? t('prd.sending') : t('prd.complementSend')}
+            </button>
+            <button className="btn btn-secondary" disabled={!!busy} onClick={() => { setComplement(false); setTargetStep(''); }}>{t('common.cancel')}</button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
+              {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
+            </button>
+            {canReject && (
+              <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
+                {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}
+              </button>
+            )}
+            {canRequestChanges && (
+              <button className="btn btn-secondary" disabled={!!busy} onClick={() => { setComplement(true); setMsg(null); }}>
+                {t('prd.requestChanges')}
+              </button>
+            )}
+          </>
         )}
       </div>
       {msg && (
