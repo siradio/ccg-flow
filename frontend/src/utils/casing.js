@@ -5,13 +5,16 @@
 // - e-mails / tél. -> laissés tels quels (une majuscule casserait l'adresse)
 // - champs libres multi-lignes (textarea) -> laissés tels quels (une phrase ne se met pas en Title Case)
 
-// Met une majuscule à la 1re lettre de chaque mot (séparé par espace, tiret ou barre oblique),
-// le reste en minuscule. Gère les lettres accentuées via \p{L} (Unicode).
+// Un sigle tout en majuscules de 2 à 4 lettres (BU, CCG, SARL, PBIC…) est préservé tel quel.
+const isAcronym = (w) => w.length >= 2 && w.length <= 4 && /^\p{Lu}+$/u.test(w);
+
+// Met une majuscule à la 1re lettre de chaque mot (suite de lettres/chiffres), le reste en
+// minuscule — SAUF les sigles tout-majuscules courts, laissés intacts. Séparateurs (espaces,
+// apostrophes, tirets, virgules) conservés. Gère les lettres accentuées via \p{L} (Unicode).
 export function toTitleCase(str) {
   if (str == null) return str;
-  return String(str)
-    .toLowerCase()
-    .replace(/(^|[\s\-/])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+  return String(str).replace(/[\p{L}\p{N}]+/gu, (w) =>
+    (isAcronym(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()));
 }
 
 // Détermine le mode de normalisation d'un champ : 'title' | 'lower' | 'none'.
