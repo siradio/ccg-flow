@@ -35,10 +35,10 @@ async function createSupplier(fields) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
       [
         nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
-        actif === undefined ? true : actif,
+        actif === undefined || actif === '' ? true : !!actif,
         code, origine || null, pays || null, categorie || null, produits_offres || null,
         mode_paiement || null, conditions_paiement || null,
-        a_contrat === undefined ? null : a_contrat, commentaires || null,
+        a_contrat === undefined || a_contrat === '' ? null : !!a_contrat, commentaires || null,
         date_engagement || null, Array.isArray(devises) ? devises : null,
       ]
     );
@@ -47,6 +47,7 @@ async function createSupplier(fields) {
     // serveur" 500 générique (ex. code fournisseur déjà utilisé, origine hors liste).
     if (e.code === '23505') throw httpError(409, 'Ce code fournisseur est déjà utilisé — choisissez-en un autre (ou laissez-le vide).');
     if (e.code === '23514') throw httpError(400, 'Origine invalide : choisissez « Import » ou « Local ».');
+    if (e.code === '22P02') throw httpError(400, 'Une valeur du formulaire est invalide — vérifiez les champs et réessayez.');
     throw e;
   }
 }

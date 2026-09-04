@@ -56,6 +56,11 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
     // et pour `origine` (CHECK 'import'/'local') : un '' violerait la contrainte. D'où « erreur
     // serveur » intermittente à l'édition, corrigée ici.
     const field = (k) => (b[k] === undefined ? existing[k] : (b[k] === '' ? null : b[k]));
+    // Booléens (actif, a_contrat) : le formulaire renvoie '' quand la valeur d'origine était NULL
+    // (formFromItem met `item[k] ?? ''`). Un '' bindé sur une colonne boolean -> 22P02
+    // (« invalid input syntax for type boolean: "" ») = « erreur serveur » à l'édition.
+    // On traite undefined et '' comme « inchangé », toute autre valeur est coercée en vrai booléen.
+    const bool = (k) => (b[k] === undefined || b[k] === '' ? existing[k] : !!b[k]);
 
     let supplier;
     try {
@@ -68,10 +73,10 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
         [
           b.nom === undefined ? existing.nom : b.nom, // nom obligatoire : jamais mis à NULL
           field('contact_nom'), field('contact_email'), field('contact_tel'), field('adresse'),
-          b.actif === undefined ? existing.actif : b.actif,
+          bool('actif'),
           existing.code, field('origine'), field('pays'), field('categorie'), field('produits_offres'),
           field('mode_paiement'), field('conditions_paiement'),
-          b.a_contrat === undefined ? existing.a_contrat : b.a_contrat,
+          bool('a_contrat'),
           field('commentaires'), field('date_engagement'),
           b.devises === undefined ? existing.devises : (Array.isArray(b.devises) ? b.devises : null),
           req.params.id,
@@ -81,6 +86,7 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
       // Mêmes messages clairs qu'à la création (suppliers.service) plutôt qu'un 500 générique.
       if (e.code === '23505') return res.status(409).json({ error: 'Ce code fournisseur est déjà utilisé — choisissez-en un autre (ou laissez-le vide).' });
       if (e.code === '23514') return res.status(400).json({ error: 'Origine invalide : choisissez « Import » ou « Local ».' });
+      if (e.code === '22P02') return res.status(400).json({ error: 'Une valeur du formulaire est invalide — vérifiez les champs et réessayez.' });
       throw e;
     }
 
