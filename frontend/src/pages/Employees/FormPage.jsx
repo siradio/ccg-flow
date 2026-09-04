@@ -236,6 +236,7 @@ export default function FormPage() {
             <button type="submit" disabled={saving} className="btn btn-primary">
               {saving ? t('common.saving') : t('common.save')}
             </button>
+            <button type="button" onClick={() => navigate('/employees')} className="btn btn-secondary">{t('common.cancel')}</button>
             {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">{t('common.delete')}</button>}
           </div>
         </form>
