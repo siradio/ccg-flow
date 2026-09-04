@@ -69,7 +69,7 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
           b.nom === undefined ? existing.nom : b.nom, // nom obligatoire : jamais mis à NULL
           field('contact_nom'), field('contact_email'), field('contact_tel'), field('adresse'),
           b.actif === undefined ? existing.actif : b.actif,
-          field('code'), field('origine'), field('pays'), field('categorie'), field('produits_offres'),
+          existing.code, field('origine'), field('pays'), field('categorie'), field('produits_offres'),
           field('mode_paiement'), field('conditions_paiement'),
           b.a_contrat === undefined ? existing.a_contrat : b.a_contrat,
           field('commentaires'), field('date_engagement'),
@@ -92,7 +92,7 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
       }
     }
     res.json(await withEntityIds(supplier));
-  } catch (e) { next(e); }
+  } catch (e) { console.error('PUT /suppliers échec:', e && e.code, '-', e && e.message); next(e); }
 });
 
 router.delete('/:id', requireAuth, requireEdit, async (req, res, next) => {

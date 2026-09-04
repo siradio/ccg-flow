@@ -476,7 +476,9 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
     );
   }
   return (
-    <input placeholder={label} required={field.required} type={field.type || 'text'} value={value || ''}
-      onChange={e => onChange(e.target.value)} />
+    <input placeholder={field.placeholderKey ? t(field.placeholderKey) : label} required={field.required && !field.readOnly}
+      type={field.type || 'text'} value={value || ''} readOnly={field.readOnly}
+      onChange={e => onChange(e.target.value)}
+      style={field.readOnly ? { background: 'var(--color-hover)', color: 'var(--color-text-muted)' } : undefined} />
   );
 }
