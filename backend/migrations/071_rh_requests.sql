@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS rh_requests (
   business_unit_id  INTEGER REFERENCES business_units(id),
   statut            TEXT NOT NULL DEFAULT 'brouillon'
                     CHECK (statut IN ('brouillon','en_validation','validee','refusee','annulee','cloturee')),
-  current_role      TEXT,                                       -- rôle attendu à l'étape courante (validation par rôle)
+  role_courant      TEXT,                                       -- rôle attendu à l'étape courante (validation par rôle) — évite le mot réservé PG `current_role`
   type_id           INTEGER REFERENCES rh_types(id),            -- type de congé / motif d'absence
   date_debut        DATE,
   date_fin          DATE,

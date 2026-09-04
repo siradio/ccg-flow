@@ -55,7 +55,7 @@ async function listPending(roleEntityPairs) {
   const params = [];
   for (const { roleCode, entityId } of roleEntityPairs) {
     params.push(entityId, roleCode);
-    clauses.push(`(r.entity_id = $${params.length - 1} AND r.current_role = $${params.length})`);
+    clauses.push(`(r.entity_id = $${params.length - 1} AND r.role_courant = $${params.length})`);
   }
   return all(`${BASE_SELECT} WHERE r.statut = 'en_validation' AND (${clauses.join(' OR ')}) ORDER BY r.created_at DESC`, params);
 }

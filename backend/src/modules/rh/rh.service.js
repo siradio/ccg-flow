@@ -68,7 +68,7 @@ async function submit(user, id) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
-  await repo.update(id, { statut: 'en_validation', current_role: CHAIN[0] });
+  await repo.update(id, { statut: 'en_validation', role_courant: CHAIN[0] });
   await repo.logHistory(id, 'soumission', user.id, null);
   await notifications.notifyRoleOnEntity(req.entity_id, CHAIN[0], 'Demande RH à valider',
     `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
@@ -78,17 +78,17 @@ async function submit(user, id) {
 async function validate(user, id, commentaire) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
-  if (req.statut !== 'en_validation' || !req.current_role) throw httpError(400, 'Aucune validation en attente.');
-  await assertRoleOr403(user, req.current_role, req.entity_id);
-  const suivant = nextRole(req.current_role);
+  if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
+  await assertRoleOr403(user, req.role_courant, req.entity_id);
+  const suivant = nextRole(req.role_courant);
   if (suivant) {
-    await repo.update(id, { current_role: suivant });
-    await repo.logHistory(id, `validation_${req.current_role}`, user.id, commentaire);
+    await repo.update(id, { role_courant: suivant });
+    await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
     await notifications.notifyRoleOnEntity(req.entity_id, suivant, 'Demande RH à valider',
       `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
   } else {
-    await repo.update(id, { statut: 'validee', current_role: null, decided_by: user.id, decided_at: new Date() });
-    await repo.logHistory(id, `validation_${req.current_role}`, user.id, commentaire);
+    await repo.update(id, { statut: 'validee', role_courant: null, decided_by: user.id, decided_at: new Date() });
+    await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
     await notifyRequester(req, 'Demande RH validée', `Votre demande ${req.numero} a été validée.`);
   }
   return getDetail(id);
@@ -97,10 +97,10 @@ async function validate(user, id, commentaire) {
 async function reject(user, id, commentaire) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
-  if (req.statut !== 'en_validation' || !req.current_role) throw httpError(400, 'Aucune validation en attente.');
-  await assertRoleOr403(user, req.current_role, req.entity_id);
+  if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
+  await assertRoleOr403(user, req.role_courant, req.entity_id);
   if (!commentaire || !commentaire.trim()) throw httpError(400, 'Un commentaire est obligatoire pour refuser.');
-  await repo.update(id, { statut: 'refusee', current_role: null, decided_by: user.id, decided_at: new Date() });
+  await repo.update(id, { statut: 'refusee', role_courant: null, decided_by: user.id, decided_at: new Date() });
   await repo.logHistory(id, 'refus', user.id, commentaire);
   await notifyRequester(req, 'Demande RH refusée', `Votre demande ${req.numero} a été refusée : ${commentaire}`);
   return getDetail(id);
@@ -111,7 +111,7 @@ async function cancel(user, id, commentaire) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (!['brouillon', 'en_validation'].includes(req.statut)) throw httpError(400, `Annulation impossible depuis le statut "${req.statut}".`);
-  await repo.update(id, { statut: 'annulee', current_role: null });
+  await repo.update(id, { statut: 'annulee', role_courant: null });
   await repo.logHistory(id, 'annulation', user.id, commentaire);
   return getDetail(id);
 }
