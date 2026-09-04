@@ -679,11 +679,15 @@ function ValidationSection({ pr, refresh, showToast, steps = [] }) {
 
   // Le rôle requis vient de la configuration réelle de l'étape (pr.current_step_role, renvoyée par
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
+  // Phase de traitement achat AVANT sélection d'un devis : pas de validation ici, mais le service
+  // achat peut renvoyer pour complément une demande incomplète.
+  const isProcessing = ['soumise', 'en_analyse_achat', 'devis_en_cours'].includes(pr.status);
   let requiredRole = null;
   if (pr.status === 'en_attente_validation_besoin') requiredRole = 'validateur_besoin';
   else if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
   else if (pr.status === 'en_validation') requiredRole = pr.current_step_role;
   else if (pr.status === 'en_validation_dga') requiredRole = 'validateur_besoin';
+  else if (isProcessing) requiredRole = 'service_achat';
 
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
   const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga';
@@ -696,6 +700,8 @@ function ValidationSection({ pr, refresh, showToast, steps = [] }) {
   else if (pr.status === 'en_validation_dga') currentOrdre = byCode('validation_dga')?.ordre ?? Infinity;
   else if (pr.status === 'devis_selectionne') currentOrdre = byCode('validation_achat')?.ordre ?? null;
   else if (pr.status === 'en_attente_validation_besoin') currentOrdre = byCode('expression_besoin')?.ordre ?? null;
+  else if (['soumise', 'en_analyse_achat'].includes(pr.status)) currentOrdre = byCode('analyse_achat')?.ordre ?? null;
+  else if (pr.status === 'devis_en_cours') currentOrdre = byCode('devis')?.ordre ?? null;
   const targets = (currentOrdre == null) ? []
     : steps.filter(s => s.ordre < currentOrdre && s.role_code_requis && !['generation_bc', 'validation_dga'].includes(s.code))
       .sort((a, b) => a.ordre - b.ordre);
@@ -728,7 +734,7 @@ function ValidationSection({ pr, refresh, showToast, steps = [] }) {
   const showComment = canReject || complement;
   return (
     <section className="card">
-      <h2>{t('prd.validation')}</h2>
+      <h2>{isProcessing ? t('prd.complementSectionTitle') : t('prd.validation')}</h2>
       {showComment && (
         <textarea placeholder={complement ? t('prd.complementPlaceholder') : t('prd.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
           disabled={!!busy}
@@ -753,9 +759,11 @@ function ValidationSection({ pr, refresh, showToast, steps = [] }) {
           </>
         ) : (
           <>
-            <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
-              {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
-            </button>
+            {!isProcessing && (
+              <button className="btn btn-primary" disabled={!!busy} onClick={() => act('validate')}>
+                {busy === 'validate' ? t('prd.validating') : t('prd.validate')}
+              </button>
+            )}
             {canReject && (
               <button className="btn btn-danger" disabled={!!busy} onClick={() => act('reject')}>
                 {busy === 'reject' ? t('prd.rejecting') : t('prd.reject')}

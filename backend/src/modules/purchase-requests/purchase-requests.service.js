@@ -604,6 +604,12 @@ async function requestChanges(user, prId, { targetStepCode, comment }) {
     currentOrdre = steps.find(s => s.code === 'validation_achat')?.ordre ?? null; currentRole = 'service_achat';
   } else if (pr.status === 'en_attente_validation_besoin') {
     currentOrdre = steps.find(s => s.code === 'expression_besoin')?.ordre ?? null; currentRole = 'validateur_besoin';
+  } else if (['soumise', 'en_analyse_achat'].includes(pr.status)) {
+    // Phase de traitement achat AVANT sélection d'un devis : le service achat peut renvoyer pour
+    // complément (ex. demande incomplète) vers une étape amont, sans avoir à traiter la demande.
+    currentOrdre = steps.find(s => s.code === 'analyse_achat')?.ordre ?? null; currentRole = 'service_achat';
+  } else if (pr.status === 'devis_en_cours') {
+    currentOrdre = steps.find(s => s.code === 'devis')?.ordre ?? null; currentRole = 'service_achat';
   } else {
     throw httpError(400, `Aucune demande de complément possible depuis le statut "${pr.status}".`);
   }

@@ -11,7 +11,7 @@ import { useI18n } from '../../i18n/I18nContext';
 // référentiel complet (la case de l'entité de la demande en cours est simplement pré-cochée).
 export const SUPPLIER_FIELDS = [
   { key: 'nom', labelKey: 'refx.f.nom', required: true },
-  { key: 'code', labelKey: 'refx.f.code' },
+  { key: 'code', labelKey: 'refx.f.code', readOnly: true, placeholderKey: 'refx.f.codeAuto' },
   { key: 'origine', labelKey: 'refx.f.origine', type: 'select', options: ['Import', 'Local'], optionNs: 'refx.origine' },
   { key: 'pays', labelKey: 'refx.f.pays' },
   { key: 'categorie', labelKey: 'refx.f.categorie' },

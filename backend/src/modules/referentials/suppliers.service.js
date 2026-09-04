@@ -10,15 +10,23 @@ async function withEntityIds(supplier) {
   return { ...supplier, entity_ids: rows.map(r => r.entity_id) };
 }
 
+// Code fournisseur auto-généré : FRN-### (suivant = plus grand numéro FRN existant + 1). Le code
+// saisi côté formulaire est ignoré (le code est géré par le système, cf. migration 072).
+async function nextSupplierCode() {
+  const r = await one(`SELECT COALESCE(MAX((SUBSTRING(code FROM '^FRN-([0-9]+)$'))::int), 0) + 1 AS n FROM suppliers`);
+  return 'FRN-' + String(r.n).padStart(3, '0');
+}
+
 async function createSupplier(fields) {
   const {
     nom, contact_nom, contact_email, contact_tel, adresse, actif,
-    code, origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
+    origine, pays, categorie, produits_offres, mode_paiement, conditions_paiement, a_contrat, commentaires,
     date_engagement, devises,
   } = fields;
   if (!nom) throw httpError(400, 'nom obligatoire.');
 
   try {
+    const code = await nextSupplierCode();
     return await one(
       `INSERT INTO suppliers
          (nom, contact_nom, contact_email, contact_tel, adresse, actif,
@@ -28,7 +36,7 @@ async function createSupplier(fields) {
       [
         nom, contact_nom || null, contact_email || null, contact_tel || null, adresse || null,
         actif === undefined ? true : actif,
-        code || null, origine || null, pays || null, categorie || null, produits_offres || null,
+        code, origine || null, pays || null, categorie || null, produits_offres || null,
         mode_paiement || null, conditions_paiement || null,
         a_contrat === undefined ? null : a_contrat, commentaires || null,
         date_engagement || null, Array.isArray(devises) ? devises : null,
