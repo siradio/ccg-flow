@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signature de courriel — CCG</title>
+<style>
+  :root{
+    --ground:#F5F7FA; --panel:#FFFFFF; --edge:#DCE3EC;
+    --ink:#13294B; --ink-2:#4C5768; --ink-3:#8A94A6;
+    --bleu:#1F5FBF; --rouge:#D4202A; --jaune:#F5C518;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:15px/1.6 'Segoe UI',system-ui,-apple-system,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:36px 22px 90px}
+  h1{font-size:27px;margin:0;letter-spacing:-.02em}
+  .chapo{margin-top:10px;color:var(--ink-2);max-width:62ch}
+  h2{font-size:17px;margin:34px 0 12px;color:var(--bleu)}
+  .carte{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:22px}
+  .grille{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grille{grid-template-columns:1fr}}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);
+    text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+  label .doux{font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-3)}
+  input,select{width:100%;padding:9px 11px;border:1px solid var(--edge);border-radius:8px;
+    font:15px 'Segoe UI',sans-serif;color:var(--ink);background:#fff}
+  input:focus,select:focus{outline:2px solid var(--bleu);outline-offset:1px;border-color:var(--bleu)}
+  optgroup{font-weight:600;color:var(--ink-3)}
+  optgroup option{font-weight:400;color:var(--ink)}
+  .plein{grid-column:1/-1}
+  .case{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13.5px;
+    font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-2);cursor:pointer}
+  .case input{width:auto;margin:0;accent-color:var(--bleu);cursor:pointer}
+  .apercu{background:#fff;border:1px dashed var(--edge);border-radius:12px;padding:24px;
+    margin-top:14px;overflow-x:auto}
+  button{background:var(--bleu);color:#fff;border:0;border-radius:8px;
+    padding:11px 20px;font:600 15px 'Segoe UI',sans-serif;cursor:pointer}
+  button:hover{background:#17499A}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+  .etat{font-size:14px;color:#1B6B4A;font-weight:600}
+  ol{padding-left:20px;color:var(--ink-2)} ol li{margin-bottom:9px}
+  code{background:#EEF1F6;border:1px solid var(--edge);border-radius:5px;
+    padding:1px 6px;font-family:ui-monospace,Consolas,monospace;font-size:.88em;color:#1D3A55}
+  .note{border-left:3px solid var(--jaune);background:#FEFAEC;border-radius:0 10px 10px 0;
+    padding:14px 18px;margin-top:16px;color:var(--ink-2);font-size:14.5px}
+  .note strong{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Signature de courriel CCG</h1>
+  <p class="chapo">Chaque collaborateur ouvre ce fichier, saisit ses coordonnées, copie la
+     signature et la colle dans Outlook. Le logo est intégré au fichier : rien à héberger.</p>
+
+  <h2>1. Vos coordonnées</h2>
+  <div class="carte">
+    <div class="grille">
+      <div>
+        <label for="choixFormule">Formule de politesse</label>
+        <select id="choixFormule">
+          <optgroup label="Bilingue">
+            <option>Cordialement / Regards,</option>
+            <option>Bien cordialement / Best regards,</option>
+          </optgroup>
+          <optgroup label="Français">
+            <option>Cordialement,</option>
+            <option>Bien cordialement,</option>
+            <option>Bien à vous,</option>
+            <option>Sincères salutations,</option>
+            <option>Respectueusement,</option>
+            <option>Merci et bonne journée,</option>
+          </optgroup>
+          <optgroup label="English">
+            <option>Best regards,</option>
+            <option>Kind regards,</option>
+            <option>Regards,</option>
+            <option>Sincerely,</option>
+            <option>Many thanks,</option>
+          </optgroup>
+          <option value="">Aucune formule</option>
+        </select>
+      </div>
+      <div>
+        <label for="formule">Texte de la formule <span class="doux">— modifiable</span></label>
+        <input id="formule" value="Cordialement / Regards,">
+      </div>
+      <div>
+        <label for="prenom">Prénom</label>
+        <input id="prenom" value="Siradio">
+      </div>
+      <div>
+        <label for="nom">Nom</label>
+        <input id="nom" value="Diallo">
+      </div>
+      <div>
+        <label for="fonction">Fonction</label>
+        <input id="fonction" value="Senior Consultant Data &amp; Analytics">
+      </div>
+      <div>
+        <label for="tel1">Téléphone professionnel</label>
+        <input id="tel1" value="+224 610 84 18 16">
+        <label class="case" for="wa1"><input type="checkbox" id="wa1">
+          Ce numéro est aussi sur WhatsApp</label>
+      </div>
+      <div>
+        <label for="tel2">Second téléphone <span class="doux">— facultatif</span></label>
+        <input id="tel2" value="+33 7 66 86 15 97">
+        <label class="case" for="wa2"><input type="checkbox" id="wa2" checked>
+          Ce numéro est aussi sur WhatsApp</label>
+      </div>
+      <div>
+        <label for="mail">Courriel</label>
+        <input id="mail" value="siradio.diallo@ccggroupe.com">
+      </div>
+      <div class="plein">
+        <label for="adresse">Adresse <span class="doux">— facultative, laisser vide pour retirer la ligne</span></label>
+        <input id="adresse" value="">
+      </div>
+      <div class="plein">
+        <label for="linkedin">LinkedIn <span class="doux">— facultatif, laisser vide pour retirer la ligne</span></label>
+        <input id="linkedin" value="https://www.linkedin.com/in/ss-diallo/">
+      </div>
+      <div class="plein">
+        <label for="site">Site</label>
+        <input id="site" value="www.ccggroupe.com">
+      </div>
+    </div>
+  </div>
+
+  <h2>2. Aperçu</h2>
+  <div class="apercu" id="apercu"></div>
+  <div class="actions">
+    <button id="copier">Copier la signature</button>
+    <span class="etat" id="etat"></span>
+  </div>
+
+  <h2>3. Installation</h2>
+  <div class="carte">
+    <ol>
+      <li><strong>Outlook (bureau)</strong> — Fichier → Options → Courrier → Signatures.
+          Créer une signature, coller avec <code>Ctrl+V</code>, enregistrer.
+          Définir la signature par défaut pour les nouveaux messages et les réponses.</li>
+      <li><strong>Outlook sur le web</strong> — Paramètres → Courrier → Rédiger et répondre →
+          Signature électronique. Coller, puis cocher les deux cases d’insertion automatique.</li>
+    </ol>
+    <div class="note">
+      <p><strong>Les champs laissés vides disparaissent.</strong> Adresse, second téléphone
+         et LinkedIn sont facultatifs : sans saisie, la ligne correspondante n’apparaît pas,
+         et aucun espace vide ne subsiste.</p>
+      <p style="margin-bottom:0"><strong>La casse du nom est corrigée automatiquement.</strong>
+         Que vous saisissiez <code>SIRADIO</code>, <code>siradio</code> ou <code>Siradio</code>,
+         la signature affiche <code>Siradio</code>. Les noms composés sont respectés :
+         <code>JEAN-PIERRE</code> devient <code>Jean-Pierre</code>. La signature porte toujours
+         le prénom avant le nom.</p>
+    </div>
+  </div>
+
+  <h2>4. Ce qu’il ne faut pas modifier</h2>
+  <div class="carte">
+    <p style="margin:0;color:var(--ink-2)">La signature est bâtie en tableaux avec des styles en
+       ligne. C’est archaïque, mais c’est la seule construction qu’Outlook rende correctement —
+       il utilise le moteur de Word, qui ignore la mise en page moderne. Ne pas remplacer les
+       tableaux par des blocs, ne pas déplacer les styles dans une feuille séparée : la plupart
+       des messageries la supprimeraient.</p>
+  </div>
+
+</div>
+
+<script>
+const LOGO_CCG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJcAAABoCAMAAADLhZKHAAADAFBMVEVMaXHt3Bz////////////////q1xv///////////////////////////////////////////+fwNrYxyWhqtO1z+KirdXSvwylvtqtzOAuNYwuNYz///8uNYyyudvWww640+Pi0RPq2hcuNYyvs9l7eriswt6swNz56x756x61u92uwN3Svwz///+OisL///+1yeE3PJGUoM2lw9yaoc756x705B3Svwz56x6jpa9BQ5VMTZylu9kuNYy7zeOYmst8hr+Hg75PUJKss9nf3fDU2ezD3OhZWKP///9wbLDSvwz56x756x756x756x6rp9O5vKaQoMy+wuDSvwzGyuSeqc+Ys9TF0uJ+erjz8/ouNYz///9XXqUuNYyMiMDJxuTJxuTF1Oe+x8VgXqd1hb1VVKDb2OyRutX56x4uNYy+Hi/SvwyUvdamzN6jydxfXaagx9t5dbVsaa6pz9+dxNqGgr2XwNeawtiTj8VTUp86PZHajTZGSJj////LWjSLstJCUp04Q5RYc7FGWqOCqc17oMkyPJCxyLqt0eBNYqehnc6v1OFefbZsjr9lhbs5iDN0lsW42uXEPjI9S5nrvjGlyN2vq9VSaqyYttb14CPPZzWcutjq2h3vySyTiohdXI+YsdPBMDDTdDaQtNOCncnz1SnXgTa8uN3M05fIumx1nDGy1uLnsjKJo83s42SJlsfipjWmtSlhZKp3gryFi8J4ib+JrdCUlsnjzxfn4GmVo83emjbX3Zbj4HaWrSxvb7FjbK/x4h7cyBLXyWzt52pETJqDoy+roXuxvCdlcrKIncqjvNqApMvITTO+zqve1iP15zaHh8DBwCfk00/AwZWQqdCEkMRzk8P36B3h1Webl45ba63GzaCuzNOUkKRuf7l4j8KgqNJMjDNiZpbI2LLQ2aKhwcg6Po3TzyOAe593c427zb9ilTE/RZakyNfWyFK7rnV6mMZyeLeFfoupxMGyo0+XqMKimoRybqVWaqyAk8V7nzDCtYLIv3arwLilsdaZx9LdAAAAknRSTlMAwNCwMBBw8MCAoWBQQHGQIOD+IXTtKqDq+hBASoBmZ/4QQCh+/NzIgMBG/IBl7FejvF/13lCX5vD6psi5VHqka9j7xPtR/ZA88tBw0DCw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';
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const ids = ['formule', 'prenom', 'nom', 'fonction', 'tel1', 'tel2', 'mail',
+               'adresse', 'linkedin', 'site'];
+  const cases = ['wa1', 'wa2'];
+
+  // Le collaborateur tape comme il veut ; la signature, elle, reste uniforme.
+  // Une lettre debute un mot apres un espace, un trait d'union ou une apostrophe.
+  const capitaliser = (s) => s.replace(/\s+/g, ' ').trim().toLocaleLowerCase('fr')
+    .replace(/(^|[\s'’-])(\p{L})/gu, (m, sep, c) => sep + c.toLocaleUpperCase('fr'));
+
+  const echappe = (s) => String(s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const val = (id) => echappe($(id).value.trim());
+
+  // Tableaux + styles en ligne : la seule construction qu'Outlook rende juste.
+  function signature() {
+    const police = "font-family:Calibri,Arial,Helvetica,sans-serif";
+    const corps = police + ";font-size:14px;color:#1A1A1A;line-height:1.55";
+
+    const formule = val('formule');
+    const nomAffiche = echappe([capitaliser($('prenom').value), capitaliser($('nom').value)]
+      .filter(Boolean).join(' '));
+    const fonction = val('fonction');
+    const tel1 = val('tel1'), tel2 = val('tel2');
+    const mail = val('mail'), adresse = val('adresse');
+    const linkedin = val('linkedin'), site = val('site');
+    const brut = (t) => t.replace(/[^+0-9]/g, '');
+
+    // Un pictogramme par ligne, comme dans les signatures existantes.
+    const ligne = (picto, contenu) =>
+      '<tr><td style="padding:1px 8px 1px 0;vertical-align:top;font-size:14px;">' + picto + '</td>'
+      + '<td style="padding:1px 0;vertical-align:top;' + corps + ';">' + contenu + '</td></tr>';
+
+    const lien = (href, texte, couleur) =>
+      '<a href="' + href + '" style="color:' + (couleur || '#1155CC') + ';text-decoration:underline;">'
+      + texte + '</a>';
+
+    // La mention WhatsApp suit le numero concerne, pas la ligne entiere.
+    const numero = (t, wa) => t
+      ? lien('tel:' + brut(t), t, '#1A1A1A')
+        + (wa ? ' <strong style="color:#1F5FBF;">(WhatsApp)</strong>' : '')
+      : '';
+    const tels = [numero(tel1, $('wa1').checked), numero(tel2, $('wa2').checked)]
+      .filter(Boolean).join(' &nbsp;|&nbsp; ');
+
+    const lignes = [];
+    if (tels) lignes.push(ligne('&#128222;', '<strong>' + tels + '</strong>'));
+    if (mail) lignes.push(ligne('&#9993;', lien('mailto:' + mail, mail)));
+    if (adresse) lignes.push(ligne('&#128205;', '<strong>' + adresse + '</strong>'));
+    if (linkedin) lignes.push(ligne('&#128279;', 'LinkedIn&nbsp;: ' + lien(linkedin, linkedin)));
+    if (site) {
+      const href = /^https?:/i.test(site) ? site : 'https://' + site.replace(/^www\./i, 'www.');
+      lignes.push(ligne('&#127760;', lien(href, site)));
+    }
+
+    // Deux colonnes : le logo, puis un filet vertical qui porte les informations.
+    return [
+      formule ? '<div style="' + corps + ';padding:0 0 16px 0;">' + formule + '</div>' : '',
+      '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;', police, ';">',
+        '<tr>',
+          '<td style="padding:0 18px 0 0;vertical-align:top;">',
+            '<img src="', LOGO_CCG, '" alt="CCG" width="110" height="76" ',
+              'style="display:block;border:0;outline:none;text-decoration:none;">',
+          '</td>',
+          '<td style="padding:0 0 0 18px;border-left:2px solid #1F5FBF;vertical-align:top;">',
+            '<div style="', police, ';font-size:16px;font-weight:bold;color:#1F5FBF;',
+              'line-height:1.3;">', nomAffiche, '</div>',
+            '<div style="', police, ';font-size:14px;font-weight:bold;color:#1A1A1A;',
+              'line-height:1.4;padding-top:2px;">', fonction, '</div>',
+            '<div style="height:9px;line-height:9px;font-size:0;">&nbsp;</div>',
+            '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">',
+              lignes.join(''),
+            '</table>',
+          '</td>',
+        '</tr>',
+      '</table>'].join('');
+  }
+
+  function rafraichir() { $('apercu').innerHTML = signature(); }
+  ids.forEach((id) => $(id).addEventListener('input', rafraichir));
+  cases.forEach((id) => $(id).addEventListener('change', rafraichir));
+
+  // Le menu ne fait que pre-remplir : le champ texte reste la source.
+  $('choixFormule').addEventListener('change', () => {
+    $('formule').value = $('choixFormule').value;
+    rafraichir();
+  });
+
+  rafraichir();
+
+  function dire(msg) {
+    $('etat').textContent = msg;
+    setTimeout(() => { $('etat').textContent = ''; }, 3000);
+  }
+
+  $('copier').addEventListener('click', async () => {
+    const html = signature();
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([$('apercu').innerText], { type: 'text/plain' }),
+      })]);
+      dire('Signature copiée — collez-la dans Outlook.');
+    } catch (e) {
+      const s = window.getSelection(), r = document.createRange();
+      r.selectNodeContents($('apercu'));
+      s.removeAllRanges(); s.addRange(r);
+      dire(document.execCommand('copy')
+        ? 'Signature copiée — collez-la dans Outlook.'
+        : 'Copie refusée : sélectionnez l’aperçu et faites Ctrl+C.');
+      s.removeAllRanges();
+    }
+  });
+})();
+</script>
+</body>
+</html>
