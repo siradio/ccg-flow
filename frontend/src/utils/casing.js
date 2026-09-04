@@ -7,14 +7,19 @@
 
 // Un sigle tout en majuscules de 2 à 4 lettres (BU, CCG, SARL, PBIC…) est préservé tel quel.
 const isAcronym = (w) => w.length >= 2 && w.length <= 4 && /^\p{Lu}+$/u.test(w);
+const titleWord = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 
 // Met une majuscule à la 1re lettre de chaque mot (suite de lettres/chiffres), le reste en
-// minuscule — SAUF les sigles tout-majuscules courts, laissés intacts. Séparateurs (espaces,
-// apostrophes, tirets, virgules) conservés. Gère les lettres accentuées via \p{L} (Unicode).
+// minuscule. Un sigle isolé dans un texte en casse mixte est préservé (ex. « Guinée Emballages
+// SARL »). MAIS si TOUTE la valeur est en majuscules (ex. « LAIT EN POUDRE », « ADEMAT »), on
+// considère qu'il s'agit d'une saisie tout-capitales et on applique le Title Case complet — sinon
+// des mots courts (LAIT, EN…) seraient pris à tort pour des sigles. Séparateurs conservés.
 export function toTitleCase(str) {
   if (str == null) return str;
-  return String(str).replace(/[\p{L}\p{N}]+/gu, (w) =>
-    (isAcronym(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()));
+  const s = String(str);
+  const alphaWords = s.match(/\p{L}+/gu) || [];
+  const allCaps = alphaWords.length > 0 && alphaWords.every(w => w === w.toUpperCase());
+  return s.replace(/[\p{L}\p{N}]+/gu, (w) => ((!allCaps && isAcronym(w)) ? w : titleWord(w)));
 }
 
 // Détermine le mode de normalisation d'un champ : 'title' | 'lower' | 'none'.
