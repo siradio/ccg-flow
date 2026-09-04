@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import Modal from '../../components/Modal.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const EMPTY_FORM = {
@@ -15,8 +16,12 @@ const EMPTY_FORM = {
   manager_employee_id: '',
 };
 
-export default function FormPage() {
-  const { id } = useParams();
+// Utilisable soit comme page routée (/employees/new, /employees/:id), soit comme MODALE au-dessus
+// de la liste (props `employeeId` + `onDone`). En mode modale, aucune navigation : on ferme via onDone.
+export default function FormPage({ employeeId, onDone } = {}) {
+  const routeParams = useParams();
+  const isModal = typeof onDone === 'function';
+  const id = employeeId !== undefined ? employeeId : routeParams.id;
   const isNew = !id;
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -97,10 +102,10 @@ export default function FormPage() {
     try {
       if (isNew) {
         const res = await client.post('/employees', payload);
-        navigate(`/employees/${res.data.id}`);
+        if (isModal) onDone(res.data); else navigate(`/employees/${res.data.id}`);
       } else {
-        await client.put(`/employees/${id}`, payload);
-        navigate('/employees');
+        const res = await client.put(`/employees/${id}`, payload);
+        if (isModal) onDone(res.data); else navigate('/employees');
       }
     } catch (err) {
       setError(err.response?.data?.error || t('emp.saveError'));
@@ -112,15 +117,28 @@ export default function FormPage() {
   async function onDelete() {
     if (!(await confirm(t('emp.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
     await client.delete(`/employees/${id}`);
-    navigate('/employees');
+    if (isModal) onDone(); else navigate('/employees');
   }
 
-  if (!loaded) return <p>{t('prd.loading')}</p>;
+  function onCancel() {
+    if (isModal) onDone(); else navigate('/employees');
+  }
 
-  return (
-    <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>{isNew ? t('emp.newEmployeeTitle') : `${form.prenom} ${form.nom}`}</h1>
-      <div className="card" style={{ maxWidth: 640 }}>
+  const title = isNew ? t('emp.newEmployeeTitle') : `${form.prenom} ${form.nom}`;
+  // En mode modale, on encapsule le contenu dans <Modal>. En mode page, dans un <div> + carte.
+  const wrap = (content) => (isModal
+    ? <Modal title={title} onClose={onCancel} wide>{content}</Modal>
+    : (
+      <div>
+        <h1 className="page-title" style={{ marginBottom: 20 }}>{title}</h1>
+        <div className="card" style={{ maxWidth: 640 }}>{content}</div>
+      </div>
+    ));
+
+  if (!loaded) return wrap(<p>{t('prd.loading')}</p>);
+
+  return wrap(
+    (
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <label className="field">{t('emp.th.matricule')}
@@ -236,11 +254,10 @@ export default function FormPage() {
             <button type="submit" disabled={saving} className="btn btn-primary">
               {saving ? t('common.saving') : t('common.save')}
             </button>
-            <button type="button" onClick={() => navigate('/employees')} className="btn btn-secondary">{t('common.cancel')}</button>
+            <button type="button" onClick={onCancel} className="btn btn-secondary">{t('common.cancel')}</button>
             {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">{t('common.delete')}</button>}
           </div>
         </form>
-      </div>
-    </div>
+    )
   );
 }
