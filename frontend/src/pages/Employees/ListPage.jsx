@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { StatutBadge } from './statutBadge.jsx';
 import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
+import EmployeeFormModal from './FormPage.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -21,6 +21,15 @@ export default function ListPage() {
   const [alertCfg, setAlertCfg] = useState({ actif: false, jours: '30', emails: '' });
   const [alertMsg, setAlertMsg] = useState('');
   const [filters, setFilters] = useState({ q: '', entity_id: '', business_unit_id: '', statut: '' });
+  // Saisie employé en modale : undefined = fermée, null = nouvel employé, id = édition.
+  const [formFor, setFormFor] = useState(undefined);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [toast, setToast] = useState(null);
+  function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
+  function onFormDone(saved) {
+    setFormFor(undefined);
+    if (saved) { setReloadTick(t => t + 1); showToast(t('ref.saved')); }
+  }
 
   useEffect(() => {
     client.get('/entities').then(res => setEntities(res.data));
@@ -60,7 +69,7 @@ export default function ListPage() {
       client.get('/employees', { params }).then(res => setEmployees(res.data)).finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timer);
-  }, [filters]);
+  }, [filters, reloadTick]);
 
   function setFilter(key, value) {
     setFilters(f => ({ ...f, [key]: value }));
@@ -68,13 +77,19 @@ export default function ListPage() {
 
   return (
     <div>
+      {toast && (
+        <div className="alert alert-success" style={{ position: 'fixed', top: 16, right: 16, zIndex: 3000, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+          {toast}
+        </div>
+      )}
+      {formFor !== undefined && <EmployeeFormModal employeeId={formFor} onDone={onFormDone} />}
       <ReferentialsSubnav />
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('refx.nav.employees')}</h1>
           <p className="page-subtitle">{t('emp.count', { n: employees.length })}{loading ? '…' : ''}</p>
         </div>
-        {canWrite && <Link to="/employees/new" className="btn btn-primary">{t('emp.newEmployee')}</Link>}
+        {canWrite && <button type="button" className="btn btn-primary" onClick={() => setFormFor(null)}>{t('emp.newEmployee')}</button>}
       </div>
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
@@ -129,7 +144,7 @@ export default function ListPage() {
                   <td>{emp.site_nom || '—'}</td>
                   <td><StatutBadge statut={emp.statut} /></td>
                   <td>{emp.anciennete_annees != null ? t('emp.years', { n: emp.anciennete_annees }) : '—'}</td>
-                  {canWrite && <td><Link to={`/employees/${emp.id}`} className="btn btn-secondary btn-sm">{t('common.edit')}</Link></td>}
+                  {canWrite && <td><button type="button" onClick={() => setFormFor(emp.id)} className="btn btn-secondary btn-sm">{t('common.edit')}</button></td>}
                 </tr>
               ))}
               {!loading && employees.length === 0 && (

@@ -15,6 +15,12 @@ const PERMS = {
   controle_gestion:  ['pa_view_own', 'pa_view_entity', 'pa_valider_cg'],
   finances:          ['pa_view_own', 'pa_view_entity', 'pa_valider_finances'],
   validateur_besoin: ['pa_view_own', 'pa_view_entity', 'pa_valider_besoin'],
+  // Rôles RH (Lot 0) — attribués par entité ; les permissions fines seront exploitées par le
+  // module RH à venir. Déclarés ici pour que les rôles soient reconnus dès leur attribution.
+  responsable:       ['rh_view_team', 'rh_valider'],
+  rh:                ['rh_view_all', 'rh_valider', 'rh_gerer'],
+  daf:               ['rh_view_all', 'rh_valider'],
+  dg:                ['rh_view_all', 'rh_valider'],
 };
 
 function isSuperAdmin(user) {

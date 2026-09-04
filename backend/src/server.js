@@ -22,6 +22,7 @@ app.use('/api/sites', require('./modules/referentials/sites.routes'));
 app.use('/api/warehouses', require('./modules/referentials/warehouses.routes'));
 app.use('/api/machines', require('./modules/referentials/machines.routes'));
 app.use('/api/employees', require('./modules/employees/employees.routes'));
+app.use('/api/rh', require('./modules/rh/rh.routes'));
 app.use('/api/products', require('./modules/referentials/products.routes'));
 app.use('/api/product-categories', require('./modules/referentials/product-categories.routes'));
 app.use('/api/business-units', require('./modules/referentials/business-units.routes'));

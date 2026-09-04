@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
-import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
+import { useAuth, isSuperAdmin, hasSubModuleLevel } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
 import { StatusBadge } from './statusLabels.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import SupplierFormModal from '../Referentials/SupplierFormModal.jsx';
 
 // On charge l'ensemble des demandes visibles (volume modéré) puis recherche + tri par colonne
 // entièrement côté client — même mécanique que les référentiels.
@@ -27,6 +28,10 @@ export default function ListPage() {
   const [mineOnly, setMineOnly] = useState(null);
   // Peut être activé d'entrée via ?pending=true (lien "Voir les demandes" du tableau de bord).
   const [pendingOnly, setPendingOnly] = useState(searchParams.get('pending') === 'true');
+  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const canAddSupplier = hasSubModuleLevel(user, 'referentiels.suppliers', 'ajout');
+  function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
 
   const nonDemandeurEntities = useMemo(() => {
     if (!user) return [];
@@ -69,10 +74,27 @@ export default function ListPage() {
 
   return (
     <div>
+      {toast && (
+        <div className="alert alert-success" style={{ position: 'fixed', top: 16, right: 16, zIndex: 3000, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+          {toast}
+        </div>
+      )}
       <div className="page-header">
         <h1 className="page-title">{t('nav.purchases')}</h1>
-        <Link to="/purchase-requests/new" className="btn btn-primary">{t('pr.newBtn')}</Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canAddSupplier && (
+            <button type="button" className="btn btn-secondary" onClick={() => setAddSupplierOpen(true)}>{t('refx.addSupplierBtn')}</button>
+          )}
+          <Link to="/purchase-requests/new" className="btn btn-primary">{t('pr.newBtn')}</Link>
+        </div>
       </div>
+
+      {addSupplierOpen && (
+        <SupplierFormModal
+          onClose={() => setAddSupplierOpen(false)}
+          onCreated={() => { setAddSupplierOpen(false); showToast(t('refx.supplierAdded')); }}
+        />
+      )}
 
       <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="search" value={q} onChange={e => setQ(e.target.value)}

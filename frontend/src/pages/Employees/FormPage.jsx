@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
+import Modal from '../../components/Modal.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const EMPTY_FORM = {
@@ -12,10 +13,15 @@ const EMPTY_FORM = {
   // RH complémentaires
   date_naissance: '', nationalite: '', numero_cnss: '', situation_familiale: '',
   contact_urgence_nom: '', contact_urgence_tel: '', permis_travail: false, permis_travail_expiration: '',
+  manager_employee_id: '',
 };
 
-export default function FormPage() {
-  const { id } = useParams();
+// Utilisable soit comme page routée (/employees/new, /employees/:id), soit comme MODALE au-dessus
+// de la liste (props `employeeId` + `onDone`). En mode modale, aucune navigation : on ferme via onDone.
+export default function FormPage({ employeeId, onDone } = {}) {
+  const routeParams = useParams();
+  const isModal = typeof onDone === 'function';
+  const id = employeeId !== undefined ? employeeId : routeParams.id;
   const isNew = !id;
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -24,6 +30,7 @@ export default function FormPage() {
   const [entities, setEntities] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
   const [sites, setSites] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -33,6 +40,7 @@ export default function FormPage() {
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     client.get('/sites').then(res => setSites(res.data));
+    client.get('/employees').then(res => setEmployees(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -50,6 +58,7 @@ export default function FormPage() {
         nationalite: e.nationalite || '', numero_cnss: e.numero_cnss || '', situation_familiale: e.situation_familiale || '',
         contact_urgence_nom: e.contact_urgence_nom || '', contact_urgence_tel: e.contact_urgence_tel || '',
         permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
+        manager_employee_id: e.manager_employee_id ?? '',
       });
       setLoaded(true);
     });
@@ -88,14 +97,15 @@ export default function FormPage() {
       contact_urgence_tel: form.contact_urgence_tel || null,
       permis_travail: !!form.permis_travail,
       permis_travail_expiration: (form.permis_travail && form.permis_travail_expiration) ? form.permis_travail_expiration : null,
+      manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
     };
     try {
       if (isNew) {
         const res = await client.post('/employees', payload);
-        navigate(`/employees/${res.data.id}`);
+        if (isModal) onDone(res.data); else navigate(`/employees/${res.data.id}`);
       } else {
-        await client.put(`/employees/${id}`, payload);
-        navigate('/employees');
+        const res = await client.put(`/employees/${id}`, payload);
+        if (isModal) onDone(res.data); else navigate('/employees');
       }
     } catch (err) {
       setError(err.response?.data?.error || t('emp.saveError'));
@@ -107,15 +117,28 @@ export default function FormPage() {
   async function onDelete() {
     if (!(await confirm(t('emp.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
     await client.delete(`/employees/${id}`);
-    navigate('/employees');
+    if (isModal) onDone(); else navigate('/employees');
   }
 
-  if (!loaded) return <p>{t('prd.loading')}</p>;
+  function onCancel() {
+    if (isModal) onDone(); else navigate('/employees');
+  }
 
-  return (
-    <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>{isNew ? t('emp.newEmployeeTitle') : `${form.prenom} ${form.nom}`}</h1>
-      <div className="card" style={{ maxWidth: 640 }}>
+  const title = isNew ? t('emp.newEmployeeTitle') : `${form.prenom} ${form.nom}`;
+  // En mode modale, on encapsule le contenu dans <Modal>. En mode page, dans un <div> + carte.
+  const wrap = (content) => (isModal
+    ? <Modal title={title} onClose={onCancel} wide>{content}</Modal>
+    : (
+      <div>
+        <h1 className="page-title" style={{ marginBottom: 20 }}>{title}</h1>
+        <div className="card" style={{ maxWidth: 640 }}>{content}</div>
+      </div>
+    ));
+
+  if (!loaded) return wrap(<p>{t('prd.loading')}</p>);
+
+  return wrap(
+    (
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <label className="field">{t('emp.th.matricule')}
@@ -160,6 +183,14 @@ export default function FormPage() {
             </label>
             <label className="field">{t('emp.manager')}
               <input value={form.manager} onChange={e => set('manager', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.managerEmployee')}
+              <select value={form.manager_employee_id} onChange={e => set('manager_employee_id', e.target.value)}>
+                <option value="">—</option>
+                {employees.filter(emp => String(emp.id) !== String(id)).map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}{emp.matricule ? ` (${emp.matricule})` : ''}</option>
+                ))}
+              </select>
             </label>
             <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
@@ -223,10 +254,10 @@ export default function FormPage() {
             <button type="submit" disabled={saving} className="btn btn-primary">
               {saving ? t('common.saving') : t('common.save')}
             </button>
+            <button type="button" onClick={onCancel} className="btn btn-secondary">{t('common.cancel')}</button>
             {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">{t('common.delete')}</button>}
           </div>
         </form>
-      </div>
-    </div>
+    )
   );
 }
