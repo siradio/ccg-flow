@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useSort } from '../../components/useSort.jsx';
+import Modal from '../../components/Modal.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import { normalizeForm, normalizeFieldValue } from '../../utils/casing.js';
 
 // Libellé d'un champ : traduit si le champ porte une `labelKey`, sinon libellé brut (français) —
 // laisse les référentiels non encore internationalisés fonctionner tels quels.
@@ -23,8 +25,9 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const [form, setForm] = useState(() => emptyForm(fields, entities));
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false); // la saisie se fait dans une modale (ajout/édition)
+  const [toast, setToast] = useState(null);         // confirmation flottante (ajout/modif)
   const [search, setSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
   // Tri par colonne (clic sur l'en-tête) via la primitive partagée useSort (même comportement partout).
@@ -35,14 +38,17 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   // options d'un select, ou valeurs distinctes des items pour un champ texte libre).
   const filterDefs = filters.map(key => fields.find(f => f.key === key)).filter(Boolean);
 
-  // Visible dès qu'on peut créer, OU qu'on est en train d'éditer un élément existant (le seul
-  // moyen d'entrer en édition est le bouton "Éditer", lui-même gaté par canEdit).
-  const showForm = canAdd || editingId !== null;
-
   function load() {
     client.get(endpoint).then(res => setItems(res.data));
   }
   useEffect(load, [endpoint]);
+
+  // Confirmation flottante (haut-droite) — remplace l'ancien message en ligne sous le formulaire,
+  // qui n'était plus visible une fois la saisie passée dans une modale.
+  function showToast(message) {
+    setToast(message);
+    setTimeout(() => setToast(cur => (cur === message ? null : cur)), 3200);
+  }
 
   // Construit les valeurs du formulaire à partir d'un enregistrement existant (édition ou duplication).
   function formFromItem(item) {
@@ -57,14 +63,19 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
     return next;
   }
 
-  // Le formulaire est en bas de page, après le tableau — sans ce défilement, cliquer "Éditer"/
-  // "Dupliquer" sur une ligne du haut ne montre visuellement aucun effet (même pattern que Prices).
-  function scrollToForm() { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+  // La saisie se fait désormais dans une modale (plus pratique que le formulaire en bas de page).
+  function openAdd() {
+    setEditingId(null);
+    setForm(emptyForm(fields, entities));
+    setError('');
+    setFormOpen(true);
+  }
 
   function startEdit(item) {
     setEditingId(item.id);
     setForm(formFromItem(item));
-    scrollToForm();
+    setError('');
+    setFormOpen(true);
   }
 
   // Duplication : pré-remplit le formulaire avec une fiche existante SANS editingId → le submit crée
@@ -72,22 +83,31 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   function startDuplicate(item) {
     setEditingId(null);
     setForm(formFromItem(item));
-    scrollToForm();
+    setError('');
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditingId(null);
+    setForm(emptyForm(fields, entities));
+    setError('');
   }
 
   async function onSubmit(e) {
     e.preventDefault();
     if (saving) return; // garde-fou anti double-clic
-    setError(''); setNotice('');
+    setError('');
     setSaving(true);
     try {
       const wasEdit = !!editingId;
-      if (editingId) await client.put(`${endpoint}/${editingId}`, form);
-      else await client.post(endpoint, form);
-      setForm(emptyForm(fields, entities));
-      setEditingId(null);
+      // Normalisation de casse (Title Case / unités en minuscule / codes libres) avant envoi.
+      const payload = normalizeForm(fields, form);
+      if (editingId) await client.put(`${endpoint}/${editingId}`, payload);
+      else await client.post(endpoint, payload);
       load();
-      setNotice(wasEdit ? t('ref.saved') : t('ref.added'));
+      closeForm();
+      showToast(wasEdit ? t('ref.saved') : t('ref.added'));
     } catch (err) {
       setError(err.response?.data?.error || t('ref.error'));
     } finally {
@@ -128,7 +148,18 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
   return (
     <div>
-      <h1 className="page-title" style={{ marginBottom: 20 }}>{title}</h1>
+      {toast && (
+        <div className="alert alert-success" style={{ position: 'fixed', top: 16, right: 16, zIndex: 3000, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}>
+          {toast}
+        </div>
+      )}
+
+      <div className="page-header">
+        <h1 className="page-title">{title}</h1>
+        {canAdd && (
+          <button type="button" className="btn btn-primary" onClick={openAdd}>{t('common.add')}</button>
+        )}
+      </div>
 
       {items.length > 0 && (
         <div className="form-inline" style={{ marginBottom: 16 }}>
@@ -201,33 +232,35 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
         </div>
       </div>
 
-      {showForm && (
-        <form onSubmit={onSubmit} className="card form-inline" style={{ maxWidth: 'none' }}>
-          <strong style={{ width: '100%', fontSize: 15 }}>{editingId ? t('ref.modify') : t('common.add')}</strong>
-          {fields.filter(f => fieldVisible(f, form)).map(f => {
-            if (f.type === 'photo') {
-              return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
-                hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
-            }
-            const input = <FieldInput field={f} value={form[f.key]}
-              onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
-              entities={entities} sites={sites} lists={lists} />;
-            // La case à cocher porte déjà son propre libellé à côté d'elle.
-            if (f.type === 'checkbox') return <span key={f.key} style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>{input}</span>;
-            // Un libellé au-dessus de chaque champ : sans ça, les placeholders (tronqués sur les
-            // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
-            return (
-              <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
-                {fieldLabel(f, t)}{f.required ? ' *' : ''}
-                {input}
-              </label>
-            );
-          })}
-          {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
-          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('common.saving') : (editingId ? t('common.save') : t('common.add'))}</button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm(fields, entities)); setNotice(''); }} className="btn btn-secondary">{t('common.cancel')}</button>}
-          {notice && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success, #15803d)', alignSelf: 'center' }}>{notice}</span>}
-        </form>
+      {formOpen && (
+        <Modal title={editingId ? t('ref.modify') : t('common.add')} onClose={closeForm} wide>
+          <form onSubmit={onSubmit} className="form-inline" style={{ maxWidth: 'none' }}>
+            {fields.filter(f => fieldVisible(f, form)).map(f => {
+              if (f.type === 'photo') {
+                return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
+                  hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
+              }
+              const input = <FieldInput field={f} value={form[f.key]}
+                onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
+                entities={entities} sites={sites} lists={lists} />;
+              // La case à cocher porte déjà son propre libellé à côté d'elle.
+              if (f.type === 'checkbox') return <span key={f.key} style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>{input}</span>;
+              // Un libellé au-dessus de chaque champ : sans ça, les placeholders (tronqués sur les
+              // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
+              return (
+                <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  {fieldLabel(f, t)}{f.required ? ' *' : ''}
+                  {input}
+                </label>
+              );
+            })}
+            {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
+            <div style={{ width: '100%', display: 'flex', gap: 8, marginTop: 4 }}>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('common.saving') : (editingId ? t('common.save') : t('common.add'))}</button>
+              <button type="button" onClick={closeForm} className="btn btn-secondary">{t('common.cancel')}</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
@@ -469,16 +502,18 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
   if (field.type === 'checkbox') {
     return <label style={{ fontSize: 13 }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} /> {label}</label>;
   }
+  // Normalisation de casse à la sortie du champ (Title Case / unités en minuscule ; no-op sinon).
+  const onBlurNormalize = e => { const nv = normalizeFieldValue(field, e.target.value); if (nv !== (value || '')) onChange(nv); };
   if (field.type === 'textarea') {
     return (
       <textarea placeholder={label} required={field.required} rows={2} style={{ minWidth: 220 }}
-        value={value || ''} onChange={e => onChange(e.target.value)} />
+        value={value || ''} onChange={e => onChange(e.target.value)} onBlur={onBlurNormalize} />
     );
   }
   return (
     <input placeholder={field.placeholderKey ? t(field.placeholderKey) : label} required={field.required && !field.readOnly}
       type={field.type || 'text'} value={value || ''} readOnly={field.readOnly}
-      onChange={e => onChange(e.target.value)}
+      onChange={e => onChange(e.target.value)} onBlur={field.readOnly ? undefined : onBlurNormalize}
       style={field.readOnly ? { background: 'var(--color-hover)', color: 'var(--color-text-muted)' } : undefined} />
   );
 }

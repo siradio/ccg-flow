@@ -394,6 +394,23 @@ tbody tr:hover .sticky-col {
   gap: 8px;
 }
 
+/* Modale porteuse d'un formulaire (ajout/édition de référentiel) : plus large et défilable. */
+.modal-card-form {
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal-card-wide {
+  max-width: 760px;
+}
+.modal-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 /* ─── Badges (statuts, rôles) ──────────────────────────────────────── */
 
 .badge {
