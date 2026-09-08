@@ -25,7 +25,8 @@ const CONFIGS = {
     title: 'Parc — véhicules', endpoint: '/vehicles', subModuleKey: 'logistique.parc',
     filters: ['type_id', 'statut'],
     fields: [
-      { key: 'immatriculation', label: 'Immatriculation', required: true },
+      { key: 'immatriculation', label: 'Immatriculation', required: true, casing: 'none' },
+      { key: 'numero_chassis', label: 'N° de châssis', casing: 'none' },
       { key: 'type_id', label: 'Type', type: 'fkSelect', listKey: 'vehicleTypes' },
       { key: 'marque', label: 'Marque' },
       { key: 'modele', label: 'Modèle' },
