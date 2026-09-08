@@ -18,7 +18,7 @@ export default function DemandeDetail() {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
 
-  function load() { return client.get(`/rh/demandes/${id}`).then(res => setR(res.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError'))); }
+  function load() { return client.get(`/rh/requests/${id}`).then(res => setR(res.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError'))); }
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dfmt = (d) => d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') : '—';
@@ -45,8 +45,8 @@ export default function DemandeDetail() {
   if (!r) return <div><RhSubnav /><p>{t('rh.loading')}</p></div>;
 
   const isOwner = r.created_by === user.id;
-  const canValidate = r.statut === 'en_validation' && r.current_role
-    && (user.roles || []).some(role => role.role_code === r.current_role && Number(role.entity_id) === Number(r.entity_id));
+  const canValidate = r.statut === 'en_validation' && r.role_courant
+    && (user.roles || []).some(role => role.role_code === r.role_courant && Number(role.entity_id) === Number(r.entity_id));
   const empName = `${r.employee_prenom || ''} ${r.employee_nom || ''}`.trim();
 
   return (
