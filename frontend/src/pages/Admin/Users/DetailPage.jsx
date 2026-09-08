@@ -282,13 +282,8 @@ export default function DetailPage() {
               <input placeholder={t('adm.users.f.email')} type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
               <input placeholder={t('adm.users.f.telephone')} value={editForm.telephone} onChange={e => setEditForm({ ...editForm, telephone: e.target.value })} />
               <input placeholder={t('adm.users.f.fonction')} value={editForm.fonction} onChange={e => setEditForm({ ...editForm, fonction: e.target.value })} />
-              {/* Le lien compte ↔ fiche employé se gère désormais depuis Référentiels → Employés
-                  (fiche employé, champ « Compte utilisateur lié »), jugé plus logique côté RH. */}
-              {u.employee_id && (
-                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', alignSelf: 'center' }}>
-                  {t('adm.users.f.employeeLinkedInfo')}
-                </span>
-              )}
+              {/* Le lien compte ↔ fiche employé se gère depuis Référentiels → Employés (fiche employé,
+                  champ « Compte utilisateur lié ») — plus rien ici, côté gestion des utilisateurs. */}
               <button onClick={saveEdit} disabled={sendingId === u.id} className="btn btn-primary btn-sm">{t('common.save')}</button>
             </div>
           </div>
