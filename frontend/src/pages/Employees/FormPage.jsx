@@ -206,15 +206,16 @@ export default function FormPage({ employeeId, onDone } = {}) {
                 placeholder={t('emp.managerSearchPlaceholder')}
               />
             </label>
-            <label className="field">{t('emp.linkedUser')}
-              <select value={form.linked_user_id} onChange={e => set('linked_user_id', e.target.value)} title={t('emp.linkedUserHint')}>
-                <option value="">{t('emp.linkedUserNone')}</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>
-                    {u.prenom} {u.nom} ({u.email}){u.employee_id && String(u.employee_id) !== String(id) ? ` — ${t('emp.linkedElsewhere')}` : ''}
-                  </option>
-                ))}
-              </select>
+            <label className="field" title={t('emp.linkedUserHint')}>{t('emp.linkedUser')}
+              <SearchableSelect
+                value={form.linked_user_id}
+                onChange={v => set('linked_user_id', v ?? '')}
+                options={users}
+                getLabel={u => `${u.prenom} ${u.nom} (${u.email})${u.employee_id && String(u.employee_id) !== String(id) ? ` — ${t('emp.linkedElsewhere')}` : ''}`}
+                getSearch={u => `${u.prenom} ${u.nom} ${u.email}`}
+                placeholder={t('emp.linkedUserSearchPlaceholder')}
+                noneLabel={t('emp.linkedUserNone')}
+              />
             </label>
             <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
