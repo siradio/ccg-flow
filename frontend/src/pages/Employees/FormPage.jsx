@@ -16,6 +16,8 @@ const EMPTY_FORM = {
   manager_employee_id: '',
   // Solde de congés (Lot 2) : amorçage du droit à congés
   conge_solde_initial: '', conge_solde_date: '',
+  // Compte utilisateur lié (géré depuis le référentiel RH)
+  linked_user_id: '',
 };
 
 // Utilisable soit comme page routée (/employees/new, /employees/:id), soit comme MODALE au-dessus
@@ -33,6 +35,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
   const [businessUnits, setBusinessUnits] = useState([]);
   const [sites, setSites] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [users, setUsers] = useState([]); // comptes liables (lien compte ↔ employé)
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -43,6 +46,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     client.get('/sites').then(res => setSites(res.data));
     client.get('/employees').then(res => setEmployees(res.data)).catch(() => {});
+    client.get('/employees/linkable-users').then(res => setUsers(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -62,6 +66,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
         permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
         manager_employee_id: e.manager_employee_id ?? '',
         conge_solde_initial: e.conge_solde_initial ?? '', conge_solde_date: e.conge_solde_date ? e.conge_solde_date.slice(0, 10) : '',
+        linked_user_id: e.linked_user_id ?? '',
       });
       setLoaded(true);
     });
@@ -103,6 +108,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
       manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
       conge_solde_initial: form.conge_solde_initial === '' ? 0 : Number(form.conge_solde_initial),
       conge_solde_date: form.conge_solde_date || null,
+      linked_user_id: form.linked_user_id ? Number(form.linked_user_id) : null,
     };
     try {
       if (isNew) {
@@ -194,6 +200,16 @@ export default function FormPage({ employeeId, onDone } = {}) {
                 <option value="">—</option>
                 {employees.filter(emp => String(emp.id) !== String(id)).map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}{emp.matricule ? ` (${emp.matricule})` : ''}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">{t('emp.linkedUser')}
+              <select value={form.linked_user_id} onChange={e => set('linked_user_id', e.target.value)} title={t('emp.linkedUserHint')}>
+                <option value="">{t('emp.linkedUserNone')}</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.prenom} {u.nom} ({u.email}){u.employee_id && String(u.employee_id) !== String(id) ? ` — ${t('emp.linkedElsewhere')}` : ''}
+                  </option>
                 ))}
               </select>
             </label>

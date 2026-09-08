@@ -5,11 +5,14 @@ const BASE_SELECT = `
          ent.code AS entity_code, ent.nom AS entity_nom,
          bu.code AS business_unit_code, bu.nom AS business_unit_nom,
          s.nom AS site_nom,
-         DATE_PART('year', AGE(CURRENT_DATE, e.date_embauche)) AS anciennete_annees
+         DATE_PART('year', AGE(CURRENT_DATE, e.date_embauche)) AS anciennete_annees,
+         lu.id AS linked_user_id, lu.email AS linked_user_email,
+         TRIM(CONCAT(lu.prenom, ' ', lu.nom)) AS linked_user_nom
   FROM employees e
   JOIN entities ent ON ent.id = e.entity_id
   LEFT JOIN business_units bu ON bu.id = e.business_unit_id
   LEFT JOIN sites s ON s.id = e.site_id
+  LEFT JOIN users lu ON lu.employee_id = e.id
 `;
 
 async function list({ q, entityId, businessUnitId, statut, departement }) {
@@ -70,4 +73,20 @@ async function remove(id) {
   await run('DELETE FROM employees WHERE id = $1', [id]);
 }
 
-module.exports = { list, getById, create, update, remove };
+// Comptes utilisateurs actifs, pour lier un compte à une fiche employé depuis le référentiel RH
+// (endpoint accessible aux gestionnaires RH, sans exposer l'administration complète des utilisateurs).
+// `employee_id` indique si le compte est déjà relié à une (autre) fiche.
+async function listLinkableUsers() {
+  return all(`SELECT id, prenom, nom, email, employee_id FROM users WHERE actif = true ORDER BY nom, prenom`);
+}
+
+// Définit LE compte utilisateur relié à une fiche employé (relation 1‑1 via users.employee_id).
+// userId falsy => on délie. Sinon on retire d'abord tout autre compte pointant vers cette fiche,
+// puis on affecte le compte choisi (qui bascule ainsi son lien vers cette fiche).
+async function setLinkedUser(employeeId, userId) {
+  const uid = userId ? Number(userId) : null;
+  await run('UPDATE users SET employee_id = NULL WHERE employee_id = $1', [employeeId]);
+  if (uid) await run('UPDATE users SET employee_id = $1 WHERE id = $2', [employeeId, uid]);
+}
+
+module.exports = { list, getById, create, update, remove, listLinkableUsers, setLinkedUser };
