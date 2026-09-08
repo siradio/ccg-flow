@@ -58,6 +58,12 @@ async function createConge(user, body) { return createRequest(user, 'conge', bod
 // ─── Solde de congés (acquisition mensuelle) ──────────────────────────────────
 const TAUX_ACQUISITION_MENSUEL = 2.5; // jours ouvrables acquis par mois (≈ 30 j/an)
 
+// Formate une date PG (objet Date à minuit local) en 'YYYY-MM-DD' via ses composants locaux —
+// robuste au fuseau du serveur (toISOString(), en UTC, décalerait d'un jour hors UTC).
+function toIsoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Nombre de mois ENTIERS écoulés entre deux dates (un mois n'est acquis qu'au jour anniversaire).
 function completeMonthsBetween(from, to) {
   let m = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
@@ -71,8 +77,11 @@ function completeMonthsBetween(from, to) {
 async function getCongeSolde(employeeId) {
   const emp = await one('SELECT id, prenom, nom, date_embauche, conge_solde_initial, conge_solde_date FROM employees WHERE id = $1', [employeeId]);
   if (!emp) throw httpError(404, 'Employé introuvable.');
+  // pg peut renvoyer une colonne DATE en objet Date : on reformate en ISO 'YYYY-MM-DD' de façon
+  // robuste (String(dateObj) donnerait « Fri May 08 » → cast ::date invalide côté SQL).
   const base = emp.conge_solde_date || emp.date_embauche || null;
-  const baseIso = base ? String(base).slice(0, 10) : null;
+  const baseD = base ? new Date(base) : null;
+  const baseIso = (baseD && !isNaN(baseD)) ? toIsoDate(baseD) : null;
   const mois = baseIso ? completeMonthsBetween(new Date(baseIso + 'T00:00:00Z'), new Date()) : 0;
   const initial = Number(emp.conge_solde_initial) || 0;
   const acquis = Math.round((initial + TAUX_ACQUISITION_MENSUEL * mois) * 100) / 100;
