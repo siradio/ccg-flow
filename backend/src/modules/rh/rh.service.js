@@ -5,14 +5,28 @@ const numbering = require('../../utils/numbering');
 const { hasRoleOnEntity, isSuperAdmin } = require('../../middleware/permissions');
 const { httpError } = require('../../utils/httpError');
 
-// Circuit de validation par rôle (MVP) : Collaborateur → Responsable → RH.
-// (Codé simplement ici ; passera au moteur configurable dans un lot ultérieur.)
-const CHAIN = ['responsable', 'rh'];
+// Circuits de validation par rôle (MVP ; passera au moteur configurable plus tard).
+// - Absence / congé : Responsable → RH.
+// - Recrutement REMPLACEMENT : Responsable → RH → DGA (rôle `dg`).
+// - Recrutement CRÉATION de poste & autres : Responsable → RH → DAF → DGA (engagement budgétaire).
+const DEFAULT_CHAIN = ['responsable', 'rh'];
+const CHAINS = { absence: DEFAULT_CHAIN, conge: DEFAULT_CHAIN };
+const RECRUTEMENT_REMPLACEMENT = ['responsable', 'rh', 'dg'];
+const RECRUTEMENT_AUTRE = ['responsable', 'rh', 'daf', 'dg'];
+// Union de tous les rôles pouvant valider (pour la liste « À valider », tous circuits confondus).
+const ALL_VALIDATION_ROLES = ['responsable', 'rh', 'daf', 'dg'];
 const PREFIX = { absence: 'ABS', conge: 'CNG', recrutement: 'REC', cdi: 'CDI' };
 
-function nextRole(current) {
-  const i = CHAIN.indexOf(current);
-  return (i >= 0 && i < CHAIN.length - 1) ? CHAIN[i + 1] : null;
+// Le circuit d'un recrutement dépend de son sous-type (code du rh_type : remplacement vs création…).
+function chainForRequest(req) {
+  if (req.type === 'recrutement') {
+    return req.type_code === 'remplacement' ? RECRUTEMENT_REMPLACEMENT : RECRUTEMENT_AUTRE;
+  }
+  return CHAINS[req.type] || DEFAULT_CHAIN;
+}
+function nextRole(chain, current) {
+  const i = chain.indexOf(current);
+  return (i >= 0 && i < chain.length - 1) ? chain[i + 1] : null;
 }
 
 // Nombre de jours ouvrables entre deux dates incluses (hors week-end + jours fériés paramétrés).
@@ -54,6 +68,33 @@ async function createRequest(user, type, body) {
 }
 async function createAbsence(user, body) { return createRequest(user, 'absence', body); }
 async function createConge(user, body) { return createRequest(user, 'conge', body); }
+
+// Demande de recrutement (ouverture de poste) : les champs spécifiques vont dans `payload` (le
+// recrutement ne concerne pas une fiche employé existante → employee_id nul, entité = celle du
+// demandeur pour piloter le circuit responsable/RH/DAF/DGA).
+async function createRecrutement(user, body) {
+  const emp = await resolveRequesterEmployee(user);
+  const payload = {
+    poste: body.poste || null,
+    departement: body.departement || null,
+    business_unit_id: body.business_unit_id || null,
+    type_contrat: body.type_contrat || null,
+    nombre_postes: body.nombre_postes ? Number(body.nombre_postes) : null,
+    date_prise_poste: body.date_prise_poste || null,
+    profil: body.profil || null,
+    remuneration: body.remuneration || null,
+    justification: body.justification || null,
+  };
+  let req = await repo.create({
+    type: 'recrutement', employeeId: null, createdBy: user.id, entityId: emp.entity_id,
+    businessUnitId: body.business_unit_id || emp.business_unit_id, typeId: body.type_id || null,
+    dateDebut: body.date_prise_poste || null, dateFin: null, jours: null,
+    motif: body.motif || null, commentaire: body.commentaire || null, payload,
+  });
+  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.recrutement, emp.entity_code || 'CCG', req.id));
+  await repo.logHistory(req.id, 'creation', user.id, null);
+  return getDetail(req.id);
+}
 
 // ─── Solde de congés (acquisition mensuelle) ──────────────────────────────────
 const TAUX_ACQUISITION_MENSUEL = 2.5; // jours ouvrables acquis par mois (≈ 30 j/an)
@@ -115,9 +156,10 @@ async function submit(user, id) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
-  await repo.update(id, { statut: 'en_validation', role_courant: CHAIN[0] });
+  const premier = chainForRequest(req)[0];
+  await repo.update(id, { statut: 'en_validation', role_courant: premier });
   await repo.logHistory(id, 'soumission', user.id, null);
-  await notifications.notifyRoleOnEntity(req.entity_id, CHAIN[0], 'Demande RH à valider',
+  await notifications.notifyRoleOnEntity(req.entity_id, premier, 'Demande RH à valider',
     `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
   return getDetail(id);
 }
@@ -127,7 +169,7 @@ async function validate(user, id, commentaire) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
   await assertRoleOr403(user, req.role_courant, req.entity_id);
-  const suivant = nextRole(req.role_courant);
+  const suivant = nextRole(chainForRequest(req), req.role_courant);
   if (suivant) {
     await repo.update(id, { role_courant: suivant });
     await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
@@ -174,7 +216,7 @@ async function notifyRequester(req, title, message) {
 // ─── Listes ─────────────────────────────────────────────────────────────────
 function pendingRolePairs(user) {
   return (user.roles || [])
-    .filter(r => CHAIN.includes(r.role_code) && r.entity_id)
+    .filter(r => ALL_VALIDATION_ROLES.includes(r.role_code) && r.entity_id)
     .map(r => ({ roleCode: r.role_code, entityId: r.entity_id }));
 }
 async function listMine(user) { return repo.listMine(user.id); }
@@ -189,7 +231,7 @@ function canSeeAll(user) {
 }
 
 module.exports = {
-  createAbsence, createConge, getDetail, submit, validate, reject, cancel,
+  createAbsence, createConge, createRecrutement, getDetail, submit, validate, reject, cancel,
   listMine, listPending, listAll, canSeeAll, workingDays,
   getCongeSolde, getMyCongeSolde,
 };

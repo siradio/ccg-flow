@@ -5,7 +5,7 @@ const BASE_SELECT = `
   SELECT r.*, e.code AS entity_code, e.nom AS entity_nom, bu.nom AS business_unit_nom,
          emp.matricule AS employee_matricule, emp.prenom AS employee_prenom, emp.nom AS employee_nom,
          emp.poste AS employee_poste, emp.departement AS employee_departement,
-         t.libelle AS type_libelle, t.domaine AS type_domaine,
+         t.libelle AS type_libelle, t.domaine AS type_domaine, t.code AS type_code,
          u.prenom AS created_by_prenom, u.nom AS created_by_nom
   FROM rh_requests r
   JOIN entities e ON e.id = r.entity_id
