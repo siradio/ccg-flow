@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import Modal from '../../components/Modal.jsx';
+import SearchableSelect from '../../components/SearchableSelect.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const EMPTY_FORM = {
@@ -196,12 +197,14 @@ export default function FormPage({ employeeId, onDone } = {}) {
               <input value={form.manager} onChange={e => set('manager', e.target.value)} />
             </label>
             <label className="field">{t('emp.managerEmployee')}
-              <select value={form.manager_employee_id} onChange={e => set('manager_employee_id', e.target.value)}>
-                <option value="">—</option>
-                {employees.filter(emp => String(emp.id) !== String(id)).map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}{emp.matricule ? ` (${emp.matricule})` : ''}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={form.manager_employee_id}
+                onChange={v => set('manager_employee_id', v ?? '')}
+                options={employees.filter(emp => String(emp.id) !== String(id))}
+                getLabel={emp => `${emp.prenom} ${emp.nom}${emp.matricule ? ` (${emp.matricule})` : ''}`}
+                getSearch={emp => `${emp.prenom} ${emp.nom} ${emp.matricule || ''}`}
+                placeholder={t('emp.managerSearchPlaceholder')}
+              />
             </label>
             <label className="field">{t('emp.linkedUser')}
               <select value={form.linked_user_id} onChange={e => set('linked_user_id', e.target.value)} title={t('emp.linkedUserHint')}>
