@@ -54,6 +54,17 @@ router.post('/requests/absence', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+router.post('/requests/conge', async (req, res, next) => {
+  try { res.status(201).json(await service.createConge(req.user, req.body || {})); }
+  catch (e) { next(e); }
+});
+
+// Solde de congés du demandeur (pour le formulaire de demande de congé).
+router.get('/conge-solde', async (req, res, next) => {
+  try { res.json(await service.getMyCongeSolde(req.user)); }
+  catch (e) { next(e); }
+});
+
 router.get('/requests/:id', async (req, res, next) => {
   try {
     const detail = await service.getDetail(Number(req.params.id));

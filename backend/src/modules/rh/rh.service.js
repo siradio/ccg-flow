@@ -38,25 +38,63 @@ async function resolveRequesterEmployee(user) {
   return emp;
 }
 
-async function createAbsence(user, body) {
+// Création générique d'une demande RH (absence, congé…) à partir de la fiche employé du demandeur.
+async function createRequest(user, type, body) {
   const emp = await resolveRequesterEmployee(user);
   const jours = await workingDays(body.date_debut, body.date_fin);
   let req = await repo.create({
-    type: 'absence', employeeId: emp.id, createdBy: user.id, entityId: emp.entity_id,
+    type, employeeId: emp.id, createdBy: user.id, entityId: emp.entity_id,
     businessUnitId: emp.business_unit_id, typeId: body.type_id || null,
     dateDebut: body.date_debut || null, dateFin: body.date_fin || null, jours,
     motif: body.motif || null, commentaire: body.commentaire || null,
   });
-  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.absence, emp.entity_code || 'CCG', req.id));
+  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX[type] || 'RH', emp.entity_code || 'CCG', req.id));
   await repo.logHistory(req.id, 'creation', user.id, null);
   return getDetail(req.id);
+}
+async function createAbsence(user, body) { return createRequest(user, 'absence', body); }
+async function createConge(user, body) { return createRequest(user, 'conge', body); }
+
+// ─── Solde de congés (acquisition mensuelle) ──────────────────────────────────
+const TAUX_ACQUISITION_MENSUEL = 2.5; // jours ouvrables acquis par mois (≈ 30 j/an)
+
+// Nombre de mois ENTIERS écoulés entre deux dates (un mois n'est acquis qu'au jour anniversaire).
+function completeMonthsBetween(from, to) {
+  let m = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+  if (to.getUTCDate() < from.getUTCDate()) m -= 1;
+  return Math.max(0, m);
+}
+
+// Solde de congés d'un employé : acquis = solde initial + 2,5 × mois complets depuis la date de
+// référence (date de solde, sinon date d'embauche) ; pris = congés imputables validés ; en attente =
+// congés imputables en cours de validation. Disponible = acquis − pris − en attente (prudent).
+async function getCongeSolde(employeeId) {
+  const emp = await one('SELECT id, prenom, nom, date_embauche, conge_solde_initial, conge_solde_date FROM employees WHERE id = $1', [employeeId]);
+  if (!emp) throw httpError(404, 'Employé introuvable.');
+  const base = emp.conge_solde_date || emp.date_embauche || null;
+  const baseIso = base ? String(base).slice(0, 10) : null;
+  const mois = baseIso ? completeMonthsBetween(new Date(baseIso + 'T00:00:00Z'), new Date()) : 0;
+  const initial = Number(emp.conge_solde_initial) || 0;
+  const acquis = Math.round((initial + TAUX_ACQUISITION_MENSUEL * mois) * 100) / 100;
+  const t = await repo.congeImputableTaken(employeeId, baseIso);
+  const pris = Number(t.valides) || 0;
+  const enAttente = Number(t.en_attente) || 0;
+  const disponible = Math.round((acquis - pris - enAttente) * 100) / 100;
+  return { acquis, pris, enAttente, disponible, taux: TAUX_ACQUISITION_MENSUEL, moisAcquis: mois, baseDate: baseIso };
+}
+
+async function getMyCongeSolde(user) {
+  const emp = await resolveRequesterEmployee(user);
+  return getCongeSolde(emp.id);
 }
 
 async function getDetail(id) {
   const req = await repo.getById(id);
   if (!req) return null;
   const [history, attachments] = await Promise.all([repo.getHistory(id), repo.getAttachments(id)]);
-  return { ...req, history, attachments };
+  // Pour un congé, on joint le solde du demandeur (visible par lui et ses valideurs).
+  const solde = (req.type === 'conge' && req.employee_id) ? await getCongeSolde(req.employee_id).catch(() => null) : null;
+  return { ...req, history, attachments, solde };
 }
 
 function assertOwner(user, req) {
@@ -142,6 +180,7 @@ function canSeeAll(user) {
 }
 
 module.exports = {
-  createAbsence, getDetail, submit, validate, reject, cancel,
+  createAbsence, createConge, getDetail, submit, validate, reject, cancel,
   listMine, listPending, listAll, canSeeAll, workingDays,
+  getCongeSolde, getMyCongeSolde,
 };

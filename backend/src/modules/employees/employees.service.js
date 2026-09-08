@@ -41,6 +41,8 @@ const WRITABLE_FIELDS = [
   'contact_urgence_nom', 'contact_urgence_tel', 'permis_travail', 'permis_travail_expiration',
   // Responsable hiérarchique (module RH, Lot 0)
   'manager_employee_id',
+  // Solde de congés (module RH, Lot 2) : amorçage du droit à congés
+  'conge_solde_initial', 'conge_solde_date',
 ];
 
 async function create(body) {

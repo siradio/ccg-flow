@@ -14,6 +14,8 @@ const EMPTY_FORM = {
   date_naissance: '', nationalite: '', numero_cnss: '', situation_familiale: '',
   contact_urgence_nom: '', contact_urgence_tel: '', permis_travail: false, permis_travail_expiration: '',
   manager_employee_id: '',
+  // Solde de congés (Lot 2) : amorçage du droit à congés
+  conge_solde_initial: '', conge_solde_date: '',
 };
 
 // Utilisable soit comme page routée (/employees/new, /employees/:id), soit comme MODALE au-dessus
@@ -59,6 +61,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
         contact_urgence_nom: e.contact_urgence_nom || '', contact_urgence_tel: e.contact_urgence_tel || '',
         permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
         manager_employee_id: e.manager_employee_id ?? '',
+        conge_solde_initial: e.conge_solde_initial ?? '', conge_solde_date: e.conge_solde_date ? e.conge_solde_date.slice(0, 10) : '',
       });
       setLoaded(true);
     });
@@ -98,6 +101,8 @@ export default function FormPage({ employeeId, onDone } = {}) {
       permis_travail: !!form.permis_travail,
       permis_travail_expiration: (form.permis_travail && form.permis_travail_expiration) ? form.permis_travail_expiration : null,
       manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
+      conge_solde_initial: form.conge_solde_initial === '' ? 0 : Number(form.conge_solde_initial),
+      conge_solde_date: form.conge_solde_date || null,
     };
     try {
       if (isNew) {
@@ -237,6 +242,12 @@ export default function FormPage({ employeeId, onDone } = {}) {
             </label>
             <label className="field">{t('emp.emergencyPhone')}
               <input value={form.contact_urgence_tel} onChange={e => set('contact_urgence_tel', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.congeSoldeInitial')}
+              <input type="number" step="0.5" min="0" value={form.conge_solde_initial} onChange={e => set('conge_solde_initial', e.target.value)} placeholder="0" />
+            </label>
+            <label className="field">{t('emp.congeSoldeDate')}
+              <input type="date" value={form.conge_solde_date} onChange={e => set('conge_solde_date', e.target.value)} />
             </label>
             <label className="field" style={{ alignSelf: 'end' }}>
               <span><input type="checkbox" checked={form.permis_travail} onChange={e => set('permis_travail', e.target.checked)} /> {t('emp.workPermit')}</span>

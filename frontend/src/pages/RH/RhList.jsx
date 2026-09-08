@@ -36,7 +36,12 @@ function RhList({ scope, title, showNew }) {
       <RhSubnav />
       <div className="page-header">
         <h1 className="page-title">{title}</h1>
-        {showNew && <Link to="/rh/demandes/absence/new" className="btn btn-primary">{t('rh.newAbsence')}</Link>}
+        {showNew && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link to="/rh/demandes/absence/new" className="btn btn-secondary">{t('rh.newAbsence')}</Link>
+            <Link to="/rh/demandes/conge/new" className="btn btn-primary">{t('rh.newConge')}</Link>
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: 16 }}>

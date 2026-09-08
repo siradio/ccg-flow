@@ -71,6 +71,16 @@ export default function DemandeDetail() {
         </div>
       </section>
 
+      {r.type === 'conge' && r.solde && (
+        <section className="card" style={{ maxWidth: 720, marginTop: 14, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('rh.solde.available')}</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{r.solde.disponible} {t('rh.daysUnit')}</div></div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            {t('rh.solde.acquired')}: <strong>{r.solde.acquis}</strong> · {t('rh.solde.taken')}: <strong>{r.solde.pris}</strong> · {t('rh.solde.pending')}: <strong>{r.solde.enAttente}</strong>
+          </div>
+        </section>
+      )}
+
       <section className="card" style={{ maxWidth: 720, marginTop: 14 }}>
         <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('rh.attachments')}</h2>
         {r.attachments.length === 0 && <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>{t('rh.noAttachment')}</p>}
