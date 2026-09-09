@@ -34,6 +34,7 @@ import AbsenceForm from './pages/RH/AbsenceForm';
 import CongeForm from './pages/RH/CongeForm';
 import RecrutementForm from './pages/RH/RecrutementForm';
 import CdiForm from './pages/RH/CdiForm';
+import RhDashboard from './pages/RH/RhDashboard';
 import DemandeDetail from './pages/RH/DemandeDetail';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
         {/* Demandes RH (absence…) : self-service, ouvert à tout utilisateur authentifié. Les droits
             fins (voir/valider) sont gérés côté serveur ; la sous-nav masque « À valider »/« Toutes ». */}
+        <Route path="rh/dashboard" element={<RhDashboard />} />
         <Route path="rh/mes-demandes" element={<MesDemandes />} />
         <Route path="rh/a-valider" element={<AValider />} />
         <Route path="rh/toutes" element={<ToutesDemandes />} />

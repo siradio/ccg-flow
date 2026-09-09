@@ -1,4 +1,4 @@
-const { one } = require('../../db');
+const { one, all } = require('../../db');
 const repo = require('./rh.repository');
 const notifications = require('../notifications/notifications.service');
 const numbering = require('../../utils/numbering');
@@ -255,8 +255,62 @@ function canSeeAll(user) {
   return isSuperAdmin(user) || (user.roles || []).some(r => r.role_code === 'rh');
 }
 
+// Accès au tableau de bord RH : super_admin ou tout détenteur d'un rôle de validation RH.
+function canSeeDashboard(user) {
+  return isSuperAdmin(user) || (user.roles || []).some(r => ALL_VALIDATION_ROLES.includes(r.role_code));
+}
+// Entités visibles sur le dashboard : null = toutes (super_admin ou RH global), sinon les entités où
+// l'utilisateur détient un rôle de validation RH.
+function dashboardScope(user) {
+  if (isSuperAdmin(user) || (user.roles || []).some(r => r.role_code === 'rh' && !r.entity_id)) return null;
+  return [...new Set((user.roles || [])
+    .filter(r => ALL_VALIDATION_ROLES.includes(r.role_code) && r.entity_id)
+    .map(r => r.entity_id))];
+}
+
+// Tableau de bord RH : agrégats (effectif, demandes en cours/à valider, absences & congés en cours et
+// à venir, recrutements/CDI en cours), limités aux entités RH de l'utilisateur.
+async function getDashboard(user) {
+  const ent = dashboardScope(user);       // null = toutes ; [] = aucune
+  const scoped = ent !== null;
+  const empty = {
+    effectif: { total: 0, parContrat: [], parEntite: [] },
+    demandes: { enValidation: 0, parType: [], aValider: 0, recrutement: 0, cdi: 0 },
+    enCours: [], aVenir: [],
+  };
+  if (scoped && ent.length === 0) return empty;
+  const p = scoped ? [ent] : [];
+  const w = (col) => (scoped ? ` AND ${col} = ANY($1)` : ''); // filtre entité optionnel
+
+  const [empTotal, parContrat, parEntite, enValidation, parType, recrutement, cdi] = await Promise.all([
+    one(`SELECT count(*)::int n FROM employees WHERE statut='actif'${w('entity_id')}`, p),
+    all(`SELECT COALESCE(NULLIF(type_contrat,''),'—') AS type_contrat, count(*)::int n FROM employees WHERE statut='actif'${w('entity_id')} GROUP BY 1 ORDER BY n DESC`, p),
+    all(`SELECT ent.code, count(*)::int n FROM employees e JOIN entities ent ON ent.id=e.entity_id WHERE e.statut='actif'${w('e.entity_id')} GROUP BY ent.code ORDER BY n DESC`, p),
+    one(`SELECT count(*)::int n FROM rh_requests WHERE statut='en_validation'${w('entity_id')}`, p),
+    all(`SELECT type, count(*)::int n FROM rh_requests WHERE statut='en_validation'${w('entity_id')} GROUP BY type`, p),
+    one(`SELECT count(*)::int n FROM rh_requests WHERE type='recrutement' AND statut='en_validation'${w('entity_id')}`, p),
+    one(`SELECT count(*)::int n FROM rh_requests WHERE type='cdi' AND statut='en_validation'${w('entity_id')}`, p),
+  ]);
+
+  const listSel = `SELECT r.id, r.numero, r.type, r.date_debut, r.date_fin, r.jours, ent.code AS entity_code,
+      TRIM(CONCAT(emp.prenom, ' ', emp.nom)) AS employe, t.libelle AS type_libelle
+    FROM rh_requests r JOIN entities ent ON ent.id = r.entity_id
+    LEFT JOIN employees emp ON emp.id = r.employee_id LEFT JOIN rh_types t ON t.id = r.type_id`;
+  const [enCours, aVenir] = await Promise.all([
+    all(`${listSel} WHERE r.type IN ('absence','conge') AND r.statut='validee' AND r.date_debut <= CURRENT_DATE AND r.date_fin >= CURRENT_DATE${w('r.entity_id')} ORDER BY r.date_fin`, p),
+    all(`${listSel} WHERE r.type IN ('absence','conge') AND r.statut='validee' AND r.date_debut > CURRENT_DATE AND r.date_debut <= CURRENT_DATE + INTERVAL '30 days'${w('r.entity_id')} ORDER BY r.date_debut`, p),
+  ]);
+
+  const aValider = (await listPending(user)).length;
+  return {
+    effectif: { total: empTotal.n, parContrat, parEntite },
+    demandes: { enValidation: enValidation.n, parType, aValider, recrutement: recrutement.n, cdi: cdi.n },
+    enCours, aVenir,
+  };
+}
+
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel,
   listMine, listPending, listAll, canSeeAll, workingDays,
-  getCongeSolde, getMyCongeSolde,
+  getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
 };

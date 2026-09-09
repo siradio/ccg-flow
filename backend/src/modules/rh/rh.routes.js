@@ -87,6 +87,14 @@ router.get('/conge-solde', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+// Tableau de bord RH (agrégats) — réservé aux détenteurs d'un rôle de validation RH / super_admin.
+router.get('/dashboard', async (req, res, next) => {
+  try {
+    if (!service.canSeeDashboard(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    res.json(await service.getDashboard(req.user));
+  } catch (e) { next(e); }
+});
+
 router.get('/requests/:id', async (req, res, next) => {
   try {
     const detail = await service.getDetail(Number(req.params.id));
