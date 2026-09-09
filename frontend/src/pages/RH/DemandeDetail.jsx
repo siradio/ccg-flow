@@ -18,7 +18,7 @@ export default function DemandeDetail() {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
 
-  function load() { return client.get(`/rh/demandes/${id}`).then(res => setR(res.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError'))); }
+  function load() { return client.get(`/rh/requests/${id}`).then(res => setR(res.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError'))); }
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dfmt = (d) => d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') : '—';
@@ -45,8 +45,8 @@ export default function DemandeDetail() {
   if (!r) return <div><RhSubnav /><p>{t('rh.loading')}</p></div>;
 
   const isOwner = r.created_by === user.id;
-  const canValidate = r.statut === 'en_validation' && r.current_role
-    && (user.roles || []).some(role => role.role_code === r.current_role && Number(role.entity_id) === Number(r.entity_id));
+  const canValidate = r.statut === 'en_validation' && r.role_courant
+    && (user.roles || []).some(role => role.role_code === r.role_courant && Number(role.entity_id) === Number(r.entity_id));
   const empName = `${r.employee_prenom || ''} ${r.employee_nom || ''}`.trim();
 
   return (
@@ -62,14 +62,49 @@ export default function DemandeDetail() {
 
       <section className="card" style={{ maxWidth: 720 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 18px', fontSize: 14 }}>
-          <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.type')}</span><span style={{ fontWeight: 600 }}>{r.type_libelle || t(RH_TYPE_LABELS[r.type])}</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.f.dept')}</span><span>{r.employee_departement || '—'} · {r.entity_code}</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.period')}</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)} → {dfmt(r.date_fin)} ({r.jours ?? '—'} {t('rh.daysUnit')})</span>
-          {r.motif && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.motif')}</span><span>{r.motif}</span></>}
+          <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.type')}</span><span style={{ fontWeight: 600 }}>{r.type_libelle || t(RH_TYPE_LABELS[r.type] || 'rh.type.absence')}</span>
+          {r.type === 'recrutement' ? (
+            <>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.poste')}</span><span style={{ fontWeight: 600 }}>{r.payload?.poste || '—'}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.requester')}</span><span>{r.created_by_prenom} {r.created_by_nom} · {r.entity_code}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.contrat')}</span><span>{r.payload?.type_contrat || '—'} · {r.payload?.nombre_postes || 1} {t('rh.recrutement.postes')}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.datePrise')}</span><span>{dfmt(r.date_debut)}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.departement')}</span><span>{r.payload?.departement || '—'}{r.business_unit_nom ? ` · ${r.business_unit_nom}` : ''}</span>
+              {r.motif && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.motif')}</span><span>{r.motif}</span></>}
+              {r.payload?.profil && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.profil')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.profil}</span></>}
+              {r.payload?.remuneration && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.remuneration')}</span><span>{r.payload.remuneration}</span></>}
+              {r.payload?.justification && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.justification')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.justification}</span></>}
+            </>
+          ) : r.type === 'cdi' ? (
+            <>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.f.dept')}</span><span>{r.employee_departement || '—'} · {r.entity_code}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.datePassage')}</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)}</span>
+              {r.payload?.nouveau_poste && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.nouveauPoste')}</span><span>{r.payload.nouveau_poste}</span></>}
+              {r.payload?.nouvelle_remuneration && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.nouvelleRemuneration')}</span><span>{r.payload.nouvelle_remuneration}</span></>}
+              {r.payload?.justification && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.justification')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.justification}</span></>}
+            </>
+          ) : (
+            <>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.f.dept')}</span><span>{r.employee_departement || '—'} · {r.entity_code}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.period')}</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)} → {dfmt(r.date_fin)} ({r.jours ?? '—'} {t('rh.daysUnit')})</span>
+              {r.motif && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.motif')}</span><span>{r.motif}</span></>}
+            </>
+          )}
           {r.commentaire && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.comment')}</span><span>{r.commentaire}</span></>}
         </div>
       </section>
+
+      {r.type === 'conge' && r.solde && (
+        <section className="card" style={{ maxWidth: 720, marginTop: 14, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div><div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('rh.solde.available')}</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{r.solde.disponible} {t('rh.daysUnit')}</div></div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
+            {t('rh.solde.acquired')}: <strong>{r.solde.acquis}</strong> · {t('rh.solde.taken')}: <strong>{r.solde.pris}</strong> · {t('rh.solde.pending')}: <strong>{r.solde.enAttente}</strong>
+          </div>
+        </section>
+      )}
 
       <section className="card" style={{ maxWidth: 720, marginTop: 14 }}>
         <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('rh.attachments')}</h2>

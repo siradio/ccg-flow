@@ -29,6 +29,13 @@ import ScheduledReports from './pages/Admin/ScheduledReports';
 import TestData from './pages/Admin/TestData';
 import EmployeesListPage from './pages/Employees/ListPage';
 import EmployeesFormPage from './pages/Employees/FormPage';
+import { MesDemandes, AValider, ToutesDemandes } from './pages/RH/RhList';
+import AbsenceForm from './pages/RH/AbsenceForm';
+import CongeForm from './pages/RH/CongeForm';
+import RecrutementForm from './pages/RH/RecrutementForm';
+import CdiForm from './pages/RH/CdiForm';
+import RhDashboard from './pages/RH/RhDashboard';
+import DemandeDetail from './pages/RH/DemandeDetail';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
 import MouvementForm from './pages/Stock/MouvementForm';
@@ -71,6 +78,17 @@ export default function App() {
         <Route path="employees" element={<RequireModule subModule="rh"><EmployeesListPage /></RequireModule>} />
         <Route path="employees/new" element={<RequireModule subModule="rh" minNiveau="ajout"><EmployeesFormPage /></RequireModule>} />
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
+        {/* Demandes RH (absence…) : self-service, ouvert à tout utilisateur authentifié. Les droits
+            fins (voir/valider) sont gérés côté serveur ; la sous-nav masque « À valider »/« Toutes ». */}
+        <Route path="rh/dashboard" element={<RhDashboard />} />
+        <Route path="rh/mes-demandes" element={<MesDemandes />} />
+        <Route path="rh/a-valider" element={<AValider />} />
+        <Route path="rh/toutes" element={<ToutesDemandes />} />
+        <Route path="rh/demandes/absence/new" element={<AbsenceForm />} />
+        <Route path="rh/demandes/conge/new" element={<CongeForm />} />
+        <Route path="rh/demandes/recrutement/new" element={<RecrutementForm />} />
+        <Route path="rh/demandes/cdi/new" element={<CdiForm />} />
+        <Route path="rh/demandes/:id" element={<DemandeDetail />} />
         {/* Fusionné dans le Tableau de bord (onglets Vue globale/Achats/RH/Stock) — redirige les liens/habitudes existants. */}
         <Route path="kpi" element={<Navigate to="/" replace />} />
         <Route path="stock/referentiels" element={<RequireModule subModule="stock.referentiels"><StockReferentiels /></RequireModule>} />

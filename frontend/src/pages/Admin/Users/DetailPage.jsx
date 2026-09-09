@@ -29,12 +29,12 @@ export default function DetailPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [otherUsers, setOtherUsers] = useState([]); // pour "copier les accès de…"
-  const [employeesList, setEmployeesList] = useState([]); // pour lier le compte à une fiche employé (RH)
 
   function load() {
     return client.get(`/users/${id}`).then(res => {
       setU(res.data);
-      setEditForm(f => f || { nom: res.data.nom, prenom: res.data.prenom, email: res.data.email, telephone: res.data.telephone || '', fonction: res.data.fonction || '', employeeId: res.data.employee_id ?? '' });
+      // Le lien vers la fiche employé se gère depuis Référentiels → Employés, plus ici.
+      setEditForm(f => f || { nom: res.data.nom, prenom: res.data.prenom, email: res.data.email, telephone: res.data.telephone || '', fonction: res.data.fonction || '' });
     });
   }
   useEffect(() => {
@@ -44,7 +44,6 @@ export default function DetailPage() {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     client.get('/access-profiles').then(res => setProfiles(res.data));
     client.get('/users').then(res => setOtherUsers(res.data));
-    client.get('/employees').then(res => setEmployeesList(res.data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -283,10 +282,8 @@ export default function DetailPage() {
               <input placeholder={t('adm.users.f.email')} type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
               <input placeholder={t('adm.users.f.telephone')} value={editForm.telephone} onChange={e => setEditForm({ ...editForm, telephone: e.target.value })} />
               <input placeholder={t('adm.users.f.fonction')} value={editForm.fonction} onChange={e => setEditForm({ ...editForm, fonction: e.target.value })} />
-              <select value={editForm.employeeId ?? ''} onChange={e => setEditForm({ ...editForm, employeeId: e.target.value })} title={t('adm.users.f.employee')}>
-                <option value="">{t('adm.users.f.employeeNone')}</option>
-                {employeesList.map(emp => <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}{emp.matricule ? ` (${emp.matricule})` : ''}</option>)}
-              </select>
+              {/* Le lien compte ↔ fiche employé se gère depuis Référentiels → Employés (fiche employé,
+                  champ « Compte utilisateur lié ») — plus rien ici, côté gestion des utilisateurs. */}
               <button onClick={saveEdit} disabled={sendingId === u.id} className="btn btn-primary btn-sm">{t('common.save')}</button>
             </div>
           </div>

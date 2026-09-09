@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import Modal from '../../components/Modal.jsx';
+import SearchableSelect from '../../components/SearchableSelect.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const EMPTY_FORM = {
@@ -14,6 +15,10 @@ const EMPTY_FORM = {
   date_naissance: '', nationalite: '', numero_cnss: '', situation_familiale: '',
   contact_urgence_nom: '', contact_urgence_tel: '', permis_travail: false, permis_travail_expiration: '',
   manager_employee_id: '',
+  // Solde de congés (Lot 2) : amorçage du droit à congés
+  conge_solde_initial: '', conge_solde_date: '',
+  // Compte utilisateur lié (géré depuis le référentiel RH)
+  linked_user_id: '',
 };
 
 // Utilisable soit comme page routée (/employees/new, /employees/:id), soit comme MODALE au-dessus
@@ -31,6 +36,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
   const [businessUnits, setBusinessUnits] = useState([]);
   const [sites, setSites] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [users, setUsers] = useState([]); // comptes liables (lien compte ↔ employé)
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -41,6 +47,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     client.get('/sites').then(res => setSites(res.data));
     client.get('/employees').then(res => setEmployees(res.data)).catch(() => {});
+    client.get('/employees/linkable-users').then(res => setUsers(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -59,6 +66,8 @@ export default function FormPage({ employeeId, onDone } = {}) {
         contact_urgence_nom: e.contact_urgence_nom || '', contact_urgence_tel: e.contact_urgence_tel || '',
         permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
         manager_employee_id: e.manager_employee_id ?? '',
+        conge_solde_initial: e.conge_solde_initial ?? '', conge_solde_date: e.conge_solde_date ? e.conge_solde_date.slice(0, 10) : '',
+        linked_user_id: e.linked_user_id ?? '',
       });
       setLoaded(true);
     });
@@ -98,6 +107,9 @@ export default function FormPage({ employeeId, onDone } = {}) {
       permis_travail: !!form.permis_travail,
       permis_travail_expiration: (form.permis_travail && form.permis_travail_expiration) ? form.permis_travail_expiration : null,
       manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
+      conge_solde_initial: form.conge_solde_initial === '' ? 0 : Number(form.conge_solde_initial),
+      conge_solde_date: form.conge_solde_date || null,
+      linked_user_id: form.linked_user_id ? Number(form.linked_user_id) : null,
     };
     try {
       if (isNew) {
@@ -185,12 +197,25 @@ export default function FormPage({ employeeId, onDone } = {}) {
               <input value={form.manager} onChange={e => set('manager', e.target.value)} />
             </label>
             <label className="field">{t('emp.managerEmployee')}
-              <select value={form.manager_employee_id} onChange={e => set('manager_employee_id', e.target.value)}>
-                <option value="">—</option>
-                {employees.filter(emp => String(emp.id) !== String(id)).map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.prenom} {emp.nom}{emp.matricule ? ` (${emp.matricule})` : ''}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={form.manager_employee_id}
+                onChange={v => set('manager_employee_id', v ?? '')}
+                options={employees.filter(emp => String(emp.id) !== String(id))}
+                getLabel={emp => `${emp.prenom} ${emp.nom}${emp.matricule ? ` (${emp.matricule})` : ''}`}
+                getSearch={emp => `${emp.prenom} ${emp.nom} ${emp.matricule || ''}`}
+                placeholder={t('emp.managerSearchPlaceholder')}
+              />
+            </label>
+            <label className="field" title={t('emp.linkedUserHint')}>{t('emp.linkedUser')}
+              <SearchableSelect
+                value={form.linked_user_id}
+                onChange={v => set('linked_user_id', v ?? '')}
+                options={users}
+                getLabel={u => `${u.prenom} ${u.nom} (${u.email})${u.employee_id && String(u.employee_id) !== String(id) ? ` — ${t('emp.linkedElsewhere')}` : ''}`}
+                getSearch={u => `${u.prenom} ${u.nom} ${u.email}`}
+                placeholder={t('emp.linkedUserSearchPlaceholder')}
+                noneLabel={t('emp.linkedUserNone')}
+              />
             </label>
             <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
@@ -237,6 +262,12 @@ export default function FormPage({ employeeId, onDone } = {}) {
             </label>
             <label className="field">{t('emp.emergencyPhone')}
               <input value={form.contact_urgence_tel} onChange={e => set('contact_urgence_tel', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.congeSoldeInitial')}
+              <input type="number" step="0.5" min="0" value={form.conge_solde_initial} onChange={e => set('conge_solde_initial', e.target.value)} placeholder="0" />
+            </label>
+            <label className="field">{t('emp.congeSoldeDate')}
+              <input type="date" value={form.conge_solde_date} onChange={e => set('conge_solde_date', e.target.value)} />
             </label>
             <label className="field" style={{ alignSelf: 'end' }}>
               <span><input type="checkbox" checked={form.permis_travail} onChange={e => set('permis_travail', e.target.checked)} /> {t('emp.workPermit')}</span>

@@ -5,7 +5,7 @@ const BASE_SELECT = `
   SELECT r.*, e.code AS entity_code, e.nom AS entity_nom, bu.nom AS business_unit_nom,
          emp.matricule AS employee_matricule, emp.prenom AS employee_prenom, emp.nom AS employee_nom,
          emp.poste AS employee_poste, emp.departement AS employee_departement,
-         t.libelle AS type_libelle, t.domaine AS type_domaine,
+         t.libelle AS type_libelle, t.domaine AS type_domaine, t.code AS type_code,
          u.prenom AS created_by_prenom, u.nom AS created_by_nom
   FROM rh_requests r
   JOIN entities e ON e.id = r.entity_id
@@ -101,7 +101,23 @@ async function holidaysBetween(from, to) {
   return all('SELECT date FROM rh_jours_feries WHERE date BETWEEN $1 AND $2', [from, to]);
 }
 
+// Total des jours de congés imputables au solde pour un employé, depuis une date de référence :
+// séparés entre validés (déjà décomptés) et en attente de validation (réservés).
+async function congeImputableTaken(employeeId, baseDate) {
+  return one(
+    `SELECT
+        COALESCE(SUM(CASE WHEN r.statut = 'validee' THEN r.jours END), 0) AS valides,
+        COALESCE(SUM(CASE WHEN r.statut = 'en_validation' THEN r.jours END), 0) AS en_attente
+     FROM rh_requests r
+     JOIN rh_types t ON t.id = r.type_id
+     WHERE r.employee_id = $1 AND r.type = 'conge' AND t.imputable_solde = true
+       AND ($2::date IS NULL OR r.date_debut >= $2::date)`,
+    [employeeId, baseDate]
+  );
+}
+
 module.exports = {
   create, setNumero, getById, update, listMine, listPending, listAll,
   logHistory, getHistory, addAttachment, getAttachments, getAttachment, deleteAttachment, holidaysBetween,
+  congeImputableTaken,
 };

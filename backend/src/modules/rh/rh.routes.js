@@ -54,6 +54,47 @@ router.post('/requests/absence', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+router.post('/requests/conge', async (req, res, next) => {
+  try { res.status(201).json(await service.createConge(req.user, req.body || {})); }
+  catch (e) { next(e); }
+});
+
+router.post('/requests/recrutement', async (req, res, next) => {
+  try { res.status(201).json(await service.createRecrutement(req.user, req.body || {})); }
+  catch (e) { next(e); }
+});
+
+router.post('/requests/cdi', async (req, res, next) => {
+  try { res.status(201).json(await service.createCdi(req.user, req.body || {})); }
+  catch (e) { next(e); }
+});
+
+// Liste légère d'employés pour les sélecteurs RH (ex. employé concerné par un passage CDD→CDI).
+// Accessible à tout utilisateur authentifié du module RH (pas besoin du droit d'admin employés).
+router.get('/employees', async (req, res, next) => {
+  try {
+    res.json(await all(
+      `SELECT e.id, e.matricule, e.nom, e.prenom, e.type_contrat, e.entity_id, ent.code AS entity_code
+       FROM employees e JOIN entities ent ON ent.id = e.entity_id
+       WHERE e.statut <> 'sorti' ORDER BY e.nom, e.prenom`
+    ));
+  } catch (e) { next(e); }
+});
+
+// Solde de congés du demandeur (pour le formulaire de demande de congé).
+router.get('/conge-solde', async (req, res, next) => {
+  try { res.json(await service.getMyCongeSolde(req.user)); }
+  catch (e) { next(e); }
+});
+
+// Tableau de bord RH (agrégats) — réservé aux détenteurs d'un rôle de validation RH / super_admin.
+router.get('/dashboard', async (req, res, next) => {
+  try {
+    if (!service.canSeeDashboard(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    res.json(await service.getDashboard(req.user));
+  } catch (e) { next(e); }
+});
+
 router.get('/requests/:id', async (req, res, next) => {
   try {
     const detail = await service.getDetail(Number(req.params.id));

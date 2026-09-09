@@ -11,7 +11,7 @@ const blob = require('../../storage/blob');
 const router = simpleCrudRouter({
   table: 'vehicles',
   columns: [
-    'immatriculation', 'type_id', 'marque', 'modele', 'annee',
+    'immatriculation', 'numero_chassis', 'type_id', 'marque', 'modele', 'annee',
     'entity_id', 'site_id', 'statut', 'compteur_km', 'capacite_reservoir',
     'date_mise_circulation', 'date_acquisition',
   ],

@@ -55,6 +55,12 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Comptes utilisateurs liables — pour choisir « Compte utilisateur lié » depuis la fiche employé.
+// Déclaré AVANT '/:id' pour ne pas être capturé comme un id.
+router.get('/linkable-users', requireAuth, async (req, res, next) => {
+  try { res.json(await service.listLinkableUsers()); } catch (e) { next(e); }
+});
+
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const employee = await service.getById(Number(req.params.id));
@@ -69,15 +75,20 @@ router.post('/', requireAuth, requireCreate, async (req, res, next) => {
     if (!nom || !prenom || !entity_id) {
       return res.status(400).json({ error: 'nom, prenom et entity_id sont obligatoires.' });
     }
-    res.status(201).json(await service.create(req.body));
+    const created = await service.create(req.body);
+    if ('linked_user_id' in (req.body || {})) await service.setLinkedUser(created.id, req.body.linked_user_id);
+    res.status(201).json(await service.getById(created.id));
   } catch (e) { next(e); }
 });
 
 router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
   try {
-    const updated = await service.update(Number(req.params.id), req.body || {});
+    const id = Number(req.params.id);
+    const updated = await service.update(id, req.body || {});
     if (!updated) return res.status(404).json({ error: 'Employé introuvable.' });
-    res.json(updated);
+    // Lien compte utilisateur ↔ employé, géré depuis le référentiel RH (relation users.employee_id).
+    if ('linked_user_id' in (req.body || {})) await service.setLinkedUser(id, req.body.linked_user_id);
+    res.json(await service.getById(id));
   } catch (e) { next(e); }
 });
 
