@@ -10,7 +10,8 @@ const { httpError } = require('../../utils/httpError');
 // - Recrutement REMPLACEMENT : Responsable → RH → DGA (rôle `dg`).
 // - Recrutement CRÉATION de poste & autres : Responsable → RH → DAF → DGA (engagement budgétaire).
 const DEFAULT_CHAIN = ['responsable', 'rh'];
-const CHAINS = { absence: DEFAULT_CHAIN, conge: DEFAULT_CHAIN };
+// Passage CDD→CDI (engagement permanent) : Responsable → RH → DAF → DGA.
+const CHAINS = { absence: DEFAULT_CHAIN, conge: DEFAULT_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'] };
 const RECRUTEMENT_REMPLACEMENT = ['responsable', 'rh', 'dg'];
 const RECRUTEMENT_AUTRE = ['responsable', 'rh', 'daf', 'dg'];
 // Union de tous les rôles pouvant valider (pour la liste « À valider », tous circuits confondus).
@@ -92,6 +93,30 @@ async function createRecrutement(user, body) {
     motif: body.motif || null, commentaire: body.commentaire || null, payload,
   });
   req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.recrutement, emp.entity_code || 'CCG', req.id));
+  await repo.logHistory(req.id, 'creation', user.id, null);
+  return getDetail(req.id);
+}
+
+// Passage CDD→CDI : concerne un EMPLOYÉ EXISTANT (celui en CDD). Le demandeur (created_by) est le
+// manager ; l'entité de la demande = celle de l'employé concerné (pilote le circuit de validation).
+async function createCdi(user, body) {
+  if (!body.employee_id) throw httpError(400, "Sélectionnez l'employé concerné.");
+  const emp = await one('SELECT * FROM employees WHERE id = $1', [body.employee_id]);
+  if (!emp) throw httpError(400, 'Employé concerné introuvable.');
+  const payload = {
+    nouveau_poste: body.nouveau_poste || null,
+    nouvelle_remuneration: body.nouvelle_remuneration || null,
+    date_passage: body.date_passage || null,
+    justification: body.justification || null,
+  };
+  let req = await repo.create({
+    type: 'cdi', employeeId: emp.id, createdBy: user.id, entityId: emp.entity_id,
+    businessUnitId: emp.business_unit_id, typeId: null,
+    dateDebut: body.date_passage || null, dateFin: null, jours: null,
+    motif: body.motif || null, commentaire: body.commentaire || null, payload,
+  });
+  const entRow = await one('SELECT code FROM entities WHERE id = $1', [emp.entity_id]).catch(() => null);
+  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.cdi, (entRow && entRow.code) || 'CCG', req.id));
   await repo.logHistory(req.id, 'creation', user.id, null);
   return getDetail(req.id);
 }
@@ -231,7 +256,7 @@ function canSeeAll(user) {
 }
 
 module.exports = {
-  createAbsence, createConge, createRecrutement, getDetail, submit, validate, reject, cancel,
+  createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel,
   listMine, listPending, listAll, canSeeAll, workingDays,
   getCongeSolde, getMyCongeSolde,
 };

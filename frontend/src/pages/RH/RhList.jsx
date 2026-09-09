@@ -40,7 +40,8 @@ function RhList({ scope, title, showNew }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link to="/rh/demandes/absence/new" className="btn btn-secondary">{t('rh.newAbsence')}</Link>
             <Link to="/rh/demandes/conge/new" className="btn btn-secondary">{t('rh.newConge')}</Link>
-            <Link to="/rh/demandes/recrutement/new" className="btn btn-primary">{t('rh.newRecrutement')}</Link>
+            <Link to="/rh/demandes/recrutement/new" className="btn btn-secondary">{t('rh.newRecrutement')}</Link>
+            <Link to="/rh/demandes/cdi/new" className="btn btn-primary">{t('rh.newCdi')}</Link>
           </div>
         )}
       </div>

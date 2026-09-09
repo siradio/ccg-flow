@@ -64,6 +64,23 @@ router.post('/requests/recrutement', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+router.post('/requests/cdi', async (req, res, next) => {
+  try { res.status(201).json(await service.createCdi(req.user, req.body || {})); }
+  catch (e) { next(e); }
+});
+
+// Liste légère d'employés pour les sélecteurs RH (ex. employé concerné par un passage CDD→CDI).
+// Accessible à tout utilisateur authentifié du module RH (pas besoin du droit d'admin employés).
+router.get('/employees', async (req, res, next) => {
+  try {
+    res.json(await all(
+      `SELECT e.id, e.matricule, e.nom, e.prenom, e.type_contrat, e.entity_id, ent.code AS entity_code
+       FROM employees e JOIN entities ent ON ent.id = e.entity_id
+       WHERE e.statut <> 'sorti' ORDER BY e.nom, e.prenom`
+    ));
+  } catch (e) { next(e); }
+});
+
 // Solde de congés du demandeur (pour le formulaire de demande de congé).
 router.get('/conge-solde', async (req, res, next) => {
   try { res.json(await service.getMyCongeSolde(req.user)); }

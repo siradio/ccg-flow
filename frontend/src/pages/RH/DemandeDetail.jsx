@@ -75,6 +75,15 @@ export default function DemandeDetail() {
               {r.payload?.remuneration && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.remuneration')}</span><span>{r.payload.remuneration}</span></>}
               {r.payload?.justification && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.justification')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.justification}</span></>}
             </>
+          ) : r.type === 'cdi' ? (
+            <>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.f.dept')}</span><span>{r.employee_departement || '—'} · {r.entity_code}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.datePassage')}</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)}</span>
+              {r.payload?.nouveau_poste && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.nouveauPoste')}</span><span>{r.payload.nouveau_poste}</span></>}
+              {r.payload?.nouvelle_remuneration && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.nouvelleRemuneration')}</span><span>{r.payload.nouvelle_remuneration}</span></>}
+              {r.payload?.justification && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.justification')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.justification}</span></>}
+            </>
           ) : (
             <>
               <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
