@@ -7,7 +7,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/achats', requireSubModule('kpi.achats'), async (req, res, next) => {
-  try { res.json(await service.getAchatsKpi()); }
+  try { res.json(await service.getAchatsKpi(req.query.business_unit_id || null)); }
   catch (e) { next(e); }
 });
 

@@ -245,15 +245,30 @@ function GlobalTab({ data }) {
   );
 }
 
-function AchatsKpiTab({ data }) {
+function AchatsKpiTab({ data, bus = [], achatsBu = '', setAchatsBu }) {
   const { t, lang } = useI18n();
   const loc = lang === 'en' ? 'en-US' : 'fr-FR';
-  const statusEntries = STATUS_ORDER
+  const statusEntries = !data ? [] : STATUS_ORDER
     .filter(s => data.prByStatus[s])
     .map(s => ({ label: STATUS_LABELS[s] || s, count: data.prByStatus[s], code: s }));
 
+  const filterBar = bus.length > 0 && (
+    <div className="form-inline" style={{ marginBottom: 12 }}>
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        {t('dash.filterBu')}
+        <select value={achatsBu} onChange={e => setAchatsBu(e.target.value)}>
+          <option value="">{t('cockpit.allBu')}</option>
+          {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+        </select>
+      </label>
+    </div>
+  );
+
+  if (!data) return <>{filterBar}<p>{t('prd.loading')}</p></>;
+
   return (
     <>
+      {filterBar}
       <div className="kpi-grid">
         <div className="card kpi-card">
           <div className="kpi-value">{data.tauxRefus.taux != null ? `${Math.round(data.tauxRefus.taux * 100)}%` : '—'}</div>
@@ -498,14 +513,25 @@ export default function Dashboard() {
   const [achats, setAchats] = useState(null);
   const [rh, setRh] = useState(null);
   const [stock, setStock] = useState(null);
+  const [bus, setBus] = useState([]);          // BU visibles (filtre KPI achats)
+  const [achatsBu, setAchatsBu] = useState(''); // BU sélectionnée pour les KPI achats
+  const canAchats = allowedTabs.some(tb => tb.key === 'achats');
 
   useEffect(() => {
     client.get('/dashboard').then(res => setData(res.data));
-    if (allowedTabs.some(tb => tb.key === 'achats')) client.get('/kpi/achats').then(res => setAchats(res.data));
     if (allowedTabs.some(tb => tb.key === 'rh')) client.get('/kpi/rh').then(res => setRh(res.data));
     if (allowedTabs.some(tb => tb.key === 'stock')) client.get('/kpi/stock').then(res => setStock(res.data));
+    if (canAchats) client.get('/business-units/mine').then(res => setBus(res.data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // KPI achats : rechargés à chaque changement de filtre BU.
+  useEffect(() => {
+    if (!canAchats) return;
+    setAchats(null);
+    client.get('/kpi/achats', { params: achatsBu ? { business_unit_id: achatsBu } : {} }).then(res => setAchats(res.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [achatsBu]);
 
   if (!data) return <Loading />;
 
@@ -521,7 +547,7 @@ export default function Dashboard() {
       </nav>
 
       {tab === 'global' && <GlobalTab data={data} />}
-      {tab === 'achats' && (achats ? <AchatsKpiTab data={achats} /> : <p>{t('prd.loading')}</p>)}
+      {tab === 'achats' && <AchatsKpiTab data={achats} bus={bus} achatsBu={achatsBu} setAchatsBu={setAchatsBu} />}
       {tab === 'rh' && (rh ? <RhKpiTab data={rh} /> : <p>{t('prd.loading')}</p>)}
       {tab === 'stock' && (stock ? <StockKpiTab data={stock} /> : <p>{t('prd.loading')}</p>)}
     </div>

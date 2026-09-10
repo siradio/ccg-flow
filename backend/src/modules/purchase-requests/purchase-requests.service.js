@@ -689,9 +689,19 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
   return repo.listVisibleTo({ status, requesterId: user.id, entityIds: visibleEntityIds }, pageOpts);
 }
 
+// Export analytique : toutes les demandes des entités où l'utilisateur détient un rôle (toutes pour
+// un super_admin), filtrées par plage de dates de création. Réservé aux valideurs (contrôle en route).
+async function exportRows(user, { from, to }) {
+  const entityIds = isSuperAdmin(user)
+    ? null
+    : [...new Set((user.roles || []).map(r => r.entity_id).filter(Boolean))];
+  if (entityIds && entityIds.length === 0) return [];
+  return repo.exportRows({ from, to, entityIds });
+}
+
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
-  validateStep, rejectStep, requestChanges, listForUser,
+  validateStep, rejectStep, requestChanges, listForUser, exportRows,
 };

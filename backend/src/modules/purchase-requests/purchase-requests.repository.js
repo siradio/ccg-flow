@@ -129,6 +129,32 @@ async function updateStatusAndStep(id, status, currentStepId) {
   );
 }
 
+// Lignes plates pour l'export Excel (analyse hors application). Une ligne par demande d'achat, avec
+// entité, BU, demandeur, statut, montant, et le bon de commande / fournisseur retenus s'ils existent.
+async function exportRows({ from, to, entityIds }) {
+  const params = [];
+  const where = [];
+  if (from) { params.push(from); where.push(`pr.created_at >= $${params.length}`); }
+  if (to) { params.push(to); where.push(`pr.created_at < ($${params.length}::date + INTERVAL '1 day')`); }
+  if (entityIds) { params.push(entityIds); where.push(`pr.entity_id = ANY($${params.length})`); }
+  return all(
+    `SELECT pr.numero, e.code AS entite, bu.nom AS business_unit, pr.objet, pr.justification,
+            TRIM(CONCAT(u.prenom, ' ', u.nom)) AS demandeur, pr.status AS statut, pr.devise,
+            pr.montant_final, pr.created_at, pr.updated_at,
+            po.numero AS bon_commande, po.montant AS montant_bon_commande, po.generated_at AS date_bon_commande,
+            s.nom AS fournisseur
+     FROM purchase_requests pr
+     JOIN entities e ON e.id = pr.entity_id
+     LEFT JOIN business_units bu ON bu.id = pr.business_unit_id
+     LEFT JOIN users u ON u.id = pr.requester_user_id
+     LEFT JOIN purchase_orders po ON po.purchase_request_id = pr.id
+     LEFT JOIN suppliers s ON s.id = po.supplier_id
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+     ORDER BY pr.created_at DESC`,
+    params
+  );
+}
+
 async function setMontantFinal(id, montant, devise) {
   return one('UPDATE purchase_requests SET montant_final = $1, devise = $2, updated_at = now() WHERE id = $3 RETURNING *', [montant, devise, id]);
 }
@@ -405,7 +431,7 @@ async function deletePendingApprovals(prId) {
 }
 
 module.exports = {
-  createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal,
+  createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal, exportRows,
   addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu, setLinesPrixUnitaireFinal,
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,

@@ -1,12 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import client from '../../api/client';
+import * as XLSX from 'xlsx';
 import { useAuth, isSuperAdmin, hasSubModuleLevel } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
-import { StatusBadge } from './statusLabels.jsx';
+import { StatusBadge, STATUS_LABELS } from './statusLabels.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import SupplierFormModal from '../Referentials/SupplierFormModal.jsx';
+
+// Rôles de la chaîne de validation du workflow achats : seuls eux (ou super_admin) peuvent exporter.
+const EXPORT_ROLES = ['service_achat', 'validateur_besoin', 'controle_gestion', 'finances'];
+const canExportAchats = (user) => isSuperAdmin(user) || (user?.roles || []).some(r => EXPORT_ROLES.includes(r.role_code));
 
 // On charge l'ensemble des demandes visibles (volume modéré) puis recherche + tri par colonne
 // entièrement côté client — même mécanique que les référentiels.
@@ -32,6 +37,50 @@ export default function ListPage() {
   const [toast, setToast] = useState(null);
   const canAddSupplier = hasSubModuleLevel(user, 'referentiels.suppliers', 'ajout');
   function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
+
+  // Export Excel (analyse hors application) — réservé aux valideurs.
+  const canExport = canExportAchats(user);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exporting, setExporting] = useState(false);
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      const params = {};
+      if (exportFrom) params.from = exportFrom;
+      if (exportTo) params.to = exportTo;
+      const { data } = await client.get('/purchase-requests/export', { params });
+      const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '');
+      const rows = data.map(r => ({
+        'N°': r.numero,
+        'Entité': r.entite,
+        'Business Unit': r.business_unit || '',
+        'Objet': r.objet || '',
+        'Demandeur': r.demandeur || '',
+        'Statut': STATUS_LABELS[r.statut] || r.statut,
+        'Montant': r.montant_final != null ? Number(r.montant_final) : (r.montant_bon_commande != null ? Number(r.montant_bon_commande) : ''),
+        'Devise': r.devise || '',
+        'Fournisseur retenu': r.fournisseur || '',
+        'Bon de commande': r.bon_commande || '',
+        'Date BC': fmtDate(r.date_bon_commande),
+        'Justification': r.justification || '',
+        'Date création': fmtDate(r.created_at),
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 24 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 12 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Achats');
+      const suffix = [exportFrom, exportTo].filter(Boolean).join('_') || 'tout';
+      XLSX.writeFile(wb, `Achats_${suffix}.xlsx`);
+      showToast(t('pr.export.done', { n: rows.length }));
+      setExportOpen(false);
+    } catch (err) {
+      showToast(err.response?.data?.error || t('pr.export.error'));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const nonDemandeurEntities = useMemo(() => {
     if (!user) return [];
@@ -82,12 +131,30 @@ export default function ListPage() {
       <div className="page-header">
         <h1 className="page-title">{t('nav.purchases')}</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canExport && (
+            <button type="button" className="btn btn-secondary" onClick={() => setExportOpen(o => !o)}>{t('pr.export.btn')}</button>
+          )}
           {canAddSupplier && (
             <button type="button" className="btn btn-secondary" onClick={() => setAddSupplierOpen(true)}>{t('refx.addSupplierBtn')}</button>
           )}
           <Link to="/purchase-requests/new" className="btn btn-primary">{t('pr.newBtn')}</Link>
         </div>
       </div>
+
+      {canExport && exportOpen && (
+        <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="field">{t('pr.export.from')}
+            <input type="date" value={exportFrom} onChange={e => setExportFrom(e.target.value)} />
+          </label>
+          <label className="field">{t('pr.export.to')}
+            <input type="date" value={exportTo} onChange={e => setExportTo(e.target.value)} />
+          </label>
+          <button type="button" className="btn btn-primary" disabled={exporting} onClick={exportExcel}>
+            {exporting ? t('pr.export.running') : t('pr.export.download')}
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('pr.export.hint')}</span>
+        </div>
+      )}
 
       {addSupplierOpen && (
         <SupplierFormModal

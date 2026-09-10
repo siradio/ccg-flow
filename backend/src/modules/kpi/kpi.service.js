@@ -1,29 +1,34 @@
 const { all, one } = require('../../db');
 
-async function getAchatsKpi() {
-  const prByStatusRows = await all('SELECT status, COUNT(*)::int AS count FROM purchase_requests GROUP BY status');
+async function getAchatsKpi(businessUnitId = null) {
+  // Filtre optionnel par Business Unit (seule SOGUIPAL est multi-BU) : tissé dans chaque requête.
+  const bu = businessUnitId ? Number(businessUnitId) : null;
+  const p = bu ? [bu] : [];
+  const andBu = (col) => (bu ? ` AND ${col} = $1` : '');       // à ajouter à un WHERE existant
+  const whereBu = (col) => (bu ? ` WHERE ${col} = $1` : '');   // seule condition
+
+  const prByStatusRows = await all(
+    `SELECT status, COUNT(*)::int AS count FROM purchase_requests${whereBu('business_unit_id')} GROUP BY status`, p);
   const prByStatus = Object.fromEntries(prByStatusRows.map(r => [r.status, r.count]));
 
   const prByEntity = await all(
     `SELECT e.code AS entity_code, COUNT(pr.id)::int AS count
-     FROM entities e LEFT JOIN purchase_requests pr ON pr.entity_id = e.id
-     GROUP BY e.code ORDER BY e.code`
-  );
+     FROM entities e LEFT JOIN purchase_requests pr ON pr.entity_id = e.id${andBu('pr.business_unit_id')}
+     GROUP BY e.code ORDER BY e.code`, p);
 
   const montantParDevise = await all(
     `SELECT devise, COALESCE(SUM(montant_final), 0)::float AS total
-     FROM purchase_requests WHERE status = 'bon_commande_genere' GROUP BY devise`
-  );
+     FROM purchase_requests WHERE status = 'bon_commande_genere'${andBu('business_unit_id')} GROUP BY devise`, p);
 
   // Taux de refus = part des demandes soumises ayant subi au moins un refus au cours de leur
   // circuit — plus parlant que le seul statut final "rejetee", qui ne survient que si une étape
   // est configurée en "annulation" (par défaut tout refus renvoie au service achat, cf. §3.1).
   const totalSoumises = await one(
-    "SELECT COUNT(*)::int AS n FROM purchase_requests WHERE status != 'brouillon'"
-  );
+    `SELECT COUNT(*)::int AS n FROM purchase_requests WHERE status != 'brouillon'${andBu('business_unit_id')}`, p);
   const refusees = await one(
-    "SELECT COUNT(DISTINCT purchase_request_id)::int AS n FROM approvals WHERE statut = 'refusee'"
-  );
+    `SELECT COUNT(DISTINCT a.purchase_request_id)::int AS n FROM approvals a
+     ${bu ? 'JOIN purchase_requests pr ON pr.id = a.purchase_request_id' : ''}
+     WHERE a.statut = 'refusee'${andBu('pr.business_unit_id')}`, p);
   const tauxRefus = {
     totalSoumises: totalSoumises.n,
     aSubiUnRefus: refusees.n,
@@ -32,16 +37,15 @@ async function getAchatsKpi() {
 
   const delai = await one(
     `SELECT AVG(EXTRACT(EPOCH FROM (po.generated_at - pr.created_at)) / 86400.0)::float AS jours
-     FROM purchase_orders po JOIN purchase_requests pr ON pr.id = po.purchase_request_id`
-  );
+     FROM purchase_orders po JOIN purchase_requests pr ON pr.id = po.purchase_request_id${whereBu('pr.business_unit_id')}`, p);
 
   const topFournisseurs = await all(
     `SELECT s.nom AS supplier_nom, po.devise, SUM(po.montant)::float AS total
      FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id
+     ${bu ? 'JOIN purchase_requests pr ON pr.id = po.purchase_request_id AND pr.business_unit_id = $1' : ''}
      GROUP BY s.nom, po.devise
      ORDER BY total DESC
-     LIMIT 5`
-  );
+     LIMIT 5`, p);
 
   // Performance par étape de validation vs SLA configuré : temps réel passé = decided_at − created_at
   // (voir migration 034). Le respect du SLA est calculé ligne par ligne contre le SLA de la version
@@ -56,14 +60,14 @@ async function getAchatsKpi() {
             COUNT(*) FILTER (WHERE ws.sla_jours IS NOT NULL)::int AS n_avec_sla
      FROM approvals a
      JOIN workflow_steps ws ON ws.id = a.workflow_step_id
+     ${bu ? 'JOIN purchase_requests pr ON pr.id = a.purchase_request_id AND pr.business_unit_id = $1' : ''}
      WHERE a.decided_at IS NOT NULL AND a.statut <> 'en_attente'
        -- Exclut les validations d'avant la mise en service du SLA : leur created_at a été posé par
        -- défaut à la date de migration (postérieure à leur decided_at), ce qui donnerait un délai
        -- négatif. On ne mesure que les validations dont le cycle complet est postérieur.
        AND a.decided_at >= a.created_at
      GROUP BY ws.code, ws.nom
-     ORDER BY ordre`
-  );
+     ORDER BY ordre`, p);
   const slaParEtape = slaRows.map(r => ({
     code: r.code,
     nom: r.nom,

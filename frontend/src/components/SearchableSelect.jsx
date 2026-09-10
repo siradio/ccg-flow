@@ -50,7 +50,7 @@ export default function SearchableSelect({
           else if (e.key === 'Enter' && open && filtered[hi]) { e.preventDefault(); choose(filtered[hi]); }
           else if (e.key === 'Escape') { setOpen(false); }
         }}
-        style={{ width: '100%', paddingRight: value ? 24 : undefined }}
+        style={{ width: '100%', minWidth: 260, paddingRight: value ? 24 : undefined }}
       />
       {value && !disabled && (
         <button type="button" onClick={() => choose(null)} aria-label={t('common.clear')}

@@ -10,7 +10,7 @@ const EMPTY_FORM = {
   matricule: '', nom: '', prenom: '', poste: '', departement: '',
   entity_id: '', business_unit_id: '', site_id: '', manager: '',
   date_embauche: '', type_contrat: '', statut: 'actif',
-  salaire_mensuel: '', telephone: '', email: '',
+  salaire_mensuel: '', telephone: '', email: '', adresse: '',
   // RH complémentaires
   date_naissance: '', nationalite: '', numero_cnss: '', situation_familiale: '',
   contact_urgence_nom: '', contact_urgence_tel: '', permis_travail: false, permis_travail_expiration: '',
@@ -60,7 +60,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
         entity_id: e.entity_id ?? '', business_unit_id: e.business_unit_id ?? '', site_id: e.site_id ?? '',
         manager: e.manager || '', date_embauche: e.date_embauche ? e.date_embauche.slice(0, 10) : '',
         type_contrat: e.type_contrat || '', statut: e.statut || 'actif',
-        salaire_mensuel: e.salaire_mensuel ?? '', telephone: e.telephone || '', email: e.email || '',
+        salaire_mensuel: e.salaire_mensuel ?? '', telephone: e.telephone || '', email: e.email || '', adresse: e.adresse || '',
         date_naissance: e.date_naissance ? e.date_naissance.slice(0, 10) : '',
         nationalite: e.nationalite || '', numero_cnss: e.numero_cnss || '', situation_familiale: e.situation_familiale || '',
         contact_urgence_nom: e.contact_urgence_nom || '', contact_urgence_tel: e.contact_urgence_tel || '',
@@ -98,6 +98,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
       type_contrat: form.type_contrat || null,
       telephone: form.telephone || null,
       email: form.email || null,
+      adresse: form.adresse || null,
       date_naissance: form.date_naissance || null,
       nationalite: form.nationalite || null,
       numero_cnss: form.numero_cnss || null,
@@ -238,6 +239,9 @@ export default function FormPage({ employeeId, onDone } = {}) {
             </label>
             <label className="field">{t('login.email')}
               <input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            </label>
+            <label className="field">{t('emp.address')}
+              <input value={form.adresse} onChange={e => set('adresse', e.target.value)} />
             </label>
             <label className="field">{t('emp.birthDate')}
               <input type="date" value={form.date_naissance} onChange={e => set('date_naissance', e.target.value)} />

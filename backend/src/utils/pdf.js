@@ -206,12 +206,14 @@ async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supp
   });
 }
 
-async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, supplierNom, logoBuffer, signatureBuffer, stampBuffer }) {
+async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, entityCode, businessUnitNom, supplierNom, logoBuffer, signatureBuffer, stampBuffer }) {
   return renderPdf(doc => {
     renderLetterhead(doc, 'Bon de commande', logoBuffer);
     doc.fontSize(11).font('Helvetica').fillColor('black');
     doc.text(`Numéro : ${purchaseOrder.numero}`);
     doc.text(`Entité : ${entityNom}`);
+    // La Business Unit n'est pertinente que pour SOGUIPAL (multi-BU) ; masquée pour les autres entités.
+    if (entityCode === 'SOGUIPAL') doc.text(`Business Unit : ${businessUnitNom || '—'}`);
     doc.text(`Fournisseur : ${supplierNom}`);
     doc.text(`Référence demande d'achat : ${purchaseRequest.numero}`);
     doc.text(`Date : ${new Date(purchaseOrder.generated_at).toLocaleDateString('fr-FR')}`);
