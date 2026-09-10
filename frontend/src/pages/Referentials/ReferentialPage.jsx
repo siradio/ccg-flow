@@ -5,7 +5,10 @@ import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useSort } from '../../components/useSort.jsx';
 import Modal from '../../components/Modal.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
+import Pagination from '../../components/Pagination.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+
+const PAGE_SIZE = 20;
 import { normalizeForm, normalizeFieldValue } from '../../utils/casing.js';
 
 // Libellé d'un champ : traduit si le champ porte une `labelKey`, sinon libellé brut (français) —
@@ -146,6 +149,11 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
     return v;
   };
   const sortedItems = apply(visibleItems);
+  // Pagination client : 20 par page. On revient à la 1re page quand le filtrage change le total.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search, filterValues]);
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageItems = sortedItems.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div>
@@ -210,7 +218,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
               </tr>
             </thead>
             <tbody>
-              {sortedItems.map(item => (
+              {pageItems.map(item => (
                 <tr key={item.id}>
                   {fields.map(f => <td key={f.key}>{renderValue(f, item, entities, sites, lists, endpoint, t)}</td>)}
                   {(canEdit || (canAdd && duplicable) || rowLink) && (
@@ -232,6 +240,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
           </table>
         </div>
       </div>
+
+      <Pagination page={page} total={sortedItems.length} pageSize={PAGE_SIZE} onPage={setPage} />
 
       {formOpen && (
         <Modal title={editingId ? t('ref.modify') : t('common.add')} onClose={closeForm} wide>

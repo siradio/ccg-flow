@@ -188,6 +188,10 @@ export default function DetailPage() {
         <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
       )}
 
+      {pr.status === 'bon_commande_genere' && (
+        <ReceptionSection pr={pr} isRequester={isRequester} guarded={guarded} />
+      )}
+
       {['devis_selectionne', 'en_validation', 'bon_commande_genere'].includes(pr.status) && hasRoleOnEntity(user, 'service_achat', pr.entity_id) && (
         <section className="card">
           <h2>{t('prd.reopenTitle')}</h2>
@@ -652,6 +656,43 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
           <button type="submit" className="btn btn-primary" disabled={!form.quoteRequestSupplierId || quoteTotal <= 0}>{t('prd.saveQuote')}</button>
         </form>
       )}
+    </section>
+  );
+}
+
+// Réception de commande : le demandeur confirme (case + commentaire) que la marchandise a été reçue,
+// une fois le bon de commande généré. Visible par tous ; modifiable par le demandeur de la DA.
+function ReceptionSection({ pr, isRequester, guarded }) {
+  const { t, lang } = useI18n();
+  const [recu, setRecu] = useState(!!pr.receptionnee);
+  const [comment, setComment] = useState(pr.reception_commentaire || '');
+  const [saving, setSaving] = useState(false);
+  const dtfmt = (d) => (d ? new Date(d).toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR') : '');
+
+  async function save() {
+    setSaving(true);
+    await guarded(() => client.post(`/purchase-requests/${pr.id}/reception`, { receptionnee: recu, commentaire: comment }), t('prd.reception.saved'));
+    setSaving(false);
+  }
+
+  return (
+    <section className="card">
+      <h2>{t('prd.reception.title')}</h2>
+      {pr.receptionnee && (
+        <p className="alert alert-success" style={{ marginTop: 0 }}>
+          {t('prd.reception.confirmed', { date: dtfmt(pr.reception_at) })}{pr.reception_commentaire ? ` — ${pr.reception_commentaire}` : ''}
+        </p>
+      )}
+      {isRequester ? (
+        <>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={recu} onChange={e => setRecu(e.target.checked)} /> {t('prd.reception.checkbox')}
+          </label>
+          <textarea placeholder={t('prd.reception.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)}
+            style={{ display: 'block', width: '100%', margin: '10px 0' }} />
+          <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? t('common.saving') : t('common.save')}</button>
+        </>
+      ) : (!pr.receptionnee && <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>{t('prd.reception.pending')}</p>)}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tool
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { ExportButtons, DetailExportButtons } from '../../utils/exportData';
+import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 // Module Production — relevé de production journalière (flux) + suivi cumulé sur une période.
@@ -48,6 +49,11 @@ export default function ProductionReleve() {
   const [saving, setSaving] = useState(false);
   const [period, setPeriod] = useState({ from: monthStart(), to: today(), bu: '' });
   const [suivi, setSuivi] = useState([]);
+  const { sort: suiviSort, by: suiviBy, apply: suiviApply } = useSort();
+  // Défaut : dernière saisie en tête (dernier_jour décroissant) ; les en-têtes cliquables prennent
+  // ensuite le relais (et le 3e clic revient à ce défaut).
+  const suiviDefault = [...suivi].sort((a, b) => String(b.dernier_jour || '').localeCompare(String(a.dernier_jour || '')));
+  const suiviRows = suiviApply(suiviDefault);
   const [evoGran, setEvoGran] = useState('semaine');
   const [evoProduct, setEvoProduct] = useState('');
   const [evo, setEvo] = useState([]);
@@ -249,9 +255,16 @@ export default function ProductionReleve() {
               <div className="card" style={{ padding: 0 }}>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>{t('stockreleve.th.product')}</th><th>{t('stockreleve.th.bu')}</th><th className="num">{t('prodrel.th.totalProduced')}</th><th className="num">{t('prodrel.th.daysEntered')}</th><th>{t('prodrel.th.lastDay')}</th><th>{t('stockreleve.th.by')}</th></tr></thead>
+                    <thead><tr>
+                      <SortTh label={t('stockreleve.th.product')} colKey="produit" get={r => `${r.code || ''} ${r.designation || ''}`} sort={suiviSort} by={suiviBy} />
+                      <SortTh label={t('stockreleve.th.bu')} colKey="bu" get={r => r.bu_nom} sort={suiviSort} by={suiviBy} />
+                      <SortTh label={t('prodrel.th.totalProduced')} colKey="total" get={r => Number(r.total_produit) || 0} sort={suiviSort} by={suiviBy} className="num" />
+                      <SortTh label={t('prodrel.th.daysEntered')} colKey="jours" get={r => Number(r.jours_saisis) || 0} sort={suiviSort} by={suiviBy} className="num" />
+                      <SortTh label={t('prodrel.th.lastDay')} colKey="dernier" get={r => r.dernier_jour} sort={suiviSort} by={suiviBy} />
+                      <SortTh label={t('stockreleve.th.by')} colKey="par" get={r => r.saisi_par} sort={suiviSort} by={suiviBy} />
+                    </tr></thead>
                     <tbody>
-                      {suivi.map(r => (
+                      {suiviRows.map(r => (
                         <tr key={r.product_id}>
                           <td><strong>{r.code || ''}</strong>{r.code ? ' — ' : ''}{r.designation}</td>
                           <td>{r.bu_nom}</td>

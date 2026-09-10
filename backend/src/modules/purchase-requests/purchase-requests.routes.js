@@ -56,6 +56,12 @@ router.post('/:id/submit', requireAuth, async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+// Réception de commande (demandeur) — au statut « bon de commande généré ».
+router.post('/:id/reception', requireAuth, async (req, res, next) => {
+  try { res.json(await service.markReception(req.user, Number(req.params.id), req.body || {})); }
+  catch (e) { next(e); }
+});
+
 router.post('/:id/lines', requireAuth, async (req, res, next) => {
   try {
     const { productId, descriptionLibre, quantite, unite, prixUnitaireEstime } = req.body || {};
