@@ -1,7 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSubModule } = require('../../middleware/permissions');
+const { requireSubModule, isSuperAdmin } = require('../../middleware/permissions');
+
+// Accès à l'export : réservé aux membres de la chaîne de validation du workflow achats
+// (valideurs), pas aux simples demandeurs. Super_admin inclus.
+const EXPORT_ROLES = ['service_achat', 'validateur_besoin', 'controle_gestion', 'finances'];
+function canExport(user) {
+  return isSuperAdmin(user) || (user.roles || []).some(r => EXPORT_ROLES.includes(r.role_code));
+}
 const service = require('./purchase-requests.service');
 const auditService = require('../audit/audit.service');
 const attachmentsService = require('../attachments/attachments.service');
@@ -25,6 +32,14 @@ router.get('/', requireAuth, async (req, res, next) => {
       entityId, status, mine: mine === 'true', pendingAction: pendingAction === 'true',
       page: page ? Number(page) : 1, pageSize: pageSize ? Number(pageSize) : 20,
     }));
+  } catch (e) { next(e); }
+});
+
+// Export analytique des demandes d'achat (Excel généré côté client) — filtre de dates optionnel.
+router.get('/export', requireAuth, async (req, res, next) => {
+  try {
+    if (!canExport(req.user)) return res.status(403).json({ error: "Export réservé aux membres de la chaîne de validation des achats." });
+    res.json(await service.exportRows(req.user, { from: req.query.from || null, to: req.query.to || null }));
   } catch (e) { next(e); }
 });
 
