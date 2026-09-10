@@ -8,10 +8,23 @@ import { StatusBadge, STATUS_LABELS } from './statusLabels.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import SupplierFormModal from '../Referentials/SupplierFormModal.jsx';
+import Pagination from '../../components/Pagination.jsx';
 
 // Rôles de la chaîne de validation du workflow achats : seuls eux (ou super_admin) peuvent exporter.
 const EXPORT_ROLES = ['service_achat', 'validateur_besoin', 'controle_gestion', 'finances'];
 const canExportAchats = (user) => isSuperAdmin(user) || (user?.roles || []).some(r => EXPORT_ROLES.includes(r.role_code));
+
+const UI_PAGE_SIZE = 20;
+const pad2 = (n) => String(n).padStart(2, '0');
+// Bornes du mois en cours (valeurs par défaut du filtre d'export).
+function currentMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  return {
+    from: `${y}-${pad2(m + 1)}-01`,
+    to: `${y}-${pad2(m + 1)}-${pad2(new Date(y, m + 1, 0).getDate())}`,
+  };
+}
 
 // On charge l'ensemble des demandes visibles (volume modéré) puis recherche + tri par colonne
 // entièrement côté client — même mécanique que les référentiels.
@@ -41,8 +54,8 @@ export default function ListPage() {
   // Export Excel (analyse hors application) — réservé aux valideurs.
   const canExport = canExportAchats(user);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportFrom, setExportFrom] = useState('');
-  const [exportTo, setExportTo] = useState('');
+  const [exportFrom, setExportFrom] = useState(() => currentMonthRange().from);
+  const [exportTo, setExportTo] = useState(() => currentMonthRange().to);
   const [exporting, setExporting] = useState(false);
   async function exportExcel() {
     setExporting(true);
@@ -120,6 +133,10 @@ export default function ListPage() {
       .some(v => String(v || '').toLowerCase().includes(term))
   );
   const rows = apply(filtered);
+  // Pagination client : 20 par page ; retour page 1 quand la recherche/les filtres changent le total.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [q, effectiveMineOnly, pendingOnly]);
+  const pageRows = rows.slice((page - 1) * UI_PAGE_SIZE, page * UI_PAGE_SIZE);
 
   return (
     <div>
@@ -193,7 +210,7 @@ export default function ListPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(pr => (
+                {pageRows.map(pr => (
                   <tr key={pr.id}>
                     <td><Link to={`/purchase-requests/${pr.id}`}>{pr.numero}</Link></td>
                     <td>{pr.entity_code}</td>
@@ -213,6 +230,8 @@ export default function ListPage() {
           )}
         </div>
       </div>
+
+      {!loading && <Pagination page={page} total={rows.length} pageSize={UI_PAGE_SIZE} onPage={setPage} />}
 
       {!loading && total > 0 && (
         <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-text-muted)' }}>
