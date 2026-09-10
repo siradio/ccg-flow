@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useSort } from '../../components/useSort.jsx';
 import Modal from '../../components/Modal.jsx';
+import SearchableSelect from '../../components/SearchableSelect.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import { normalizeForm, normalizeFieldValue } from '../../utils/casing.js';
 
@@ -457,10 +458,34 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
     );
   }
   if (field.type === 'fkSelect') {
+    const opts = lists[field.listKey] || [];
+    // Variante recherchable (grandes listes : employés…) — combobox qui filtre à la frappe.
+    if (field.searchable) {
+      return (
+        <SearchableSelect value={value} onChange={v => onChange(v ?? null)} options={opts}
+          getLabel={o => o.nom} getSearch={o => o.search || o.nom}
+          placeholder={`${label}…`} noneLabel={field.required ? `${label}…` : '—'} />
+      );
+    }
+    // Groupement par `optgroup` si les options portent un `group` (ex. produits rangés par BU).
+    if (opts.some(o => o.group)) {
+      const groups = {};
+      for (const o of opts) (groups[o.group || '—'] ||= []).push(o);
+      return (
+        <select required={field.required} value={value || ''} onChange={e => onChange(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">{field.required ? `${label}…` : '—'}</option>
+          {Object.entries(groups).map(([g, arr]) => (
+            <optgroup key={g} label={g}>
+              {arr.map(o => <option key={o.id} value={o.id}>{o.nom}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      );
+    }
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(e.target.value ? Number(e.target.value) : null)}>
         <option value="">{field.required ? `${label}…` : '—'}</option>
-        {(lists[field.listKey] || []).map(o => <option key={o.id} value={o.id}>{o.nom}</option>)}
+        {opts.map(o => <option key={o.id} value={o.id}>{o.nom}</option>)}
       </select>
     );
   }
