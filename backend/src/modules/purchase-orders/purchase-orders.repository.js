@@ -15,12 +15,14 @@ async function setNumero(id, numero) {
 async function getById(id) {
   return one(
     `SELECT po.*, s.nom AS supplier_nom, s.contact_email AS supplier_email,
-            pr.numero AS purchase_request_numero, pr.entity_id, pr.objet,
-            e.nom AS entity_nom, e.code AS entity_code
+            pr.numero AS purchase_request_numero, pr.entity_id, pr.objet, pr.business_unit_id,
+            e.nom AS entity_nom, e.code AS entity_code,
+            bu.nom AS business_unit_nom
      FROM purchase_orders po
      JOIN suppliers s ON s.id = po.supplier_id
      JOIN purchase_requests pr ON pr.id = po.purchase_request_id
      JOIN entities e ON e.id = pr.entity_id
+     LEFT JOIN business_units bu ON bu.id = pr.business_unit_id
      WHERE po.id = $1`,
     [id]
   );

@@ -33,6 +33,8 @@ async function buildPoPdf(po) {
     purchaseRequest: { numero: po.purchase_request_numero },
     lines,
     entityNom: po.entity_nom,
+    entityCode: po.entity_code,
+    businessUnitNom: po.business_unit_nom,
     supplierNom: po.supplier_nom,
     logoBuffer: images.logo,
     signatureBuffer: images.signature,
