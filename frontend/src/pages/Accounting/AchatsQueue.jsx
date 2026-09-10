@@ -67,7 +67,7 @@ export default function AchatsQueue() {
         </div>
       )}
 
-      <div className="form-inline" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="form-inline" style={{ marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <input type="search" value={filters.q} onChange={e => setF('q', e.target.value)}
           placeholder={t('acc.searchPlaceholder')} style={{ minWidth: 240 }} />
         <label className="field">{t('acc.f.from')}<input type="date" value={filters.from} onChange={e => setF('from', e.target.value)} /></label>
