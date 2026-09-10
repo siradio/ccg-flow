@@ -38,6 +38,10 @@ export function IconCart() {
 export function IconChart() {
   return <Svg><path d="M4 20V10M11 20V4M18 20v-7" /><path d="M2 20h20" /></Svg>;
 }
+// Comptabilité — calculatrice (grand livre / traitement comptable).
+export function IconAccounting() {
+  return <Svg><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 7h8" /><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15v2" /></Svg>;
+}
 export function IconBox() {
   return <Svg><path d="M21 8 12 3 3 8l9 5 9-5Z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></Svg>;
 }

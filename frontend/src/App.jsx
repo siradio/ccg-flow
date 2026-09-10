@@ -62,6 +62,9 @@ import CommissionsPage from './pages/Commerce/CommissionsPage';
 import RapportsPage from './pages/Commerce/RapportsPage';
 import PricesHistoryPage from './pages/Prices/HistoryPage';
 import PricesChartPage from './pages/Prices/ChartPage';
+import AchatsQueue from './pages/Accounting/AchatsQueue';
+import AchatsDetail from './pages/Accounting/AchatsDetail';
+import BdcCommercial from './pages/Accounting/BdcCommercial';
 
 export default function App() {
   return (
@@ -80,6 +83,13 @@ export default function App() {
         <Route path="employees/:id" element={<RequireModule subModule="rh"><EmployeesFormPage /></RequireModule>} />
         {/* Demandes RH (absence…) : self-service, ouvert à tout utilisateur authentifié. Les droits
             fins (voir/valider) sont gérés côté serveur ; la sous-nav masque « À valider »/« Toutes ». */}
+        {/* Module Comptabilité — Traitement des documents métier (V1 : BDC achat). */}
+        <Route path="comptabilite" element={<Navigate to="/comptabilite/traitement/achats" replace />} />
+        <Route path="comptabilite/traitement" element={<Navigate to="/comptabilite/traitement/achats" replace />} />
+        <Route path="comptabilite/traitement/achats" element={<RequireModule subModule="comptabilite.achats"><AchatsQueue /></RequireModule>} />
+        <Route path="comptabilite/traitement/achats/:id" element={<RequireModule subModule="comptabilite.achats"><AchatsDetail /></RequireModule>} />
+        <Route path="comptabilite/traitement/bons-de-commande" element={<RequireModule subModule="comptabilite.bdc"><BdcCommercial /></RequireModule>} />
+
         <Route path="rh/dashboard" element={<RhDashboard />} />
         <Route path="rh/mes-demandes" element={<MesDemandes />} />
         <Route path="rh/a-valider" element={<AValider />} />

@@ -73,6 +73,16 @@ const MODULES = [
       { key: 'commerce.parametres', label: 'Paramètres Commerce' },
     ],
   },
+  // Module Comptabilité — fondation du futur logiciel comptable intégré. Démarre par le TRAITEMENT
+  // comptable des documents métier (V1 : bons de commande issus des Achats). Niveaux : consultation
+  // = voir la file de travail ; edition = prendre en charge + marquer traité.
+  {
+    key: 'comptabilite', label: 'Comptabilité',
+    subModules: [
+      { key: 'comptabilite.achats', label: 'Traitement — Achats (BDC fournisseur)' },
+      { key: 'comptabilite.bdc', label: 'Traitement — Bons de commande (commercial)' },
+    ],
+  },
   { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
     key: 'referentiels', label: 'Référentiels',
