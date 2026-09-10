@@ -282,6 +282,12 @@ function AchatsKpiTab({ data, bus = [], achatsBu = '', setAchatsBu }) {
           <div className="kpi-value">{data.tauxRefus.totalSoumises}</div>
           <div className="kpi-label">{t('dash.totalSubmitted')}</div>
         </div>
+        {data.reception && (
+          <div className="card kpi-card">
+            <div className="kpi-value">{data.reception.taux != null ? `${Math.round(data.reception.taux * 100)}%` : '—'}</div>
+            <div className="kpi-label">{t('dash.receptionRate')} ({data.reception.receptionnees}/{data.reception.bcGeneres})</div>
+          </div>
+        )}
       </div>
 
       <div className="dashboard-columns">

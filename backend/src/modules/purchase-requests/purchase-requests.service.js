@@ -689,6 +689,34 @@ async function listForUser(user, { entityId, status, mine, pendingAction, page =
   return repo.listVisibleTo({ status, requesterId: user.id, entityIds: visibleEntityIds }, pageOpts);
 }
 
+// Réception de commande : le demandeur (auteur de la DA) confirme, une fois le bon de commande
+// généré, que la marchandise a bien été reçue. Statut inchangé — c'est un marqueur pour les KPI achats.
+async function markReception(user, prId, { receptionnee, commentaire }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (pr.requester_user_id !== user.id && !isSuperAdmin(user)) {
+    throw httpError(403, 'Seul le demandeur peut confirmer la réception.');
+  }
+  if (pr.status !== 'bon_commande_genere') {
+    throw httpError(400, 'La réception ne peut être confirmée qu\'une fois le bon de commande généré.');
+  }
+  const recu = !!receptionnee;
+  await one(
+    `UPDATE purchase_requests SET receptionnee = $1, reception_commentaire = $2,
+       reception_at = $3, reception_by = $4, updated_at = now() WHERE id = $5`,
+    [recu, commentaire || null, recu ? new Date() : null, recu ? user.id : null, prId]
+  );
+  await audit.logAction({
+    tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId,
+    action: recu ? 'reception_confirmee' : 'reception_annulee', userId: user.id, details: { commentaire: commentaire || null },
+  });
+  if (recu) {
+    await notifications.notifyRoleOnEntity(pr.entity_id, 'service_achat', 'Commande réceptionnée',
+      `La commande de la demande ${pr.numero} a été réceptionnée par le demandeur.`, `/purchase-requests/${prId}`);
+  }
+  return getFullDetail(prId);
+}
+
 // Export analytique : toutes les demandes des entités où l'utilisateur détient un rôle (toutes pour
 // un super_admin), filtrées par plage de dates de création. Réservé aux valideurs (contrôle en route).
 async function exportRows(user, { from, to }) {
@@ -703,5 +731,5 @@ module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
-  validateStep, rejectStep, requestChanges, listForUser, exportRows,
+  validateStep, rejectStep, requestChanges, listForUser, exportRows, markReception,
 };

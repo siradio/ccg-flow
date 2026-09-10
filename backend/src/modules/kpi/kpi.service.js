@@ -77,11 +77,22 @@ async function getAchatsKpi(businessUnitId = null) {
     tauxRespectSla: r.n_avec_sla > 0 ? r.n_dans_sla / r.n_avec_sla : null,
   }));
 
+  // Réception : part des bons de commande générés confirmés reçus par le demandeur.
+  const rec = await one(
+    `SELECT COUNT(*)::int AS bc_generes, COUNT(*) FILTER (WHERE receptionnee)::int AS receptionnees
+     FROM purchase_requests WHERE status = 'bon_commande_genere'${andBu('business_unit_id')}`, p);
+  const reception = {
+    bcGeneres: rec.bc_generes,
+    receptionnees: rec.receptionnees,
+    taux: rec.bc_generes > 0 ? rec.receptionnees / rec.bc_generes : null,
+  };
+
   return {
     prByStatus,
     prByEntity,
     montantParDevise,
     tauxRefus,
+    reception,
     delaiMoyenJours: delai.jours,
     topFournisseurs,
     slaParEtape,
