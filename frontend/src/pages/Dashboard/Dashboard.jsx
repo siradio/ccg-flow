@@ -317,6 +317,13 @@ function AchatsKpiTab({ data, bus = [], achatsBu = '', setAchatsBu }) {
             </>
           )}
         </section>
+
+        {data.prByBusinessUnit && (
+          <section className="card">
+            <h2>{t('dash.byBusinessUnit')}</h2>
+            <BarList entries={data.prByBusinessUnit.map(b => ({ label: b.business_unit, count: b.count }))} />
+          </section>
+        )}
       </div>
 
       <section className="card">

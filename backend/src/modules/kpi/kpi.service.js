@@ -16,6 +16,13 @@ async function getAchatsKpi(businessUnitId = null) {
      FROM entities e LEFT JOIN purchase_requests pr ON pr.entity_id = e.id${andBu('pr.business_unit_id')}
      GROUP BY e.code ORDER BY e.code`, p);
 
+  // Répartition des demandes par Business Unit (les entités mono-BU tombent dans « Sans BU »).
+  const prByBusinessUnit = await all(
+    `SELECT COALESCE(bu.nom, 'Sans BU') AS business_unit, COUNT(pr.id)::int AS count
+     FROM purchase_requests pr LEFT JOIN business_units bu ON bu.id = pr.business_unit_id
+     ${bu ? 'WHERE pr.business_unit_id = $1' : ''}
+     GROUP BY COALESCE(bu.nom, 'Sans BU') ORDER BY count DESC`, p);
+
   const montantParDevise = await all(
     `SELECT devise, COALESCE(SUM(montant_final), 0)::float AS total
      FROM purchase_requests WHERE status = 'bon_commande_genere'${andBu('business_unit_id')} GROUP BY devise`, p);
@@ -90,6 +97,7 @@ async function getAchatsKpi(businessUnitId = null) {
   return {
     prByStatus,
     prByEntity,
+    prByBusinessUnit,
     montantParDevise,
     tauxRefus,
     reception,
