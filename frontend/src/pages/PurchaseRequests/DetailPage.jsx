@@ -211,6 +211,8 @@ export default function DetailPage() {
 function LinesSection({ pr, products, isRequester, guarded }) {
   const { t } = useI18n();
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const editable = pr.status === 'brouillon' && isRequester;
   const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
   const money = (n) => (Number(n) || 0).toLocaleString('fr-FR');
@@ -224,6 +226,24 @@ function LinesSection({ pr, products, isRequester, guarded }) {
     if (ok) setForm({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   }
 
+  function startEdit(l) {
+    setEditingId(l.id);
+    setEditForm({
+      productId: l.product_id ? String(l.product_id) : '',
+      descriptionLibre: l.description_libre || '',
+      quantite: String(l.quantite ?? ''), unite: l.unite || '',
+    });
+  }
+  async function saveEdit(l) {
+    if (!editForm.quantite) return;
+    const ok = await guarded(() => client.put(`/purchase-requests/${pr.id}/lines/${l.id}`, {
+      productId: editForm.productId || null,
+      descriptionLibre: editForm.productId ? null : (editForm.descriptionLibre || null),
+      quantite: Number(editForm.quantite), unite: editForm.unite,
+    }));
+    if (ok) setEditingId(null);
+  }
+
   return (
     <section className="card">
       <h2>{t('prd.lines')}</h2>
@@ -235,7 +255,28 @@ function LinesSection({ pr, products, isRequester, guarded }) {
             <th>{t('prd.selectedSupplier')}</th>{editable && <th />}
           </tr></thead>
           <tbody>
-            {pr.lines.map(l => (
+            {pr.lines.map(l => (editingId === l.id ? (
+              <tr key={l.id}>
+                <td>
+                  <select value={editForm.productId} onChange={e => setEditForm({ ...editForm, productId: e.target.value })} style={{ maxWidth: 180 }}>
+                    <option value="">{t('prd.freeItem')}</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.designation}</option>)}
+                  </select>
+                  {!editForm.productId && (
+                    <input placeholder={t('prd.description')} value={editForm.descriptionLibre}
+                      onChange={e => setEditForm({ ...editForm, descriptionLibre: e.target.value })} style={{ display: 'block', marginTop: 4, minWidth: 180 }} />
+                  )}
+                </td>
+                <td><input type="number" value={editForm.quantite} onChange={e => setEditForm({ ...editForm, quantite: e.target.value })} style={{ width: 80 }} /></td>
+                <td><input value={editForm.unite} onChange={e => setEditForm({ ...editForm, unite: e.target.value })} style={{ width: 80 }} /></td>
+                {showPrices && <><td /><td /></>}
+                <td>{l.fournisseur_retenu_id ? '✓' : '—'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} onClick={() => saveEdit(l)}>{t('common.save')}</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setEditingId(null)}>{t('common.cancel')}</button>
+                </td>
+              </tr>
+            ) : (
               <tr key={l.id}>
                 <td>{l.designation || l.description_libre}</td>
                 <td>{l.quantite}</td>
@@ -246,7 +287,8 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                 </>}
                 <td>{l.fournisseur_retenu_id ? '✓' : '—'}</td>
                 {editable && (
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-secondary btn-sm" style={{ marginRight: 6 }} onClick={() => startEdit(l)}>{t('common.edit')}</button>
                     <button className="btn btn-danger btn-sm"
                       onClick={() => guarded(() => client.delete(`/purchase-requests/${pr.id}/lines/${l.id}`))}>
                       {t('common.delete')}
@@ -254,7 +296,7 @@ function LinesSection({ pr, products, isRequester, guarded }) {
                   </td>
                 )}
               </tr>
-            ))}
+            )))}
             {pr.lines.length === 0 && <tr><td className="empty-row" colSpan={(editable ? 5 : 4) + (showPrices ? 2 : 0)}>{t('prd.noLines')}</td></tr>}
           </tbody>
         </table>
