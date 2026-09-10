@@ -75,6 +75,7 @@ app.use('/api/commerce/commissions', require('./modules/commerce/commissions.rou
 app.use('/api/commerce/rapports', require('./modules/commerce/rapports.routes'));
 app.use('/api/reporting', require('./modules/reporting/reporting.routes'));
 app.use('/api/commerce/settings', require('./modules/commerce/settings.routes'));
+app.use('/api/accounting', require('./modules/accounting/accounting.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 

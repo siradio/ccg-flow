@@ -21,6 +21,7 @@ export const MODULE_SUB_KEYS = {
     'commerce.commerciaux', 'commerce.commissions', 'commerce.rapports', 'commerce.parametres',
   ],
   kpi: ['kpi.global', 'kpi.achats', 'kpi.rh', 'kpi.stock'],
+  comptabilite: ['comptabilite.achats', 'comptabilite.bdc'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
     'referentiels.products', 'referentiels.product_categories', 'referentiels.business_units', 'referentiels.suppliers',

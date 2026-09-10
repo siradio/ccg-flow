@@ -12,7 +12,7 @@ import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconEmployees, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -100,6 +100,7 @@ export default function Layout() {
           {hasModuleAccess(user, 'logistique') && <NavLink to="/logistique/vehicules" className={navClass} onClick={closeNav}><IconTruck /> {t('nav.logistics')}</NavLink>}
           {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> {t('nav.production')}</NavLink>}
           {hasModuleAccess(user, 'commerce') && <NavLink to={firstCommerceTarget(user) || '/commerce/versements'} className={navClass} onClick={closeNav}><IconTag /> {t('nav.commerce')}</NavLink>}
+          {hasModuleAccess(user, 'comptabilite') && <NavLink to="/comptabilite/traitement/achats" className={navClass} onClick={closeNav}><IconAccounting /> {t('nav.accounting')}</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
           <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>
           {hasLiens && (
