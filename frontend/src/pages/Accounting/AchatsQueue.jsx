@@ -10,6 +10,15 @@ import { useI18n } from '../../i18n/I18nContext';
 
 const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR'));
 
+// Colonnes optionnelles du tableau (N° BDC et l'action restent toujours visibles). L'ordre ici est
+// l'ordre d'affichage. Le choix est mémorisé par navigateur (localStorage).
+const OPTIONAL_COLS = ['da', 'bdcDate', 'requester', 'dept', 'supplier', 'amount', 'entity', 'daStatus', 'processing'];
+const COLS_STORAGE_KEY = 'ccg-flow-compta-achats-cols';
+const loadHiddenCols = () => {
+  try { const v = JSON.parse(localStorage.getItem(COLS_STORAGE_KEY)); return Array.isArray(v) ? v : []; }
+  catch { return []; }
+};
+
 export default function AchatsQueue() {
   const { user } = useAuth();
   const { t, lang } = useI18n();
@@ -21,9 +30,17 @@ export default function AchatsQueue() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ from: '', to: '', status: '', agent: 'all', entity_id: '', q: '' });
+  const [hiddenCols, setHiddenCols] = useState(loadHiddenCols);
+  const [colsOpen, setColsOpen] = useState(false);
 
   const dfmt = (d) => (d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') : '—');
   const setF = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setPage(1); };
+  const toggleCol = (key) => setHiddenCols(h => {
+    const next = h.includes(key) ? h.filter(k => k !== key) : [...h, key];
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(next)); } catch { /* stockage indisponible */ }
+    return next;
+  });
+  const isVisible = (key) => !hiddenCols.includes(key);
 
   useEffect(() => { client.get('/entities').then(r => setEntities(r.data)).catch(() => {}); }, []);
 
@@ -87,6 +104,30 @@ export default function AchatsQueue() {
           <option value="">{t('acc.f.allEntities')}</option>
           {entities.map(e => <option key={e.id} value={e.id}>{e.code}</option>)}
         </select>
+
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setColsOpen(o => !o)}>
+            {t('acc.cols.button')} ▾
+          </button>
+          {colsOpen && (
+            <>
+              <div onClick={() => setColsOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+              <div className="card" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 21,
+                minWidth: 220, padding: 10, boxShadow: '0 6px 24px rgba(0,0,0,.15)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                  {t('acc.cols.title')}
+                </div>
+                {OPTIONAL_COLS.map(key => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px', fontSize: 14, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={isVisible(key)} onChange={() => toggleCol(key)} />
+                    {t('acc.th.' + key)}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
@@ -96,24 +137,31 @@ export default function AchatsQueue() {
           {loading ? <Loading /> : (
             <table>
               <thead><tr>
-                <th>{t('acc.th.bdc')}</th><th>{t('acc.th.da')}</th><th>{t('acc.th.bdcDate')}</th>
-                <th>{t('acc.th.requester')}</th><th>{t('acc.th.dept')}</th><th>{t('acc.th.supplier')}</th>
-                <th className="num">{t('acc.th.amount')}</th><th>{t('acc.th.entity')}</th>
-                <th>{t('acc.th.daStatus')}</th><th>{t('acc.th.processing')}</th><th />
+                <th>{t('acc.th.bdc')}</th>
+                {isVisible('da') && <th>{t('acc.th.da')}</th>}
+                {isVisible('bdcDate') && <th>{t('acc.th.bdcDate')}</th>}
+                {isVisible('requester') && <th>{t('acc.th.requester')}</th>}
+                {isVisible('dept') && <th>{t('acc.th.dept')}</th>}
+                {isVisible('supplier') && <th>{t('acc.th.supplier')}</th>}
+                {isVisible('amount') && <th className="num">{t('acc.th.amount')}</th>}
+                {isVisible('entity') && <th>{t('acc.th.entity')}</th>}
+                {isVisible('daStatus') && <th>{t('acc.th.daStatus')}</th>}
+                {isVisible('processing') && <th>{t('acc.th.processing')}</th>}
+                <th />
               </tr></thead>
               <tbody>
                 {items.map(r => (
                   <tr key={r.po_id}>
                     <td><Link to={`/comptabilite/traitement/achats/${r.po_id}`}><strong>{r.bdc_numero}</strong></Link></td>
-                    <td>{r.da_numero}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{dfmt(r.generated_at)}</td>
-                    <td>{r.demandeur || '—'}</td>
-                    <td>{r.departement || '—'}</td>
-                    <td>{r.fournisseur || '—'}</td>
-                    <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(r.montant)} {r.devise}</td>
-                    <td>{r.entity_code}</td>
-                    <td><StatusBadge status={r.da_status} /></td>
-                    <td><ProcessingBadge status={r.processing_status} name={r.processing_status === 'PROCESSED' ? r.processed_nom : r.assigned_nom} /></td>
+                    {isVisible('da') && <td>{r.da_numero}</td>}
+                    {isVisible('bdcDate') && <td style={{ whiteSpace: 'nowrap' }}>{dfmt(r.generated_at)}</td>}
+                    {isVisible('requester') && <td>{r.demandeur || '—'}</td>}
+                    {isVisible('dept') && <td>{r.departement || '—'}</td>}
+                    {isVisible('supplier') && <td>{r.fournisseur || '—'}</td>}
+                    {isVisible('amount') && <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(r.montant)} {r.devise}</td>}
+                    {isVisible('entity') && <td>{r.entity_code}</td>}
+                    {isVisible('daStatus') && <td><StatusBadge status={r.da_status} /></td>}
+                    {isVisible('processing') && <td><ProcessingBadge status={r.processing_status} name={r.processing_status === 'PROCESSED' ? r.processed_nom : r.assigned_nom} /></td>}
                     <td>
                       <Link to={`/comptabilite/traitement/achats/${r.po_id}`} className="btn btn-secondary btn-sm">
                         {r.processing_status === 'NOT_PROCESSED' && canProcess ? t('acc.action.process') : t('acc.action.open')}
@@ -122,7 +170,7 @@ export default function AchatsQueue() {
                   </tr>
                 ))}
                 {items.length === 0 && (
-                  <tr><td className="empty-row" colSpan={11}>{t('acc.empty')}</td></tr>
+                  <tr><td className="empty-row" colSpan={2 + OPTIONAL_COLS.filter(isVisible).length}>{t('acc.empty')}</td></tr>
                 )}
               </tbody>
             </table>
