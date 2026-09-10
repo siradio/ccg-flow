@@ -206,6 +206,7 @@ export default function ListPage() {
                   <SortTh label={t('pr.th.subject')} colKey="objet" get={r => r.objet} sort={sort} by={by} />
                   <SortTh label={t('pr.th.requester')} colKey="requester" get={r => `${r.requester_prenom || ''} ${r.requester_nom || ''}`.trim()} sort={sort} by={by} />
                   <SortTh label={t('pr.th.status')} colKey="status" get={r => r.status} sort={sort} by={by} />
+                  <SortTh label={t('pr.th.reception')} colKey="reception" get={r => r.status === 'bon_commande_genere' ? (r.receptionnee ? 2 : 1) : 0} sort={sort} by={by} />
                   <SortTh label={t('pr.th.createdAt')} colKey="created_at" get={r => new Date(r.created_at).getTime()} sort={sort} by={by} />
                 </tr>
               </thead>
@@ -217,11 +218,20 @@ export default function ListPage() {
                     <td>{pr.objet}</td>
                     <td>{pr.requester_prenom} {pr.requester_nom}</td>
                     <td><StatusBadge status={pr.status} /></td>
+                    <td>
+                      {pr.status === 'bon_commande_genere' ? (
+                        <span className="badge" style={pr.receptionnee
+                          ? { background: 'var(--status-green-bg)', color: 'var(--status-green-fg)' }
+                          : { background: 'var(--status-amber-bg, #fef3c7)', color: 'var(--status-amber-fg, #b45309)' }}>
+                          {pr.receptionnee ? t('pr.reception.received') : t('pr.reception.pending')}
+                        </span>
+                      ) : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                    </td>
                     <td>{dateStr(pr.created_at)}</td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td className="empty-row" colSpan={6}>
+                  <tr><td className="empty-row" colSpan={7}>
                     {term ? t('pr.emptySearch') : pendingOnly ? t('pr.emptyPending') : t('pr.empty')}
                   </td></tr>
                 )}
