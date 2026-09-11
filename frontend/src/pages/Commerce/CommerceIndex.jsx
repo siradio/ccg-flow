@@ -21,7 +21,13 @@ const CONFIGS = {
         optionLabels: { interne: 'Interne', externe: 'Externe' } },
       { key: 'employee_id', label: 'Employé (interne)', type: 'fkSelect', listKey: 'employees', searchable: true,
         showIf: { field: 'type', equals: 'interne' },
-        autofill: { code: '_matricule', nom: '_nom', prenom: '_prenom', telephone: '_telephone', email: '_email', adresse: '_adresse' } },
+        // Case à cocher pour n'afficher que les employés « commerciaux » (département/poste/nom
+        // contenant « commerc ») — décochée = liste complète.
+        optionFilterToggle: { labelKey: 'com.commerciaux.employeeFilter',
+          match: o => /commerc/i.test(`${o._departement || ''} ${o._poste || ''} ${o.nom || ''}`) },
+        // Le code commercial est distinct du matricule : on ne le pré-remplit plus (saisi à la main,
+        // obligatoire). L'identité, elle, se pré-remplit depuis la fiche employé.
+        autofill: { nom: '_nom', prenom: '_prenom', telephone: '_telephone', email: '_email', adresse: '_adresse' } },
       { key: 'code', label: 'Code', required: true },
       // Identité : pré-remplie depuis l'employé (interne) ou saisie (externe).
       { key: 'nom', label: 'Nom' },
@@ -103,6 +109,7 @@ export default function CommerceIndex() {
       id: e.id, nom: fullEmp(e), search: `${e.prenom || ''} ${e.nom || ''} ${e.matricule || ''}`,
       _matricule: e.matricule || '', _nom: e.nom || '', _prenom: e.prenom || '',
       _telephone: e.telephone || '', _email: e.email || '', _adresse: e.adresse || '',
+      _departement: e.departement || '', _poste: e.poste || '',
     })))).catch(() => {});
     client.get('/products').then(r => setProducts(r.data.map(p => ({
       id: p.id, nom: p.designation, type_article: p.type_article, business_unit_id: p.business_unit_id,

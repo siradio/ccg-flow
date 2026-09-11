@@ -1748,6 +1748,7 @@ export const translations = {
     'com.title.banques': 'Banques',
     'com.title.zones': 'Zones commerciales',
     'com.rowLink.fiche': 'Fiche',
+    'com.commerciaux.employeeFilter': 'N’afficher que les employés du commerce',
     // Référentiels Commerce — libellés de champ
     'com.f.commerciaux.code': 'Code',
     'com.f.commerciaux.type': 'Type',
@@ -3812,6 +3813,7 @@ export const translations = {
     'com.title.banques': 'Banks',
     'com.title.zones': 'Sales zones',
     'com.rowLink.fiche': 'Profile',
+    'com.commerciaux.employeeFilter': 'Show only sales-department employees',
     // Commerce reference data — field labels
     'com.f.commerciaux.code': 'Code',
     'com.f.commerciaux.type': 'Type',
