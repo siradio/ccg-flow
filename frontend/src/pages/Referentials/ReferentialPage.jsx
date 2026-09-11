@@ -450,6 +450,7 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
 
 export function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
   const { t } = useI18n();
+  const [optFilterOn, setOptFilterOn] = useState(false); // case à cocher optionnelle (voir optionFilterToggle)
   const label = fieldLabel(field, t);
   if (field.type === 'entitySelect') {
     return (
@@ -471,10 +472,24 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
     const opts = lists[field.listKey] || [];
     // Variante recherchable (grandes listes : employés…) — combobox qui filtre à la frappe.
     if (field.searchable) {
-      return (
-        <SearchableSelect value={value} onChange={v => onChange(v ?? null)} options={opts}
+      // Case à cocher optionnelle pour restreindre les options (ex. n'afficher que les employés
+      // commerciaux) : cochée → on ne garde que les options qui passent `match` ; décochée → tout.
+      const tog = field.optionFilterToggle;
+      const shownOpts = tog && optFilterOn ? opts.filter(tog.match) : opts;
+      const select = (
+        <SearchableSelect value={value} onChange={v => onChange(v ?? null)} options={shownOpts}
           getLabel={o => o.nom} getSearch={o => o.search || o.nom}
           placeholder={`${label}…`} noneLabel={field.required ? `${label}…` : '—'} />
+      );
+      if (!tog) return select;
+      return (
+        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
+          {select}
+          <label style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'inline-flex', gap: 6, alignItems: 'center', fontWeight: 400 }}>
+            <input type="checkbox" checked={optFilterOn} onChange={e => setOptFilterOn(e.target.checked)} />
+            {tog.labelKey ? t(tog.labelKey) : tog.label}
+          </label>
+        </span>
       );
     }
     // Groupement par `optgroup` si les options portent un `group` (ex. produits rangés par BU).
