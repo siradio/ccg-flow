@@ -35,6 +35,7 @@ import CongeForm from './pages/RH/CongeForm';
 import RecrutementForm from './pages/RH/RecrutementForm';
 import CdiForm from './pages/RH/CdiForm';
 import RhDashboard from './pages/RH/RhDashboard';
+import RhParametres from './pages/RH/RhParametres';
 import DemandeDetail from './pages/RH/DemandeDetail';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="rh/mes-demandes" element={<MesDemandes />} />
         <Route path="rh/a-valider" element={<AValider />} />
         <Route path="rh/toutes" element={<ToutesDemandes />} />
+        <Route path="rh/parametres" element={<RhParametres />} />
         <Route path="rh/demandes/absence/new" element={<AbsenceForm />} />
         <Route path="rh/demandes/conge/new" element={<CongeForm />} />
         <Route path="rh/demandes/recrutement/new" element={<RecrutementForm />} />

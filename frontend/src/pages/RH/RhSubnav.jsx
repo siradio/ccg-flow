@@ -8,6 +8,8 @@ function hasAnyRole(user, codes) {
 }
 export function canValidateRh(user) { return hasAnyRole(user, ['responsable', 'rh', 'daf', 'dg', 'super_admin']); }
 export function canSeeAllRh(user) { return hasAnyRole(user, ['rh', 'super_admin']); }
+// Gestion des paramètres RH (types de demande) : réservée au RH et aux super_admin.
+export function canManageRhTypes(user) { return hasAnyRole(user, ['rh', 'super_admin']); }
 
 export default function RhSubnav() {
   const { user } = useAuth();
@@ -18,6 +20,7 @@ export default function RhSubnav() {
       <NavLink to="/rh/mes-demandes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.mine')}</NavLink>
       {canValidateRh(user) && <NavLink to="/rh/a-valider" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.pending')}</NavLink>}
       {canSeeAllRh(user) && <NavLink to="/rh/toutes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.all')}</NavLink>}
+      {canManageRhTypes(user) && <NavLink to="/rh/parametres" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.params')}</NavLink>}
     </nav>
   );
 }

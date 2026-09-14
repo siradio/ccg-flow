@@ -69,6 +69,11 @@ export default function CongeForm() {
               {types.map(x => <option key={x.id} value={x.id}>{x.libelle}{x.imputable_solde ? '' : ` (${t('rh.solde.notCounted')})`}</option>)}
             </select>
           </label>
+          {selectedType?.jours_accordes != null && (
+            <div className="alert" style={{ background: 'var(--color-hover)', color: 'var(--color-text-muted)', margin: 0 }}>
+              {t('rh.form.joursAccordes', { jours: selectedType.jours_accordes })}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <label className="field" style={{ flex: '1 1 160px' }}>{t('rh.absence.from')}
               <input type="date" value={form.date_debut} onChange={e => set('date_debut', e.target.value)} required />

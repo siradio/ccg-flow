@@ -1,8 +1,9 @@
 const express = require('express');
 const multer = require('multer');
-const { all } = require('../../db');
+const { all, one, run } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
 const { isSuperAdmin, hasRoleOnEntity } = require('../../middleware/permissions');
+const { httpError } = require('../../utils/httpError');
 const blob = require('../../storage/blob');
 const service = require('./rh.service');
 const repo = require('./rh.repository');
@@ -28,6 +29,76 @@ router.get('/types', async (req, res, next) => {
       : await all('SELECT * FROM rh_types WHERE actif = true ORDER BY domaine, ordre, libelle');
     res.json(rows);
   } catch (e) { next(e); }
+});
+
+// ── Paramètres RH : gestion des types (congé / absence / recrutement) ─────────────
+// Réservé au RH (rôle `rh` sur une entité) et aux super_admin. La table rh_types est globale
+// (non rattachée à une entité) : un seul jeu de types pour toute l'organisation.
+function canManageTypes(user) {
+  return isSuperAdmin(user) || (user.roles || []).some(r => r.role_code === 'rh');
+}
+const TYPE_DOMAINES = ['conge', 'absence', 'recrutement'];
+
+function parseType(b) {
+  const domaine = String(b.domaine || '').trim();
+  const code = String(b.code || '').trim();
+  const libelle = String(b.libelle || '').trim();
+  if (!TYPE_DOMAINES.includes(domaine)) throw httpError(400, 'Domaine invalide.');
+  if (!code) throw httpError(400, 'Le code est obligatoire.');
+  if (!libelle) throw httpError(400, 'Le libellé est obligatoire.');
+  let jours = b.jours_accordes;
+  jours = (jours === '' || jours == null) ? null : Number(jours);
+  if (jours != null && (!Number.isInteger(jours) || jours < 0)) throw httpError(400, 'Jours accordés : entier positif attendu.');
+  return {
+    domaine, code, libelle, jours_accordes: jours,
+    imputable_solde: !!b.imputable_solde,
+    justificatif_requis: !!b.justificatif_requis,
+    actif: b.actif == null ? true : !!b.actif,
+    ordre: Number(b.ordre) || 0,
+  };
+}
+
+router.get('/admin/types', async (req, res, next) => {
+  try {
+    if (!canManageTypes(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    res.json(await all('SELECT * FROM rh_types ORDER BY domaine, ordre, libelle'));
+  } catch (e) { next(e); }
+});
+
+router.post('/admin/types', async (req, res, next) => {
+  try {
+    if (!canManageTypes(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    const t = parseType(req.body || {});
+    const row = await one(
+      `INSERT INTO rh_types (domaine, code, libelle, jours_accordes, imputable_solde, justificatif_requis, actif, ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [t.domaine, t.code, t.libelle, t.jours_accordes, t.imputable_solde, t.justificatif_requis, t.actif, t.ordre]);
+    res.status(201).json(row);
+  } catch (e) { if (e.code === '23505') return res.status(409).json({ error: 'Ce couple domaine + code existe déjà.' }); next(e); }
+});
+
+router.put('/admin/types/:id', async (req, res, next) => {
+  try {
+    if (!canManageTypes(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    const t = parseType(req.body || {});
+    const row = await one(
+      `UPDATE rh_types SET domaine=$1, code=$2, libelle=$3, jours_accordes=$4, imputable_solde=$5,
+              justificatif_requis=$6, actif=$7, ordre=$8 WHERE id=$9 RETURNING *`,
+      [t.domaine, t.code, t.libelle, t.jours_accordes, t.imputable_solde, t.justificatif_requis, t.actif, t.ordre, Number(req.params.id)]);
+    if (!row) return res.status(404).json({ error: 'Type introuvable.' });
+    res.json(row);
+  } catch (e) { if (e.code === '23505') return res.status(409).json({ error: 'Ce couple domaine + code existe déjà.' }); next(e); }
+});
+
+router.delete('/admin/types/:id', async (req, res, next) => {
+  try {
+    if (!canManageTypes(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    await run('DELETE FROM rh_types WHERE id=$1', [Number(req.params.id)]);
+    res.status(204).end();
+  } catch (e) {
+    if (e.code === '23503') return res.status(409).json({ error: 'Ce type est utilisé par des demandes : désactivez-le au lieu de le supprimer.' });
+    next(e);
+  }
 });
 
 // Jours ouvrables entre deux dates (calcul en direct côté formulaire).
