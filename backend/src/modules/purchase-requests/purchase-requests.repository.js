@@ -1,5 +1,11 @@
 const { all, one, run } = require('../../db');
 
+// Exécuteur par défaut (pool). Les fonctions ci-dessous acceptent un exécuteur optionnel `x` de
+// même forme ({ all, one, run }) : passer le `tx` de withTransaction les fait participer à une
+// transaction (ex. sélection d'un devis, atomique de bout en bout). Défaut = pool → aucun impact
+// sur les appelants existants.
+const DB = { all, one, run };
+
 async function createDraft({ entityId, workflowTemplateId, requesterId, siteId, objet, justification, devise, businessUnitId }) {
   return one(
     `INSERT INTO purchase_requests
@@ -122,8 +128,8 @@ async function listVisibleTo({ status, requesterId, entityIds }, { page = 1, pag
   return toPage(rows, page, pageSize);
 }
 
-async function updateStatusAndStep(id, status, currentStepId) {
-  return one(
+async function updateStatusAndStep(id, status, currentStepId, x = DB) {
+  return x.one(
     'UPDATE purchase_requests SET status = $1, current_step_id = $2, updated_at = now() WHERE id = $3 RETURNING *',
     [status, currentStepId, id]
   );
@@ -155,8 +161,8 @@ async function exportRows({ from, to, entityIds }) {
   );
 }
 
-async function setMontantFinal(id, montant, devise) {
-  return one('UPDATE purchase_requests SET montant_final = $1, devise = $2, updated_at = now() WHERE id = $3 RETURNING *', [montant, devise, id]);
+async function setMontantFinal(id, montant, devise, x = DB) {
+  return x.one('UPDATE purchase_requests SET montant_final = $1, devise = $2, updated_at = now() WHERE id = $3 RETURNING *', [montant, devise, id]);
 }
 
 // ─── Lignes ──────────────────────────────────────────────────────────────
@@ -169,8 +175,8 @@ async function addLine(prId, { productId, descriptionLibre, quantite, unite, pri
   );
 }
 
-async function getLines(prId) {
-  return all(
+async function getLines(prId, x = DB) {
+  return x.all(
     `SELECT l.*, p.designation FROM purchase_request_lines l
      LEFT JOIN products p ON p.id = l.product_id
      WHERE l.purchase_request_id = $1 ORDER BY l.id`,
@@ -204,8 +210,8 @@ async function deleteLine(id) {
   await run('DELETE FROM purchase_request_lines WHERE id = $1', [id]);
 }
 
-async function setLinesFournisseurRetenu(prId, supplierId) {
-  await run('UPDATE purchase_request_lines SET fournisseur_retenu_id = $1 WHERE purchase_request_id = $2', [supplierId, prId]);
+async function setLinesFournisseurRetenu(prId, supplierId, x = DB) {
+  await x.run('UPDATE purchase_request_lines SET fournisseur_retenu_id = $1 WHERE purchase_request_id = $2', [supplierId, prId]);
 }
 
 // Le devis retenu ne porte qu'un montant global par fournisseur (table `quotes`, pas de détail
@@ -213,8 +219,8 @@ async function setLinesFournisseurRetenu(prId, supplierId) {
 // estimation initiale (prix_unitaire_estime * quantite), ou à parts égales par quantité si aucune
 // estimation n'existe. Résultat : prix_unitaire_final toujours renseigné après sélection d'un
 // devis, et la somme des montants de ligne correspond exactement au montant du devis retenu.
-async function setLinesPrixUnitaireFinal(prId, montantTotal) {
-  const lines = await getLines(prId);
+async function setLinesPrixUnitaireFinal(prId, montantTotal, x = DB) {
+  const lines = await getLines(prId, x);
   if (lines.length === 0) return;
 
   const poidsEstimes = lines.map(l => Number(l.prix_unitaire_estime || 0) * Number(l.quantite));
@@ -231,7 +237,7 @@ async function setLinesPrixUnitaireFinal(prId, montantTotal) {
       montantLigne = montantTotal * (quantite / sommeQuantites);
     }
     const prixUnitaire = quantite > 0 ? montantLigne / quantite : 0;
-    await run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [prixUnitaire, line.id]);
+    await x.run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [prixUnitaire, line.id]);
   }
 }
 
@@ -302,26 +308,26 @@ async function createQuoteLines(quoteId, rows) {
   }
 }
 
-async function getQuoteLines(quoteId) {
-  return all('SELECT purchase_request_line_id, prix_unitaire FROM quote_lines WHERE quote_id = $1', [quoteId]);
+async function getQuoteLines(quoteId, x = DB) {
+  return x.all('SELECT purchase_request_line_id, prix_unitaire FROM quote_lines WHERE quote_id = $1', [quoteId]);
 }
 
 // Applique les prix par ligne du devis retenu sur les lignes de la demande (prix_unitaire_final)
 // et renvoie le montant final = somme(quantité × prix unitaire).
-async function applyQuoteLinesToPrLines(prId, quoteLines) {
-  const lines = await getLines(prId);
+async function applyQuoteLinesToPrLines(prId, quoteLines, x = DB) {
+  const lines = await getLines(prId, x);
   const priceByLine = new Map(quoteLines.map(q => [Number(q.purchase_request_line_id), Number(q.prix_unitaire)]));
   let total = 0;
   for (const line of lines) {
     const pu = priceByLine.has(line.id) ? priceByLine.get(line.id) : 0;
     total += pu * Number(line.quantite);
-    await run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [pu, line.id]);
+    await x.run('UPDATE purchase_request_lines SET prix_unitaire_final = $1 WHERE id = $2', [pu, line.id]);
   }
   return total;
 }
 
-async function getQuote(id) {
-  return one(
+async function getQuote(id, x = DB) {
+  return x.one(
     `SELECT q.*, qrs.quote_request_id, qrs.supplier_id, s.nom AS supplier_nom
      FROM quotes q
      JOIN quote_request_suppliers qrs ON qrs.id = q.quote_request_supplier_id
@@ -356,9 +362,9 @@ async function getAttachments(prId) {
   );
 }
 
-async function selectQuote(quoteId, prId) {
+async function selectQuote(quoteId, prId, x = DB) {
   // Un seul devis sélectionné pour toute la demande.
-  await run(
+  await x.run(
     `UPDATE quotes SET selectionne = false
      WHERE quote_request_supplier_id IN (
        SELECT qrs.id FROM quote_request_suppliers qrs
@@ -367,7 +373,7 @@ async function selectQuote(quoteId, prId) {
      )`,
     [prId]
   );
-  return one('UPDATE quotes SET selectionne = true WHERE id = $1 RETURNING *', [quoteId]);
+  return x.one('UPDATE quotes SET selectionne = true WHERE id = $1 RETURNING *', [quoteId]);
 }
 
 // ─── Validations (approvals) ─────────────────────────────────────────────
