@@ -1,4 +1,4 @@
-const { one } = require('../../db');
+const { one, withTransaction } = require('../../db');
 const repo = require('./purchase-requests.repository');
 const poRepo = require('../purchase-orders/purchase-orders.repository');
 const suppliersService = require('../referentials/suppliers.service');
@@ -346,22 +346,29 @@ async function selectQuote(user, prId, quoteId) {
     throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
   }
 
-  const selected = await repo.selectQuote(quoteId, prId);
-  if (!selected) throw httpError(404, 'Devis introuvable.');
-  const quote = await repo.getQuote(quoteId);
-  await repo.setLinesFournisseurRetenu(prId, quote.supplier_id);
-  // Nouveau modèle : on recopie les prix par ligne du devis retenu (plus de répartition à parts
-  // égales). Repli sur l'ancienne répartition si le devis n'a pas de détail ligne (ancien devis).
-  const quoteLines = await repo.getQuoteLines(quoteId);
-  let montantFinal;
-  if (quoteLines.length) {
-    montantFinal = await repo.applyQuoteLinesToPrLines(prId, quoteLines);
-  } else {
-    await repo.setLinesPrixUnitaireFinal(prId, quote.montant);
-    montantFinal = quote.montant;
-  }
-  await repo.setMontantFinal(prId, montantFinal, quote.devise);
-  await repo.updateStatusAndStep(prId, 'devis_selectionne', null);
+  // Sélection ATOMIQUE (une seule transaction) : soit tout est appliqué — devis retenu, fournisseur
+  // et prix reportés sur les lignes, montant final ET passage en 'devis_selectionne' — soit rien.
+  // Évite l'état incohérent « devis retenu mais statut resté devis_en_cours » (DA piégée, sans
+  // bouton Valider) qu'une interruption entre deux écritures pouvait laisser auparavant.
+  const quote = await withTransaction(async (tx) => {
+    const selected = await repo.selectQuote(quoteId, prId, tx);
+    if (!selected) throw httpError(404, 'Devis introuvable.');
+    const q = await repo.getQuote(quoteId, tx);
+    await repo.setLinesFournisseurRetenu(prId, q.supplier_id, tx);
+    // Nouveau modèle : on recopie les prix par ligne du devis retenu (plus de répartition à parts
+    // égales). Repli sur l'ancienne répartition si le devis n'a pas de détail ligne (ancien devis).
+    const quoteLines = await repo.getQuoteLines(quoteId, tx);
+    let montantFinal;
+    if (quoteLines.length) {
+      montantFinal = await repo.applyQuoteLinesToPrLines(prId, quoteLines, tx);
+    } else {
+      await repo.setLinesPrixUnitaireFinal(prId, q.montant, tx);
+      montantFinal = q.montant;
+    }
+    await repo.setMontantFinal(prId, montantFinal, q.devise, tx);
+    await repo.updateStatusAndStep(prId, 'devis_selectionne', null, tx);
+    return q;
+  });
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
   return getFullDetail(prId);
 }
