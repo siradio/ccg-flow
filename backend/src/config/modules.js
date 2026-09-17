@@ -83,6 +83,24 @@ const MODULES = [
       { key: 'comptabilite.bdc', label: 'Traitement — Bons de commande (commercial)' },
     ],
   },
+  // Module DSI — pilotage du Département des Systèmes d'Information : parc (ITAM), affectations,
+  // maintenance, tickets/SLA (ITSM), activités, projets, risques, dashboard et reporting Direction.
+  // Réutilise entités/sites/BU/employés, pièces jointes, notifications, audit et UI existants.
+  {
+    key: 'dsi', label: 'DSI',
+    subModules: [
+      { key: 'dsi.dashboard', label: 'Tableau de bord DSI' },
+      { key: 'dsi.parc', label: 'Parc informatique' },
+      { key: 'dsi.affectations', label: 'Affectations' },
+      { key: 'dsi.maintenance', label: 'Maintenance' },
+      { key: 'dsi.tickets', label: 'Tickets & incidents' },
+      { key: 'dsi.activites', label: 'Activités DSI' },
+      { key: 'dsi.projets', label: 'Projets IT' },
+      { key: 'dsi.risques', label: 'Risques IT' },
+      { key: 'dsi.rapports', label: 'Rapports DSI' },
+      { key: 'dsi.referentiels', label: 'Référentiels DSI' },
+    ],
+  },
   { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
     key: 'referentiels', label: 'Référentiels',
