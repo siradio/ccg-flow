@@ -68,6 +68,10 @@ import AchatsDetail from './pages/Accounting/AchatsDetail';
 import BdcCommercial from './pages/Accounting/BdcCommercial';
 import DsiHome from './pages/DSI/DsiHome';
 import DsiReferentiels from './pages/DSI/DsiReferentiels';
+import ParcList from './pages/DSI/ParcList';
+import ParcDetail from './pages/DSI/ParcDetail';
+import Affectations from './pages/DSI/Affectations';
+import MonMateriel from './pages/DSI/MonMateriel';
 
 export default function App() {
   return (
@@ -94,6 +98,10 @@ export default function App() {
         <Route path="comptabilite/traitement/bons-de-commande" element={<RequireModule subModule="comptabilite.bdc"><BdcCommercial /></RequireModule>} />
         {/* Module DSI (L0 : référentiels ; les autres sections arrivent aux lots suivants) */}
         <Route path="dsi" element={<DsiHome />} />
+        <Route path="dsi/mon-materiel" element={<MonMateriel />} />
+        <Route path="dsi/parc" element={<RequireModule subModule="dsi.parc"><ParcList /></RequireModule>} />
+        <Route path="dsi/parc/:id" element={<RequireModule subModule="dsi.parc"><ParcDetail /></RequireModule>} />
+        <Route path="dsi/affectations" element={<RequireModule subModule="dsi.affectations"><Affectations /></RequireModule>} />
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RhDashboard />} />

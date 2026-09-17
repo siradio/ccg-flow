@@ -77,6 +77,7 @@ app.use('/api/reporting', require('./modules/reporting/reporting.routes'));
 app.use('/api/commerce/settings', require('./modules/commerce/settings.routes'));
 app.use('/api/accounting', require('./modules/accounting/accounting.routes'));
 app.use('/api/dsi/referentials', require('./modules/dsi/dsi.referentials.routes'));
+app.use('/api/dsi/equipment', require('./modules/dsi/dsi.equipment.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
