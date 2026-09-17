@@ -84,6 +84,7 @@ export default function ParcDetail() {
           <Row label={t('dsi.eq.serie')}>{eq.num_serie || '—'}</Row>
           <Row label={t('dsi.eq.etat')}>{eq.etat || '—'}</Row>
           <Row label={t('dsi.eq.entity')}>{eq.entity_nom || '—'}</Row>
+          {eq.business_unit_nom && <Row label={t('dsi.eq.bu')}>{eq.business_unit_nom}</Row>}
           <Row label={t('dsi.eq.site')}>{eq.site_nom || '—'}</Row>
           <Row label={t('dsi.eq.localisation')}>{eq.localisation || '—'}</Row>
           <Row label={t('dsi.eq.fournisseur')}>{eq.fournisseur || '—'}</Row>

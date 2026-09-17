@@ -5,6 +5,7 @@ const { nextRef } = require('./dsi.numbering');
 const EQ_SELECT = `
   SELECT e.*, c.libelle AS categorie, ty.libelle AS type_libelle, b.nom AS marque,
          ent.code AS entity_code, ent.nom AS entity_nom, s.nom AS site_nom, sup.nom AS fournisseur,
+         bu.nom AS business_unit_nom,
          a.id AS assignment_id, a.beneficiaire_type, a.employee_id AS assigned_employee_id,
          a.business_unit_id AS assigned_bu_id, a.entity_id AS assigned_entity_id, a.site_id AS assigned_site_id,
          TRIM(CONCAT(emp.prenom, ' ', emp.nom)) AS assigned_employee_nom,
@@ -16,6 +17,7 @@ const EQ_SELECT = `
   LEFT JOIN entities ent ON ent.id = e.entity_id
   LEFT JOIN sites s ON s.id = e.site_id
   LEFT JOIN suppliers sup ON sup.id = e.supplier_id
+  LEFT JOIN business_units bu ON bu.id = e.business_unit_id
   LEFT JOIN dsi_assignments a ON a.equipment_id = e.id AND a.statut = 'active'
   LEFT JOIN employees emp ON emp.id = a.employee_id
   LEFT JOIN business_units abu ON abu.id = a.business_unit_id
@@ -37,6 +39,7 @@ function buildWhere(f) {
   if (f.brandId) where.push(`e.brand_id = ${P(Number(f.brandId))}`);
   if (f.statut) where.push(`e.statut = ${P(f.statut)}`);
   if (f.entityId) where.push(`e.entity_id = ${P(Number(f.entityId))}`);
+  if (f.businessUnitId) where.push(`e.business_unit_id = ${P(Number(f.businessUnitId))}`);
   if (f.siteId) where.push(`e.site_id = ${P(Number(f.siteId))}`);
   if (f.etat) where.push(`e.etat = ${P(f.etat)}`);
   if (f.modele) where.push(`e.modele ILIKE ${P('%' + f.modele + '%')}`);
@@ -88,7 +91,7 @@ async function stats(f) {
 }
 
 const FIELDS = ['category_id', 'type_id', 'designation', 'brand_id', 'modele', 'num_serie', 'entity_id',
-  'site_id', 'localisation', 'supplier_id', 'date_achat', 'prix_achat', 'date_mise_service',
+  'business_unit_id', 'site_id', 'localisation', 'supplier_id', 'date_achat', 'prix_achat', 'date_mise_service',
   'fin_garantie', 'etat', 'statut', 'commentaire'];
 const emptyToNull = v => (v === '' || v === undefined ? null : v);
 

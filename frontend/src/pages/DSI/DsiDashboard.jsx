@@ -14,14 +14,21 @@ export default function DsiDashboard() {
   const nav = useNavigate();
   const [d, setD] = useState(null);
   const [entities, setEntities] = useState([]);
+  const [bus, setBus] = useState([]);
   const [entity, setEntity] = useState('');
+  const [bu, setBu] = useState('');
   const [error, setError] = useState('');
+  const soguipalId = entities.find(en => en.code === 'SOGUIPAL')?.id;
 
-  useEffect(() => { client.get('/entities').then(r => setEntities(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    client.get('/entities').then(r => setEntities(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data.map(b => ({ id: b.id, nom: b.nom || b.code })))).catch(() => {});
+  }, []);
   useEffect(() => {
     setD(null);
-    client.get('/dsi/dashboard', { params: entity ? { entity_id: entity } : {} }).then(r => setD(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
-  }, [entity]);
+    const params = {}; if (entity) params.entity_id = entity; if (bu) params.business_unit_id = bu;
+    client.get('/dsi/dashboard', { params }).then(r => setD(r.data)).catch(e => setError(e.response?.data?.error || 'Erreur.'));
+  }, [entity, bu]);
 
   if (error) return <div><DsiSubnav /><div className="alert alert-danger" style={{ maxWidth: 640 }}>{error}</div></div>;
 
@@ -30,10 +37,18 @@ export default function DsiDashboard() {
       <DsiSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <h1 className="page-title" style={{ margin: 0 }}>{t('dsi.dash.title')}</h1>
-        <select value={entity} onChange={e => setEntity(e.target.value)}>
-          <option value="">{t('dsi.f.allEntities')}</option>
-          {entities.map(en => <option key={en.id} value={en.id}>{en.code || en.nom}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select value={entity} onChange={e => { setEntity(e.target.value); setBu(''); }}>
+            <option value="">{t('dsi.f.allEntities')}</option>
+            {entities.map(en => <option key={en.id} value={en.id}>{en.code || en.nom}</option>)}
+          </select>
+          {soguipalId && String(entity) === String(soguipalId) && (
+            <select value={bu} onChange={e => setBu(e.target.value)}>
+              <option value="">{t('dsi.f.allBUs')}</option>
+              {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+            </select>
+          )}
+        </div>
       </div>
 
       {!d ? <Loading /> : (
@@ -61,6 +76,7 @@ export default function DsiDashboard() {
             <KPI label={t('dsi.stat.valeur')} v={money(d.parc.valeur)} />
           </Section>
           <Charts data={d.parc.parCategorie} title={t('dsi.dash.parcByCat')} />
+          <Charts data={d.parc.parBU} title={t('dsi.dash.parcByBU')} />
 
           <Section title={t('dsi.dash.support')} onClick={() => nav('/dsi/tickets')}>
             <KPI label={t('dsi.tk.stat.open')} v={d.support.ouverts} />
@@ -77,6 +93,7 @@ export default function DsiDashboard() {
             <KPI label={t('dsi.dash.resolved')} v={d.perf.resolus} />
           </Section>
           <Charts data={d.support.parCategorie} title={t('dsi.dash.ticketsByCat')} />
+          <Charts data={d.support.parBU} title={t('dsi.dash.ticketsByBU')} />
 
           <Section title={t('dsi.nav.maintenance')} onClick={() => nav('/dsi/maintenance')}>
             <KPI label={t('dsi.maint.stat.inProgress')} v={d.maintenance.en_cours} />

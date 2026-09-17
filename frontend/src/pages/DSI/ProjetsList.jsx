@@ -122,9 +122,10 @@ export function ProjetForm({ initial, onClose, onSaved }) {
   const { t } = useI18n();
   const [users, setUsers] = useState([]);
   const [entities, setEntities] = useState([]);
+  const [bus, setBus] = useState([]);
   const [f, setF] = useState({
     code: initial?.code || '', nom: initial?.nom || '', description: initial?.description || '',
-    responsable_id: initial?.responsable_id || '', sponsor_id: initial?.sponsor_id || '', entity_id: initial?.entity_id || '',
+    responsable_id: initial?.responsable_id || '', sponsor_id: initial?.sponsor_id || '', entity_id: initial?.entity_id || '', business_unit_id: initial?.business_unit_id || '',
     date_debut: initial?.date_debut ? String(initial.date_debut).slice(0, 10) : '', date_fin_prevue: initial?.date_fin_prevue ? String(initial.date_fin_prevue).slice(0, 10) : '',
     budget_prevu: initial?.budget_prevu || '', budget_consomme: initial?.budget_consomme || '', avancement_pct: initial?.avancement_pct ?? 0,
     statut: initial?.statut || 'planifie', commentaire: initial?.commentaire || '',
@@ -134,7 +135,9 @@ export function ProjetForm({ initial, onClose, onSaved }) {
   useEffect(() => {
     client.get('/dsi/projects/users').then(r => setUsers(r.data)).catch(() => {});
     client.get('/entities').then(r => setEntities(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data.map(b => ({ id: b.id, nom: b.nom || b.code })))).catch(() => {});
   }, []);
+  const soguipalId = entities.find(en => en.code === 'SOGUIPAL')?.id;
   async function submit(e) {
     e.preventDefault(); if (busy) return; if (!f.nom.trim()) { setErr('Nom requis.'); return; }
     setBusy(true); setErr('');
@@ -150,7 +153,8 @@ export function ProjetForm({ initial, onClose, onSaved }) {
           <Field label={t('dsi.proj.nom') + ' *'}><input value={f.nom} onChange={e => set('nom', e.target.value)} required /></Field>
           <Field label={t('dsi.proj.responsable')}><SearchableSelect value={f.responsable_id} onChange={v => set('responsable_id', v ?? '')} options={users} getLabel={o => o.nom} placeholder="—" /></Field>
           <Field label={t('dsi.proj.sponsor')}><SearchableSelect value={f.sponsor_id} onChange={v => set('sponsor_id', v ?? '')} options={users} getLabel={o => o.nom} placeholder="—" /></Field>
-          <Field label={t('dsi.eq.entity')}><select value={f.entity_id} onChange={e => set('entity_id', e.target.value)}><option value="">—</option>{entities.map(en => <option key={en.id} value={en.id}>{en.code || en.nom}</option>)}</select></Field>
+          <Field label={t('dsi.eq.entity')}><select value={f.entity_id} onChange={e => { set('entity_id', e.target.value); set('business_unit_id', ''); }}><option value="">—</option>{entities.map(en => <option key={en.id} value={en.id}>{en.code || en.nom}</option>)}</select></Field>
+          {soguipalId && String(f.entity_id) === String(soguipalId) && <Field label={t('dsi.eq.bu')}><SearchableSelect value={f.business_unit_id} onChange={v => set('business_unit_id', v ?? '')} options={bus} getLabel={o => o.nom} placeholder="BU concernée…" /></Field>}
           <Field label={t('dsi.proj.statut')}><select value={f.statut} onChange={e => set('statut', e.target.value)}>{PROJ_STATUTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
           <Field label={t('dsi.proj.dateDebut')}><input type="date" value={f.date_debut} onChange={e => set('date_debut', e.target.value)} /></Field>
           <Field label={t('dsi.proj.echeance')}><input type="date" value={f.date_fin_prevue} onChange={e => set('date_fin_prevue', e.target.value)} /></Field>

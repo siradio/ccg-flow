@@ -11,7 +11,7 @@ const canEdit = requireSubModule('dsi.activites', 'edition');
 
 const A_SELECT = `
   SELECT a.*, at.libelle AS type_libelle, TRIM(CONCAT(u.prenom,' ',u.nom)) AS technician_nom,
-         ent.code AS entity_code, s.nom AS site_nom,
+         ent.code AS entity_code, s.nom AS site_nom, bu.nom AS business_unit_nom,
          e.numero_inventaire AS equipement_numero,
          TRIM(CONCAT(uc.prenom,' ',uc.nom)) AS user_concerne_nom, tk.reference AS ticket_reference
   FROM dsi_activities a
@@ -19,11 +19,12 @@ const A_SELECT = `
   LEFT JOIN users u ON u.id = a.technician_id
   LEFT JOIN entities ent ON ent.id = a.entity_id
   LEFT JOIN sites s ON s.id = a.site_id
+  LEFT JOIN business_units bu ON bu.id = a.business_unit_id
   LEFT JOIN dsi_equipment e ON e.id = a.equipment_id
   LEFT JOIN users uc ON uc.id = a.user_concerne_id
   LEFT JOIN dsi_tickets tk ON tk.id = a.ticket_id`;
 
-const FIELDS = ['date', 'type_id', 'technician_id', 'entity_id', 'site_id', 'description', 'duree_min',
+const FIELDS = ['date', 'type_id', 'technician_id', 'entity_id', 'business_unit_id', 'site_id', 'description', 'duree_min',
   'equipment_id', 'user_concerne_id', 'project_id', 'ticket_id', 'resultat', 'fait_marquant', 'commentaire'];
 const nn = v => (v === '' || v === undefined ? null : v);
 
@@ -33,6 +34,7 @@ function buildWhere(q) {
   if (q.type_id) w.push(`a.type_id = ${P(Number(q.type_id))}`);
   if (q.technician_id) w.push(`a.technician_id = ${P(Number(q.technician_id))}`);
   if (q.entity_id) w.push(`a.entity_id = ${P(Number(q.entity_id))}`);
+  if (q.business_unit_id) w.push(`a.business_unit_id = ${P(Number(q.business_unit_id))}`);
   if (q.equipment_id) w.push(`a.equipment_id = ${P(Number(q.equipment_id))}`);
   if (q.ticket_id) w.push(`a.ticket_id = ${P(Number(q.ticket_id))}`);
   if (q.project_id) w.push(`a.project_id = ${P(Number(q.project_id))}`);

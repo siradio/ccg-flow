@@ -30,6 +30,8 @@ export default function TicketDetail() {
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [prios, setPrios] = useState([]);
+  const [entities, setEntities] = useState([]);
+  const [bus, setBus] = useState([]);
   const [tech, setTech] = useState('');
   const [comment, setComment] = useState('');
   const [visib, setVisib] = useState('interne');
@@ -42,6 +44,8 @@ export default function TicketDetail() {
     if (!canEdit) return;
     client.get('/dsi/tickets/users').then(r => setUsers(r.data)).catch(() => {});
     client.get('/dsi/referentials/priorities').then(r => setPrios(r.data.map(p => ({ id: p.id, nom: p.libelle })))).catch(() => {});
+    client.get('/entities').then(r => setEntities(r.data)).catch(() => {});
+    client.get('/business-units/mine').then(r => setBus(r.data.map(b => ({ id: b.id, nom: b.nom || b.code })))).catch(() => {});
   }, [canEdit]);
 
   if (error && !tk) return <div><DsiSubnav /><div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div></div>;
@@ -74,6 +78,7 @@ export default function TicketDetail() {
               <Row label={t('dsi.tk.impact')}>{tk.impact || '—'}</Row>
               <Row label={t('dsi.tk.urgence')}>{tk.urgence || '—'}</Row>
               <Row label={t('dsi.eq.entity')}>{tk.entity_code || '—'}</Row>
+              {tk.business_unit_nom && <Row label={t('dsi.eq.bu')}>{tk.business_unit_nom}</Row>}
               <Row label={t('dsi.eq.site')}>{tk.site_nom || '—'}</Row>
               {tk.equipement_numero && <Row label={t('dsi.tk.equipement')}><Link to={`/dsi/parc/${tk.equipment_id}`}>{tk.equipement_numero}</Link></Row>}
               <Row label={t('dsi.tk.cree')}>{dtfmt(tk.created_at)}</Row>
@@ -139,6 +144,14 @@ export default function TicketDetail() {
                   {prios.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
                 </select>
               </label>
+              {entities.find(en => en.code === 'SOGUIPAL')?.id === tk.entity_id && (
+                <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>{t('dsi.eq.bu')}
+                  <select value={tk.business_unit_id || ''} onChange={e => act(() => client.put(`/dsi/tickets/${id}`, { business_unit_id: e.target.value || '' }))}>
+                    <option value="">—</option>
+                    {bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+                  </select>
+                </label>
+              )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
                 {STATUS_ACTIONS.filter(a => a.from.includes(tk.statut)).map((a, i) => (
                   <button key={i} className="btn btn-secondary btn-sm" disabled={busy}

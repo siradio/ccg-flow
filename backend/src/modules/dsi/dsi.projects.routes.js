@@ -13,14 +13,15 @@ const canEdit = requireSubModule('dsi.projets', 'edition');
 const P_SELECT = `
   SELECT p.*, TRIM(CONCAT(r.prenom,' ',r.nom)) AS responsable_nom,
          TRIM(CONCAT(sp.prenom,' ',sp.nom)) AS sponsor_nom,
-         ent.code AS entity_code, pr.libelle AS priorite, pr.couleur AS priorite_couleur
+         ent.code AS entity_code, bu.nom AS business_unit_nom, pr.libelle AS priorite, pr.couleur AS priorite_couleur
   FROM dsi_projects p
   LEFT JOIN users r ON r.id = p.responsable_id
   LEFT JOIN users sp ON sp.id = p.sponsor_id
   LEFT JOIN entities ent ON ent.id = p.entity_id
+  LEFT JOIN business_units bu ON bu.id = p.business_unit_id
   LEFT JOIN dsi_priorities pr ON pr.id = p.priority_id`;
 
-const FIELDS = ['nom', 'description', 'responsable_id', 'sponsor_id', 'entity_id', 'date_debut',
+const FIELDS = ['nom', 'description', 'responsable_id', 'sponsor_id', 'entity_id', 'business_unit_id', 'date_debut',
   'date_fin_prevue', 'date_fin_reelle', 'budget_prevu', 'budget_consomme', 'avancement_pct',
   'priority_id', 'statut', 'risques', 'commentaire'];
 const nn = v => (v === '' || v === undefined ? null : v);
@@ -47,6 +48,7 @@ router.get('/', canView, async (req, res, next) => {
     const P = v => { p.push(v); return `$${p.length}`; };
     if (req.query.statut) w.push(`p.statut = ${P(req.query.statut)}`);
     if (req.query.entity_id) w.push(`p.entity_id = ${P(Number(req.query.entity_id))}`);
+    if (req.query.business_unit_id) w.push(`p.business_unit_id = ${P(Number(req.query.business_unit_id))}`);
     if (req.query.q) { const like = P('%' + req.query.q.toLowerCase() + '%'); w.push(`(LOWER(p.nom) LIKE ${like} OR LOWER(p.code) LIKE ${like})`); }
     const sql = 'WHERE ' + w.join(' AND ');
     res.json(await all(`${P_SELECT} ${sql} ORDER BY p.created_at DESC`, p));

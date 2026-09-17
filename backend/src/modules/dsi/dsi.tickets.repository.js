@@ -5,7 +5,7 @@ const T_SELECT = `
          p.libelle AS priorite, p.code AS priorite_code, p.couleur AS priorite_couleur,
          sla.seuil_risque_pct,
          e.numero_inventaire AS equipement_numero, e.designation AS equipement_designation,
-         ent.code AS entity_code, ent.nom AS entity_nom, s.nom AS site_nom,
+         ent.code AS entity_code, ent.nom AS entity_nom, s.nom AS site_nom, bu.nom AS business_unit_nom,
          TRIM(CONCAT(du.prenom,' ',du.nom)) AS demandeur_nom, du.email AS demandeur_email,
          TRIM(CONCAT(tu.prenom,' ',tu.nom)) AS technician_nom
   FROM dsi_tickets t
@@ -16,6 +16,7 @@ const T_SELECT = `
   LEFT JOIN dsi_equipment e ON e.id = t.equipment_id
   LEFT JOIN entities ent ON ent.id = t.entity_id
   LEFT JOIN sites s ON s.id = t.site_id
+  LEFT JOIN business_units bu ON bu.id = t.business_unit_id
   LEFT JOIN users du ON du.id = t.demandeur_id
   LEFT JOIN users tu ON tu.id = t.technician_id`;
 
@@ -30,6 +31,7 @@ function buildWhere(f) {
   if (f.technicianId) where.push(`t.technician_id = ${P(Number(f.technicianId))}`);
   if (f.demandeurId) where.push(`t.demandeur_id = ${P(Number(f.demandeurId))}`);
   if (f.entityId) where.push(`t.entity_id = ${P(Number(f.entityId))}`);
+  if (f.businessUnitId) where.push(`t.business_unit_id = ${P(Number(f.businessUnitId))}`);
   if (f.equipmentId) where.push(`t.equipment_id = ${P(Number(f.equipmentId))}`);
   if (f.q) {
     const like = P('%' + f.q.toLowerCase() + '%');

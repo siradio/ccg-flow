@@ -20,8 +20,8 @@ export default function ParcList() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ q: '', category_id: '', statut: '', entity_id: '', site_id: '', brand_id: '' });
-  const [lists, setLists] = useState({ categories: [], types: [], brands: [], entities: [], sites: [], suppliers: [] });
+  const [filters, setFilters] = useState({ q: '', category_id: '', statut: '', entity_id: '', business_unit_id: '', site_id: '', brand_id: '' });
+  const [lists, setLists] = useState({ categories: [], types: [], brands: [], entities: [], sites: [], suppliers: [], bus: [] });
 
   const setF = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setPage(1); };
 
@@ -33,8 +33,9 @@ export default function ParcList() {
       client.get('/entities').then(r => r.data).catch(() => []),
       client.get('/sites').then(r => r.data).catch(() => []),
       client.get('/suppliers').then(r => r.data.map(s => ({ id: s.id, nom: s.nom }))).catch(() => []),
-    ]).then(([categories, types, brands, entities, sites, suppliers]) =>
-      setLists({ categories, types, brands, entities, sites, suppliers }));
+      client.get('/business-units/mine').then(r => r.data.map(b => ({ id: b.id, nom: b.nom || b.code }))).catch(() => []),
+    ]).then(([categories, types, brands, entities, sites, suppliers, bus]) =>
+      setLists({ categories, types, brands, entities, sites, suppliers, bus }));
   }, []);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function ParcList() {
   }, [page, filters]);
 
   const sites = useMemo(() => (lists.sites || []).filter(s => !filters.entity_id || String(s.entity_id) === String(filters.entity_id)), [lists.sites, filters.entity_id]);
+  const soguipalId = useMemo(() => (lists.entities || []).find(e => e.code === 'SOGUIPAL')?.id, [lists.entities]);
   const items = data?.items || [];
 
   async function createEquipment(payload) {
@@ -100,6 +102,12 @@ export default function ParcList() {
           <option value="">{t('dsi.f.allSites')}</option>
           {sites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
         </select>
+        {soguipalId && String(filters.entity_id) === String(soguipalId) && (
+          <select value={filters.business_unit_id} onChange={e => setF('business_unit_id', e.target.value)}>
+            <option value="">{t('dsi.f.allBUs')}</option>
+            {lists.bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+          </select>
+        )}
       </div>
 
       {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}

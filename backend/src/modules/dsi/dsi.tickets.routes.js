@@ -15,6 +15,7 @@ function parseFilters(q) {
     q: q.q || null, statut: q.statut || null, open: q.open === 'true',
     priorityId: q.priority_id || null, categoryId: q.category_id || null,
     technicianId: q.technician_id || null, entityId: q.entity_id || null,
+    businessUnitId: q.business_unit_id || null,
     equipmentId: q.equipment_id || null, demandeurId: q.demandeur_id || null,
     page: q.page ? Number(q.page) : 1, pageSize: q.pageSize ? Number(q.pageSize) : 20,
   };

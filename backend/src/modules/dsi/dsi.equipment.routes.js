@@ -17,6 +17,7 @@ function parseFilters(q) {
   return {
     q: q.q || null, categoryId: q.category_id || null, typeId: q.type_id || null,
     brandId: q.brand_id || null, statut: q.statut || null, entityId: q.entity_id || null,
+    businessUnitId: q.business_unit_id || null,
     siteId: q.site_id || null, etat: q.etat || null, modele: q.modele || null,
     employeeId: q.employee_id || null,
     sortKey: q.sortKey || null, sortDir: q.sortDir || null,

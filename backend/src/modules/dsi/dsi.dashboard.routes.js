@@ -11,12 +11,19 @@ const canView = requireSubModule('dsi.dashboard', 'consultation');
 router.get('/', canView, async (req, res, next) => {
   try {
     const entityId = req.query.entity_id ? Number(req.query.entity_id) : null;
+    const buId = req.query.business_unit_id ? Number(req.query.business_unit_id) : null;
     const from = req.query.from || null;
     const to = req.query.to || null;
-    const eqEnt = entityId ? 'AND e.entity_id = $1' : '';
-    const eqParams = entityId ? [entityId] : [];
+    // Filtre commun (entité + BU) construit dynamiquement, appliqué au parc et au support.
+    const mkFilter = (alias) => {
+      const cl = []; const params = [];
+      if (entityId) { params.push(entityId); cl.push(`${alias}.entity_id = $${params.length}`); }
+      if (buId) { params.push(buId); cl.push(`${alias}.business_unit_id = $${params.length}`); }
+      return { and: cl.length ? 'AND ' + cl.join(' AND ') : '', params };
+    };
 
     // ── Parc ──
+    const ef = mkFilter('e');
     const parc = await one(
       `SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE statut='disponible')::int AS disponibles,
@@ -25,18 +32,22 @@ router.get('/', canView, async (req, res, next) => {
               COUNT(*) FILTER (WHERE statut='en_panne')::int AS en_panne,
               COUNT(*) FILTER (WHERE fin_garantie IS NOT NULL AND fin_garantie < CURRENT_DATE)::int AS hors_garantie,
               COALESCE(SUM(prix_achat) FILTER (WHERE statut<>'reforme'),0) AS valeur
-       FROM dsi_equipment e WHERE deleted_at IS NULL ${eqEnt}`, eqParams);
+       FROM dsi_equipment e WHERE deleted_at IS NULL ${ef.and}`, ef.params);
     const parcParCategorie = await all(
       `SELECT COALESCE(c.libelle,'—') AS label, COUNT(*)::int AS value
        FROM dsi_equipment e LEFT JOIN dsi_categories c ON c.id=e.category_id
-       WHERE e.deleted_at IS NULL ${eqEnt} GROUP BY c.libelle ORDER BY value DESC`, eqParams);
+       WHERE e.deleted_at IS NULL ${ef.and} GROUP BY c.libelle ORDER BY value DESC`, ef.params);
     const parcParEntite = await all(
       `SELECT ent.code AS label, COUNT(*)::int AS value
        FROM dsi_equipment e JOIN entities ent ON ent.id=e.entity_id
        WHERE e.deleted_at IS NULL GROUP BY ent.code ORDER BY value DESC`);
+    const parcParBU = await all(
+      `SELECT bu.nom AS label, COUNT(*)::int AS value
+       FROM dsi_equipment e JOIN business_units bu ON bu.id=e.business_unit_id
+       WHERE e.deleted_at IS NULL ${ef.and} GROUP BY bu.nom ORDER BY value DESC`, ef.params);
 
     // ── Support (tickets) ──
-    const tEnt = entityId ? 'AND t.entity_id = $1' : '';
+    const tf = mkFilter('t');
     const support = await one(
       `SELECT COUNT(*) FILTER (WHERE statut NOT IN ('resolu','cloture','annule'))::int AS ouverts,
               COUNT(*) FILTER (WHERE statut='en_cours')::int AS en_cours,
@@ -44,16 +55,21 @@ router.get('/', canView, async (req, res, next) => {
               COUNT(*) FILTER (WHERE p.code='critique' AND statut NOT IN ('resolu','cloture','annule'))::int AS critiques,
               COUNT(*) FILTER (WHERE t.created_at::date=CURRENT_DATE)::int AS crees_aujourdhui,
               COUNT(*) FILTER (WHERE t.resolved_at::date=CURRENT_DATE)::int AS resolus_aujourdhui
-       FROM dsi_tickets t LEFT JOIN dsi_priorities p ON p.id=t.priority_id WHERE 1=1 ${tEnt}`, eqParams);
+       FROM dsi_tickets t LEFT JOIN dsi_priorities p ON p.id=t.priority_id WHERE 1=1 ${tf.and}`, tf.params);
     const ticketsParCategorie = await all(
       `SELECT COALESCE(tc.libelle,'—') AS label, COUNT(*)::int AS value
        FROM dsi_tickets t LEFT JOIN dsi_ticket_categories tc ON tc.id=t.category_id
-       WHERE t.statut NOT IN ('cloture','annule') ${tEnt} GROUP BY tc.libelle ORDER BY value DESC`, eqParams);
+       WHERE t.statut NOT IN ('cloture','annule') ${tf.and} GROUP BY tc.libelle ORDER BY value DESC`, tf.params);
+    const ticketsParBU = await all(
+      `SELECT bu.nom AS label, COUNT(*)::int AS value
+       FROM dsi_tickets t JOIN business_units bu ON bu.id=t.business_unit_id
+       WHERE t.statut NOT IN ('cloture','annule') ${tf.and} GROUP BY bu.nom ORDER BY value DESC`, tf.params);
 
     // Performance support (sur période si fournie, sinon tout) : SLA + délais moyens.
     const perfWhere = []; const perfParams = [];
     const PP = v => { perfParams.push(v); return `$${perfParams.length}`; };
     if (entityId) perfWhere.push(`t.entity_id = ${PP(entityId)}`);
+    if (buId) perfWhere.push(`t.business_unit_id = ${PP(buId)}`);
     if (from) perfWhere.push(`t.resolved_at >= ${PP(from)}`);
     if (to) perfWhere.push(`t.resolved_at < (${PP(to)}::date + INTERVAL '1 day')`);
     perfWhere.push(`t.resolved_at IS NOT NULL`);
@@ -102,8 +118,8 @@ router.get('/', canView, async (req, res, next) => {
     };
 
     res.json({
-      parc: { ...parc, parCategorie: parcParCategorie, parEntite: parcParEntite },
-      support: { ...support, parCategorie: ticketsParCategorie },
+      parc: { ...parc, parCategorie: parcParCategorie, parEntite: parcParEntite, parBU: parcParBU },
+      support: { ...support, parCategorie: ticketsParCategorie, parBU: ticketsParBU },
       perf: { ...perf, sla_pct: slaPct },
       maintenance, projets, risques, health,
     });

@@ -14,7 +14,7 @@ export default function EquipmentForm({ initial, lists, onClose, onSubmit }) {
     category_id: initial?.category_id || '', type_id: initial?.type_id || '',
     designation: initial?.designation || '', brand_id: initial?.brand_id || '',
     modele: initial?.modele || '', num_serie: initial?.num_serie || '',
-    entity_id: initial?.entity_id || '', site_id: initial?.site_id || '',
+    entity_id: initial?.entity_id || '', business_unit_id: initial?.business_unit_id || '', site_id: initial?.site_id || '',
     localisation: initial?.localisation || '', supplier_id: initial?.supplier_id || '',
     date_achat: DATE(initial?.date_achat), prix_achat: initial?.prix_achat || '',
     date_mise_service: DATE(initial?.date_mise_service), fin_garantie: DATE(initial?.fin_garantie),
@@ -25,6 +25,8 @@ export default function EquipmentForm({ initial, lists, onClose, onSubmit }) {
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const sites = (lists.sites || []).filter(s => !f.entity_id || String(s.entity_id) === String(f.entity_id));
   const types = (lists.types || []).filter(t => !f.category_id || String(t.category_id) === String(f.category_id));
+  const soguipalId = (lists.entities || []).find(e => e.code === 'SOGUIPAL')?.id;
+  const showBU = soguipalId && String(f.entity_id) === String(soguipalId);
 
   async function submit(e) {
     e.preventDefault();
@@ -58,11 +60,16 @@ export default function EquipmentForm({ initial, lists, onClose, onSubmit }) {
           <Field label="Modèle"><input value={f.modele} onChange={e => set('modele', e.target.value)} /></Field>
           <Field label="N° de série"><input value={f.num_serie} onChange={e => set('num_serie', e.target.value)} /></Field>
           <Field label="Filiale">
-            <select value={f.entity_id} onChange={e => { set('entity_id', e.target.value); set('site_id', ''); }}>
+            <select value={f.entity_id} onChange={e => { set('entity_id', e.target.value); set('site_id', ''); set('business_unit_id', ''); }}>
               <option value="">—</option>
               {(lists.entities || []).map(en => <option key={en.id} value={en.id}>{en.code || en.nom}</option>)}
             </select>
           </Field>
+          {showBU && (
+            <Field label="Business Unit">
+              <SearchableSelect value={f.business_unit_id} onChange={v => set('business_unit_id', v ?? '')} options={lists.bus || []} getLabel={o => o.nom} placeholder="BU concernée…" />
+            </Field>
+          )}
           <Field label="Site">
             <select value={f.site_id} onChange={e => set('site_id', e.target.value)}>
               <option value="">—</option>

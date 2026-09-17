@@ -46,28 +46,29 @@ async function copySla(tx, ticketId, priorityId) {
 async function resolveEntitySite(user, body) {
   let entityId = body.entity_id || null;
   let siteId = body.site_id || null;
-  if (!entityId && user.employee_id) {
-    const emp = await one('SELECT entity_id, site_id FROM employees WHERE id = $1', [user.employee_id]);
-    if (emp) { entityId = entityId || emp.entity_id; siteId = siteId || emp.site_id; }
+  let businessUnitId = body.business_unit_id || null;
+  if ((!entityId || !businessUnitId) && user.employee_id) {
+    const emp = await one('SELECT entity_id, site_id, business_unit_id FROM employees WHERE id = $1', [user.employee_id]);
+    if (emp) { entityId = entityId || emp.entity_id; siteId = siteId || emp.site_id; businessUnitId = businessUnitId || emp.business_unit_id; }
   }
-  return { entityId, siteId };
+  return { entityId, siteId, businessUnitId };
 }
 
 async function create(user, body, { selfService = false } = {}) {
   const objet = (body.objet || '').trim();
   if (!objet) throw httpError(400, "L'objet est obligatoire.");
-  const { entityId, siteId } = await resolveEntitySite(user, body);
+  const { entityId, siteId, businessUnitId } = await resolveEntitySite(user, body);
   const priorityId = selfService ? null : (body.priority_id || null);
   const created = await withTransaction(async (tx) => {
     const reference = await nextRef(tx, { scope: 'TICKET', prefix: 'INC' });
     const t = await tx.one(
       `INSERT INTO dsi_tickets
         (reference, demandeur_id, category_id, type_id, priority_id, impact, urgence, equipment_id,
-         entity_id, site_id, objet, description, statut)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'ouvert') RETURNING *`,
+         entity_id, business_unit_id, site_id, objet, description, statut)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'ouvert') RETURNING *`,
       [reference, user.id, body.category_id || null, body.type_id || null, priorityId,
        body.impact || null, body.urgence || null, body.equipment_id || null,
-       entityId, siteId, objet, body.description || null]);
+       entityId, businessUnitId, siteId, objet, body.description || null]);
     await copySla(tx, t.id, priorityId);
     await insertEvent(tx, t.id, { action: 'creation', to: 'ouvert', visibilite: 'public', userId: user.id });
     return t;
@@ -76,7 +77,7 @@ async function create(user, body, { selfService = false } = {}) {
   return withSla(await repo.getById(created.id));
 }
 
-const UPD_FIELDS = ['category_id', 'type_id', 'impact', 'urgence', 'equipment_id', 'entity_id', 'site_id', 'objet', 'description'];
+const UPD_FIELDS = ['category_id', 'type_id', 'impact', 'urgence', 'equipment_id', 'entity_id', 'business_unit_id', 'site_id', 'objet', 'description'];
 async function update(user, id, body) {
   const t = await repo.getById(id);
   if (!t) throw httpError(404, 'Ticket introuvable.');
