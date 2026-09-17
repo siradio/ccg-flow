@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/I18nContext';
 const MONTHS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const money = (n) => (n == null ? '—' : Number(n).toLocaleString('fr-FR'));
 async function openPdf(path) { const res = await client.get(path, { responseType: 'blob' }); const url = URL.createObjectURL(res.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
+async function downloadFile(path, filename) { const res = await client.get(path, { responseType: 'blob' }); const url = URL.createObjectURL(res.data); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); }
 const SYNTHESE = [['resume', 'Résumé du mois'], ['realisations', 'Principales réalisations'], ['difficultes', 'Difficultés rencontrées'], ['risques', 'Risques'], ['attention', 'Points nécessitant l’attention de la Direction'], ['recommandations', 'Recommandations'], ['decisions', 'Décisions / arbitrages attendus']];
 
 export default function RapportDetail() {
@@ -28,6 +29,7 @@ export default function RapportDetail() {
   const snap = r.payload?.snapshot || {}; const c = snap.chiffres || {}; const tk = c.tickets || {}; const parc = c.parc || {};
   const setSyn = (k, v) => setSections(s => ({ ...s, synthese: { ...s.synthese, [k]: v } }));
   const setAna = (k, v) => setSections(s => ({ ...s, analyses: { ...s.analyses, [k]: v } }));
+  const setMeta = (k, v) => setSections(s => ({ ...s, meta: { ...(s.meta || {}), [k]: v } }));
   const act = async (fn, msg) => { setBusy(true); setError(''); setNotice(''); try { await fn(); await load(); if (msg) setNotice(msg); } catch (e) { setError(e.response?.data?.error || 'Erreur.'); } finally { setBusy(false); } };
 
   return (
@@ -40,6 +42,7 @@ export default function RapportDetail() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
         <span className="card" style={{ padding: '4px 10px', fontSize: 13 }}>{t('dsi.rep.statut')} : <strong>{r.statut}</strong>{r.valide_par_nom ? ` · ${r.valide_par_nom}` : ''}</span>
         <button className="btn btn-secondary btn-sm" onClick={() => openPdf(`/dsi/reports/${id}/pdf`)}>{t('dsi.rep.pdf')}</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => downloadFile(`/dsi/reports/${id}/word`, `Rapport-DSI-${r.annee}-${String(r.mois).padStart(2, '0')}.doc`)}>{t('dsi.rep.word')}</button>
         {canEdit && !locked && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(() => client.post('/dsi/reports/generate', { annee: r.annee, mois: r.mois, entity_id: r.entity_id }), t('dsi.rep.regenerated'))}>{t('dsi.rep.regenerate')}</button>}
         {canEdit && r.statut === 'brouillon' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(() => client.post(`/dsi/reports/${id}/submit`))}>{t('dsi.rep.submit')}</button>}
         {canEdit && r.statut === 'a_valider' && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => client.post(`/dsi/reports/${id}/validate`), t('dsi.rep.validated'))}>{t('dsi.rep.validate')}</button>}
@@ -69,6 +72,14 @@ export default function RapportDetail() {
       {/* Synthèse exécutive éditable */}
       <section className="card" style={{ marginTop: 14 }}>
         <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('dsi.rep.synthese')}</h2>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)', flex: '1 1 240px' }}>{t('dsi.rep.preparePar')}
+            <input value={sections?.meta?.prepare_par || ''} disabled={locked || !canEdit} onChange={e => setMeta('prepare_par', e.target.value)} placeholder={r.responsable_nom || ''} />
+          </label>
+          <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)', flex: '1 1 240px' }}>{t('dsi.rep.validePar')}
+            <input value={sections?.meta?.valide_par || ''} disabled={locked || !canEdit} onChange={e => setMeta('valide_par', e.target.value)} />
+          </label>
+        </div>
         {sections && SYNTHESE.map(([k, label]) => (
           <label key={k} className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>{label}
             <textarea rows={2} value={sections.synthese?.[k] || ''} disabled={locked || !canEdit} onChange={e => setSyn(k, e.target.value)} />

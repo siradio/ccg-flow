@@ -4,6 +4,7 @@ const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule } = require('../../middleware/permissions');
 const svc = require('./dsi.reports.service');
 const { generateReportPdf } = require('./dsi.reports.pdf');
+const { generateReportWord } = require('./dsi.reports.word');
 const branding = require('../referentials/entity-branding.service');
 
 const router = express.Router();
@@ -40,6 +41,17 @@ router.get('/:id/pdf', canView, async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Rapport-DSI-${r.annee}-${String(r.mois).padStart(2, '0')}.pdf"`);
     res.send(buf);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id/word', canView, async (req, res, next) => {
+  try {
+    const r = await svc.getById(Number(req.params.id));
+    if (!r) return res.status(404).json({ error: 'Rapport introuvable.' });
+    const html = generateReportWord(r, r.entity_code || null);
+    res.setHeader('Content-Type', 'application/msword');
+    res.setHeader('Content-Disposition', `attachment; filename="Rapport-DSI-${r.annee}-${String(r.mois).padStart(2, '0')}.doc"`);
+    res.send(html);
   } catch (e) { next(e); }
 });
 

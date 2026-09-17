@@ -27,10 +27,12 @@ async function generateReportPdf({ report, entityNom, logoBuffer }) {
     doc.moveDown(1.5).fontSize(18).fillColor('black').text('Rapport mensuel d’activité DSI', { align: 'center' });
     doc.moveDown(0.5).fontSize(15).fillColor(NAVY).text(moisLabel, { align: 'center' });
     if (entityNom) doc.moveDown(0.3).fontSize(11).fillColor('black').text(`Périmètre : ${entityNom}`, { align: 'center' });
-    doc.moveDown(3).fontSize(10).fillColor('black');
-    doc.text(`Préparé par : ${report.responsable_nom || '—'}`, { align: 'center' });
-    doc.text(`Statut : ${report.statut}${report.valide_par_nom ? ' — validé par ' + report.valide_par_nom : ''}`, { align: 'center' });
-    doc.text(`Généré le : ${new Date(report.genere_le || Date.now()).toLocaleDateString('fr-FR')}`, { align: 'center' });
+    doc.moveDown(3).fontSize(11).fillColor('black');
+    const meta = sec.meta || {};
+    const prepPar = meta.prepare_par || report.responsable_nom || '';
+    const validePar = meta.valide_par || report.valide_par_nom || '';
+    if (prepPar) doc.text(`Préparé par : ${prepPar}`, { align: 'center' });
+    if (validePar) { doc.moveDown(0.2).text(`Validé par : ${validePar}`, { align: 'center' }); }
 
     // ── Synthèse exécutive ──
     doc.addPage();
@@ -123,7 +125,7 @@ async function generateReportPdf({ report, entityNom, logoBuffer }) {
       para('Maintenance', sec.analyses.maintenance);
       para('Sécurité', sec.analyses.securite);
     }
-  });
+  }, { footerNote: '' });
 }
 
 module.exports = { generateReportPdf };

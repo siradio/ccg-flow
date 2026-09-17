@@ -131,6 +131,8 @@ const MONTHS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juil
 // Sections managériales éditables (vides par défaut ; le Responsable DSI les complète).
 function emptySections() {
   return {
+    // meta : mentions de la page de garde, éditables (aucune génération auto affichée).
+    meta: { prepare_par: '', valide_par: '' },
     synthese: { resume: '', realisations: '', difficultes: '', risques: '', attention: '', recommandations: '', decisions: '' },
     analyses: { sla: '', maintenance: '', securite: '' },
     recommandations: [],
