@@ -167,18 +167,19 @@ export default function ParcDetail() {
   );
 }
 
-function AssignForm({ mode, lists, onClose, onSubmit }) {
+export function AssignForm({ mode, lists, equipments, onClose, onSubmit }) {
   const { t } = useI18n();
-  const [f, setF] = useState({ beneficiaire_type: 'employe', employee_id: '', business_unit_id: '', entity_id: '', site_id: '', date_affectation: new Date().toISOString().slice(0, 10), etat_remise: '', accessoires_remis: '', retour_prevu: '', commentaire: '' });
+  const [f, setF] = useState({ equipment_id: '', beneficiaire_type: 'employe', employee_id: '', business_unit_id: '', entity_id: '', site_id: '', date_affectation: new Date().toISOString().slice(0, 10), etat_remise: '', accessoires_remis: '', retour_prevu: '', commentaire: '' });
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const sites = useMemo(() => (lists.sites || []).filter(s => !f.entity_id || String(s.entity_id) === String(f.entity_id)), [lists.sites, f.entity_id]);
-  async function submit(e) { e.preventDefault(); if (busy) return; setBusy(true); setErr(''); try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); } }
+  async function submit(e) { e.preventDefault(); if (busy) return; if (equipments && !f.equipment_id) { setErr('Équipement requis.'); return; } setBusy(true); setErr(''); try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); } }
   const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
   return (
     <Modal title={mode === 'assign' ? t('dsi.action.assign') : t('dsi.action.transfer')} onClose={onClose}>
       <form onSubmit={submit}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+          {equipments && <Field label={t('dsi.maint.equipment')}><SearchableSelect value={f.equipment_id} onChange={v => set('equipment_id', v ?? '')} options={equipments} getLabel={o => o.nom} placeholder="Équipement…" /></Field>}
           <Field label={t('dsi.assign.type')}>
             <select value={f.beneficiaire_type} onChange={e => set('beneficiaire_type', e.target.value)}>
               {BENEFICIAIRE_TYPES.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}
