@@ -18,13 +18,19 @@ export default function SearchableSelect({
   const [hi, setHi] = useState(0);
   const wrapRef = useRef(null);
 
+  // Valeurs par défaut robustes : sans `getLabel`, on affiche `nom`/`label` ; sans `getSearch`, la
+  // recherche porte sur `o.search` (ex. « prénom nom matricule ») puis, à défaut, sur le libellé.
+  // Tout est ramené à une chaîne pour ne jamais planter la saisie (cause d'écran blanc précédent).
+  const label = (o) => String((getLabel ? getLabel(o) : (o?.nom ?? o?.label)) ?? '');
+  const search = (o) => String((getSearch ? getSearch(o) : (o?.search ?? label(o))) ?? '');
+
   const selected = options.find(o => String(o.id) === String(value)) || null;
   // Hors saisie : on affiche le libellé sélectionné ; en saisie : ce que l'utilisateur tape.
-  const display = open ? query : (selected ? getLabel(selected) : '');
+  const display = open ? query : (selected ? label(selected) : '');
 
   const q = query.trim().toLowerCase();
   const filtered = !open ? []
-    : (q === '' ? options : options.filter(o => getSearch(o).toLowerCase().includes(q))).slice(0, 50);
+    : (q === '' ? options : options.filter(o => search(o).toLowerCase().includes(q))).slice(0, 50);
 
   useEffect(() => {
     function onDoc(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
@@ -64,7 +70,7 @@ export default function SearchableSelect({
             <div key={o.id} onMouseDown={e => e.preventDefault()} onClick={() => choose(o)}
               style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 13, background: i === hi ? 'var(--color-hover)' : undefined }}
               onMouseEnter={() => setHi(i)}>
-              {getLabel(o)}
+              {label(o)}
             </div>
           ))}
           {filtered.length === 0 && <div style={{ padding: '6px 10px', color: 'var(--color-text-muted)', fontSize: 13 }}>{t('common.noResults')}</div>}

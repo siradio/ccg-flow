@@ -27,7 +27,7 @@ const FIELDS = ['nom', 'description', 'responsable_id', 'sponsor_id', 'entity_id
 const nn = v => (v === '' || v === undefined ? null : v);
 
 router.get('/users', canView, async (req, res, next) => {
-  try { res.json(await all(`SELECT id, TRIM(CONCAT(prenom,' ',nom)) AS nom FROM users WHERE actif=true ORDER BY nom, prenom`)); } catch (e) { next(e); }
+  try { res.json(await all(`SELECT u.id, TRIM(CONCAT(u.prenom,' ',u.nom)) AS nom, TRIM(CONCAT(u.prenom,' ',u.nom,' ',COALESCE(e.matricule,''))) AS search FROM users u LEFT JOIN employees e ON e.id=u.employee_id WHERE u.actif = true ORDER BY u.nom, u.prenom`)); } catch (e) { next(e); }
 });
 
 router.get('/stats', canView, async (req, res, next) => {
