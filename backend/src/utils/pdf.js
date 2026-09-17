@@ -28,7 +28,10 @@ function money(n) {
   return `${withSpaces},${decPart}`;
 }
 
-function renderPdf(drawFn) {
+// `opts.footerNote` : mention affichée au pied de chaque page avant « Page i/N ». Par défaut
+// « Document généré automatiquement » (compat. Achat/Commerce). Passer '' pour n'afficher que la
+// pagination (ex. rapport DSI destiné à la Direction, qui ne doit rien laisser paraître d'auto).
+function renderPdf(drawFn, opts = {}) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
     const chunks = [];
@@ -36,7 +39,7 @@ function renderPdf(drawFn) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     drawFn(doc);
-    renderFooters(doc);
+    renderFooters(doc, opts.footerNote);
     doc.end();
   });
 }
@@ -171,7 +174,7 @@ function renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom }) 
 
 // Pied de page (mentions + numérotation), identique sur chaque page — posé une fois le document
 // entièrement dessiné, via bufferPages, pour connaître le nombre total de pages à l'avance.
-function renderFooters(doc) {
+function renderFooters(doc, note = 'Document généré automatiquement') {
   const range = doc.bufferedPageRange();
   const legal = [COMPANY.raisonSociale, COMPANY.rccm && `RCCM ${COMPANY.rccm}`].filter(Boolean).join(' — ');
   for (let i = range.start; i < range.start + range.count; i++) {
@@ -186,7 +189,8 @@ function renderFooters(doc) {
     doc.page.margins.bottom = 0;
     doc.fontSize(8).font('Helvetica').fillColor(MUTED_GRAY);
     doc.text(legal, 50, bottom, { width: PAGE_WIDTH, align: 'center' });
-    doc.text(`Document généré automatiquement — Page ${i - range.start + 1}/${range.count}`, 50, bottom + 11, { width: PAGE_WIDTH, align: 'center' });
+    const pageTxt = `Page ${i - range.start + 1}/${range.count}`;
+    doc.text(note ? `${note} — ${pageTxt}` : pageTxt, 50, bottom + 11, { width: PAGE_WIDTH, align: 'center' });
     doc.page.margins.bottom = originalBottomMargin;
   }
 }

@@ -12,7 +12,7 @@ import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconEmployees, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -101,6 +101,9 @@ export default function Layout() {
           {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> {t('nav.production')}</NavLink>}
           {hasModuleAccess(user, 'commerce') && <NavLink to={firstCommerceTarget(user) || '/commerce/versements'} className={navClass} onClick={closeNav}><IconTag /> {t('nav.commerce')}</NavLink>}
           {hasModuleAccess(user, 'comptabilite') && <NavLink to="/comptabilite/traitement/achats" className={navClass} onClick={closeNav}><IconAccounting /> {t('nav.accounting')}</NavLink>}
+          {/* DSI : visible à tout salarié (espace self-service : mon matériel, signaler un incident) ;
+              les sections de gestion restent gâtées par sous-module dans la sous-nav/les routes. */}
+          <NavLink to="/dsi" className={navClass} onClick={closeNav}><IconDsi /> {t('nav.dsi')}</NavLink>
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
           <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>
           {hasLiens && (

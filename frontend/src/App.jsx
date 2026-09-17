@@ -66,6 +66,25 @@ import PricesChartPage from './pages/Prices/ChartPage';
 import AchatsQueue from './pages/Accounting/AchatsQueue';
 import AchatsDetail from './pages/Accounting/AchatsDetail';
 import BdcCommercial from './pages/Accounting/BdcCommercial';
+import DsiHome from './pages/DSI/DsiHome';
+import DsiReferentiels from './pages/DSI/DsiReferentiels';
+import ParcList from './pages/DSI/ParcList';
+import ParcDetail from './pages/DSI/ParcDetail';
+import Affectations from './pages/DSI/Affectations';
+import MonMateriel from './pages/DSI/MonMateriel';
+import TicketsList from './pages/DSI/TicketsList';
+import TicketDetail from './pages/DSI/TicketDetail';
+import SignalerIncident from './pages/DSI/SignalerIncident';
+import MesTickets from './pages/DSI/MesTickets';
+import MonTicket from './pages/DSI/MonTicket';
+import MaintenanceList from './pages/DSI/MaintenanceList';
+import ActivitesList from './pages/DSI/ActivitesList';
+import ProjetsList from './pages/DSI/ProjetsList';
+import ProjetDetail from './pages/DSI/ProjetDetail';
+import RisquesList from './pages/DSI/RisquesList';
+import DsiDashboard from './pages/DSI/DsiDashboard';
+import RapportsList from './pages/DSI/RapportsList';
+import RapportDetail from './pages/DSI/RapportDetail';
 
 export default function App() {
   return (
@@ -90,6 +109,26 @@ export default function App() {
         <Route path="comptabilite/traitement/achats" element={<RequireModule subModule="comptabilite.achats"><AchatsQueue /></RequireModule>} />
         <Route path="comptabilite/traitement/achats/:id" element={<RequireModule subModule="comptabilite.achats"><AchatsDetail /></RequireModule>} />
         <Route path="comptabilite/traitement/bons-de-commande" element={<RequireModule subModule="comptabilite.bdc"><BdcCommercial /></RequireModule>} />
+        {/* Module DSI (L0 : référentiels ; les autres sections arrivent aux lots suivants) */}
+        <Route path="dsi" element={<DsiHome />} />
+        <Route path="dsi/tableau-bord" element={<RequireModule subModule="dsi.dashboard"><DsiDashboard /></RequireModule>} />
+        <Route path="dsi/mon-materiel" element={<MonMateriel />} />
+        <Route path="dsi/parc" element={<RequireModule subModule="dsi.parc"><ParcList /></RequireModule>} />
+        <Route path="dsi/parc/:id" element={<RequireModule subModule="dsi.parc"><ParcDetail /></RequireModule>} />
+        <Route path="dsi/affectations" element={<RequireModule subModule="dsi.affectations"><Affectations /></RequireModule>} />
+        <Route path="dsi/tickets" element={<RequireModule subModule="dsi.tickets"><TicketsList /></RequireModule>} />
+        <Route path="dsi/tickets/:id" element={<RequireModule subModule="dsi.tickets"><TicketDetail /></RequireModule>} />
+        <Route path="dsi/signaler" element={<SignalerIncident />} />
+        <Route path="dsi/mes-tickets" element={<MesTickets />} />
+        <Route path="dsi/mes-tickets/:id" element={<MonTicket />} />
+        <Route path="dsi/maintenance" element={<RequireModule subModule="dsi.maintenance"><MaintenanceList /></RequireModule>} />
+        <Route path="dsi/activites" element={<RequireModule subModule="dsi.activites"><ActivitesList /></RequireModule>} />
+        <Route path="dsi/projets" element={<RequireModule subModule="dsi.projets"><ProjetsList /></RequireModule>} />
+        <Route path="dsi/projets/:id" element={<RequireModule subModule="dsi.projets"><ProjetDetail /></RequireModule>} />
+        <Route path="dsi/risques" element={<RequireModule subModule="dsi.risques"><RisquesList /></RequireModule>} />
+        <Route path="dsi/rapports" element={<RequireModule subModule="dsi.rapports"><RapportsList /></RequireModule>} />
+        <Route path="dsi/rapports/:id" element={<RequireModule subModule="dsi.rapports"><RapportDetail /></RequireModule>} />
+        <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RhDashboard />} />
         <Route path="rh/mes-demandes" element={<MesDemandes />} />
