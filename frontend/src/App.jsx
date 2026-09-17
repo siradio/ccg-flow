@@ -82,6 +82,7 @@ import ActivitesList from './pages/DSI/ActivitesList';
 import ProjetsList from './pages/DSI/ProjetsList';
 import ProjetDetail from './pages/DSI/ProjetDetail';
 import RisquesList from './pages/DSI/RisquesList';
+import DsiDashboard from './pages/DSI/DsiDashboard';
 
 export default function App() {
   return (
@@ -108,6 +109,7 @@ export default function App() {
         <Route path="comptabilite/traitement/bons-de-commande" element={<RequireModule subModule="comptabilite.bdc"><BdcCommercial /></RequireModule>} />
         {/* Module DSI (L0 : référentiels ; les autres sections arrivent aux lots suivants) */}
         <Route path="dsi" element={<DsiHome />} />
+        <Route path="dsi/tableau-bord" element={<RequireModule subModule="dsi.dashboard"><DsiDashboard /></RequireModule>} />
         <Route path="dsi/mon-materiel" element={<MonMateriel />} />
         <Route path="dsi/parc" element={<RequireModule subModule="dsi.parc"><ParcList /></RequireModule>} />
         <Route path="dsi/parc/:id" element={<RequireModule subModule="dsi.parc"><ParcDetail /></RequireModule>} />

@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/I18nContext';
 // et plus tard Signaler un incident / Mes tickets) ouverts à tout salarié. Les sections s'ajoutent
 // au fil des lots.
 const STAFF_TABS = [
+  { to: '/dsi/tableau-bord', sub: 'dsi.dashboard', key: 'dsi.nav.dashboard' },
   { to: '/dsi/parc', sub: 'dsi.parc', key: 'dsi.nav.parc' },
   { to: '/dsi/affectations', sub: 'dsi.affectations', key: 'dsi.nav.affectations' },
   { to: '/dsi/tickets', sub: 'dsi.tickets', key: 'dsi.nav.tickets' },
