@@ -80,6 +80,7 @@ app.use('/api/dsi/referentials', require('./modules/dsi/dsi.referentials.routes'
 app.use('/api/dsi/equipment', require('./modules/dsi/dsi.equipment.routes'));
 app.use('/api/dsi/tickets', require('./modules/dsi/dsi.tickets.routes'));
 app.use('/api/dsi/maintenance', require('./modules/dsi/dsi.maintenance.routes'));
+app.use('/api/dsi/activities', require('./modules/dsi/dsi.activities.routes'));
 app.use('/api/dsi/my', require('./modules/dsi/dsi.self.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));

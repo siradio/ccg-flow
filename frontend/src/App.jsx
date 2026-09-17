@@ -78,6 +78,7 @@ import SignalerIncident from './pages/DSI/SignalerIncident';
 import MesTickets from './pages/DSI/MesTickets';
 import MonTicket from './pages/DSI/MonTicket';
 import MaintenanceList from './pages/DSI/MaintenanceList';
+import ActivitesList from './pages/DSI/ActivitesList';
 
 export default function App() {
   return (
@@ -114,6 +115,7 @@ export default function App() {
         <Route path="dsi/mes-tickets" element={<MesTickets />} />
         <Route path="dsi/mes-tickets/:id" element={<MonTicket />} />
         <Route path="dsi/maintenance" element={<RequireModule subModule="dsi.maintenance"><MaintenanceList /></RequireModule>} />
+        <Route path="dsi/activites" element={<RequireModule subModule="dsi.activites"><ActivitesList /></RequireModule>} />
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RhDashboard />} />
