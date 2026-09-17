@@ -72,6 +72,11 @@ import ParcList from './pages/DSI/ParcList';
 import ParcDetail from './pages/DSI/ParcDetail';
 import Affectations from './pages/DSI/Affectations';
 import MonMateriel from './pages/DSI/MonMateriel';
+import TicketsList from './pages/DSI/TicketsList';
+import TicketDetail from './pages/DSI/TicketDetail';
+import SignalerIncident from './pages/DSI/SignalerIncident';
+import MesTickets from './pages/DSI/MesTickets';
+import MonTicket from './pages/DSI/MonTicket';
 
 export default function App() {
   return (
@@ -102,6 +107,11 @@ export default function App() {
         <Route path="dsi/parc" element={<RequireModule subModule="dsi.parc"><ParcList /></RequireModule>} />
         <Route path="dsi/parc/:id" element={<RequireModule subModule="dsi.parc"><ParcDetail /></RequireModule>} />
         <Route path="dsi/affectations" element={<RequireModule subModule="dsi.affectations"><Affectations /></RequireModule>} />
+        <Route path="dsi/tickets" element={<RequireModule subModule="dsi.tickets"><TicketsList /></RequireModule>} />
+        <Route path="dsi/tickets/:id" element={<RequireModule subModule="dsi.tickets"><TicketDetail /></RequireModule>} />
+        <Route path="dsi/signaler" element={<SignalerIncident />} />
+        <Route path="dsi/mes-tickets" element={<MesTickets />} />
+        <Route path="dsi/mes-tickets/:id" element={<MonTicket />} />
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RhDashboard />} />

@@ -8,9 +8,12 @@ import { useI18n } from '../../i18n/I18nContext';
 const STAFF_TABS = [
   { to: '/dsi/parc', sub: 'dsi.parc', key: 'dsi.nav.parc' },
   { to: '/dsi/affectations', sub: 'dsi.affectations', key: 'dsi.nav.affectations' },
+  { to: '/dsi/tickets', sub: 'dsi.tickets', key: 'dsi.nav.tickets' },
   { to: '/dsi/referentiels', sub: 'dsi.referentiels', key: 'dsi.nav.referentiels' },
 ];
 const SELF_TABS = [
+  { to: '/dsi/signaler', key: 'dsi.nav.report' },
+  { to: '/dsi/mes-tickets', key: 'dsi.nav.myTickets' },
   { to: '/dsi/mon-materiel', key: 'dsi.nav.myEquipment' },
 ];
 

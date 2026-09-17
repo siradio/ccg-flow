@@ -35,3 +35,47 @@ export function EquipStatutBadge({ statut }) {
 
 export const statutLabel = (v) => (EQUIP_STATUTS.find(x => x.v === v)?.l || v || '—');
 export const beneficiaireLabel = (v) => (BENEFICIAIRE_TYPES.find(x => x.v === v)?.l || v || '—');
+
+// ── Tickets ─────────────────────────────────────────────────────────────────
+export const TICKET_STATUTS = [
+  { v: 'ouvert', l: 'Ouvert', c: 'blue' },
+  { v: 'affecte', l: 'Affecté', c: 'blue' },
+  { v: 'en_cours', l: 'En cours', c: 'amber' },
+  { v: 'en_attente', l: 'En attente', c: 'neutral' },
+  { v: 'resolu', l: 'Résolu', c: 'green' },
+  { v: 'cloture', l: 'Clôturé', c: 'neutral' },
+  { v: 'annule', l: 'Annulé', c: 'neutral' },
+];
+export const ticketStatutLabel = (v) => (TICKET_STATUTS.find(x => x.v === v)?.l || v || '—');
+
+export function TicketStatutBadge({ statut }) {
+  const s = TICKET_STATUTS.find(x => x.v === statut) || { l: statut || '—', c: 'neutral' };
+  const col = COLORS[s.c] || COLORS.neutral;
+  return <span style={{ background: col.bg, color: col.fg, padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.l}</span>;
+}
+
+export function PriorityBadge({ libelle, couleur }) {
+  if (!libelle) return <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
+  return <span style={{ background: (couleur || '#6b7280') + '22', color: couleur || '#6b7280', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{libelle}</span>;
+}
+
+const SLA_STATE = {
+  respecte: { l: 'Respecté', bg: COLORS.green.bg, fg: COLORS.green.fg },
+  a_risque: { l: 'À risque', bg: COLORS.amber.bg, fg: COLORS.amber.fg },
+  depasse: { l: 'Dépassé', bg: COLORS.red.bg, fg: COLORS.red.fg },
+};
+// Affiche l'état SLA de résolution (le plus parlant en liste).
+export function SlaBadge({ sla }) {
+  const r = sla?.resolution;
+  if (!r) return <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>—</span>;
+  const s = SLA_STATE[r.state] || SLA_STATE.respecte;
+  const suffix = r.done ? '' : (r.remainingMin >= 0 ? ` · ${fmtMin(r.remainingMin)}` : ` · ${fmtMin(-r.remainingMin)} de retard`);
+  return <span style={{ background: s.bg, color: s.fg, padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.l}{suffix}</span>;
+}
+export function fmtMin(min) {
+  const m = Math.abs(Math.round(min));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`;
+  return `${Math.floor(h / 24)} j ${h % 24} h`;
+}
