@@ -70,9 +70,11 @@ router.get('/:id', canView, async (req, res, next) => {
 router.post('/', canEdit, async (req, res, next) => {
   try {
     if (!req.body?.equipment_id) return res.status(400).json({ error: 'Équipement requis.' });
-    const vals = FIELDS.map(f => nn(req.body[f]));
-    const ph = FIELDS.map((_, i) => `$${i + 1}`).join(', ');
-    const row = await one(`INSERT INTO dsi_maintenance (${FIELDS.join(', ')}, created_by) VALUES (${ph}, $${FIELDS.length + 1}) RETURNING *`, [...vals, req.user.id]);
+    const entries = FIELDS.map(f => [f, nn(req.body[f])]).filter(([, v]) => v !== null);
+    const cols = [...entries.map(([c]) => c), 'created_by'];
+    const vals = [...entries.map(([, v]) => v), req.user.id];
+    const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
+    const row = await one(`INSERT INTO dsi_maintenance (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals);
     await audit.logAction({ tableName: 'dsi_maintenance', recordId: row.id, action: 'dsi_maintenance_create', userId: req.user.id, details: { equipment_id: row.equipment_id } });
     res.status(201).json(row);
   } catch (e) { next(e); }

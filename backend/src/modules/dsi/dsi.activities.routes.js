@@ -71,10 +71,14 @@ router.get('/', canView, async (req, res, next) => {
 router.post('/', canEdit, async (req, res, next) => {
   try {
     if (!req.body?.description) return res.status(400).json({ error: 'Description requise.' });
-    const body = { ...req.body, technician_id: req.body.technician_id || req.user.id };
-    const vals = FIELDS.map(f => (f === 'fait_marquant' ? !!body[f] : nn(body[f])));
-    const ph = FIELDS.map((_, i) => `$${i + 1}`).join(', ');
-    const row = await one(`INSERT INTO dsi_activities (${FIELDS.join(', ')}, created_by) VALUES (${ph}, $${FIELDS.length + 1}) RETURNING *`, [...vals, req.user.id]);
+    const body = { ...req.body, technician_id: req.body.technician_id || req.user.id, fait_marquant: !!req.body.fait_marquant };
+    // On n'insère que les champs renseignés : les colonnes NOT NULL à défaut (date…) prennent leur
+    // valeur par défaut si absentes, au lieu de recevoir un NULL explicite.
+    const entries = FIELDS.map(f => [f, f === 'fait_marquant' ? body[f] : nn(body[f])]).filter(([, v]) => v !== null);
+    const cols = [...entries.map(([c]) => c), 'created_by'];
+    const vals = [...entries.map(([, v]) => v), req.user.id];
+    const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
+    const row = await one(`INSERT INTO dsi_activities (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals);
     await audit.logAction({ tableName: 'dsi_activities', recordId: row.id, action: 'dsi_activity_create', userId: req.user.id, details: {} });
     res.status(201).json(row);
   } catch (e) { next(e); }

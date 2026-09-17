@@ -71,9 +71,13 @@ router.post('/', canEdit, async (req, res, next) => {
     const row = await withTransaction(async (tx) => {
       let code = (req.body.code || '').trim();
       if (!code) code = await nextRef(tx, { scope: 'PROJECT', prefix: 'PRJ', pad: 4 });
-      const vals = FIELDS.map(f => (f === 'avancement_pct' ? (nn(req.body[f]) || 0) : nn(req.body[f])));
-      const ph = FIELDS.map((_, i) => `$${i + 2}`).join(', ');
-      return tx.one(`INSERT INTO dsi_projects (code, ${FIELDS.join(', ')}, created_by) VALUES ($1, ${ph}, $${FIELDS.length + 2}) RETURNING *`, [code, ...vals, req.user.id]);
+      // Seuls les champs renseignés sont insérés (les colonnes NOT NULL à défaut — statut,
+      // avancement_pct — gardent leur défaut si absentes).
+      const entries = FIELDS.map(f => [f, nn(req.body[f])]).filter(([, v]) => v !== null);
+      const cols = ['code', ...entries.map(([c]) => c), 'created_by'];
+      const vals = [code, ...entries.map(([, v]) => v), req.user.id];
+      const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
+      return tx.one(`INSERT INTO dsi_projects (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals);
     });
     await audit.logAction({ tableName: 'dsi_projects', recordId: row.id, action: 'dsi_project_create', userId: req.user.id, details: { code: row.code } });
     res.status(201).json(row);
@@ -104,9 +108,11 @@ const TASK_FIELDS = ['libelle', 'responsable_id', 'echeance', 'priority_id', 'st
 router.post('/:id/tasks', canEdit, async (req, res, next) => {
   try {
     if (!req.body?.libelle) return res.status(400).json({ error: 'Libellé requis.' });
-    const vals = TASK_FIELDS.map(f => (['avancement_pct', 'ordre'].includes(f) ? (nn(req.body[f]) || 0) : nn(req.body[f])));
-    const ph = TASK_FIELDS.map((_, i) => `$${i + 2}`).join(', ');
-    res.status(201).json(await one(`INSERT INTO dsi_project_tasks (project_id, ${TASK_FIELDS.join(', ')}) VALUES ($1, ${ph}) RETURNING *`, [req.params.id, ...vals]));
+    const entries = TASK_FIELDS.map(f => [f, nn(req.body[f])]).filter(([, v]) => v !== null);
+    const cols = ['project_id', ...entries.map(([c]) => c)];
+    const vals = [req.params.id, ...entries.map(([, v]) => v)];
+    const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
+    res.status(201).json(await one(`INSERT INTO dsi_project_tasks (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals));
   } catch (e) { next(e); }
 });
 router.put('/tasks/:taskId', canEdit, async (req, res, next) => {

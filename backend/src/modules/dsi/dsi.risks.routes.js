@@ -69,10 +69,11 @@ router.post('/', canEdit, async (req, res, next) => {
     const crit = criticite(req.body.probabilite, req.body.impact);
     const row = await withTransaction(async (tx) => {
       const reference = await nextRef(tx, { scope: 'RISK', prefix: 'RSK', pad: 4 });
-      const vals = FIELDS.map(f => nn(req.body[f]));
-      const ph = FIELDS.map((_, i) => `$${i + 2}`).join(', ');
-      return tx.one(`INSERT INTO dsi_risks (reference, ${FIELDS.join(', ')}, criticite, created_by)
-        VALUES ($1, ${ph}, $${FIELDS.length + 2}, $${FIELDS.length + 3}) RETURNING *`, [reference, ...vals, crit, req.user.id]);
+      const entries = FIELDS.map(f => [f, nn(req.body[f])]).filter(([, v]) => v !== null);
+      const cols = ['reference', ...entries.map(([c]) => c), 'criticite', 'created_by'];
+      const vals = [reference, ...entries.map(([, v]) => v), crit, req.user.id];
+      const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
+      return tx.one(`INSERT INTO dsi_risks (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals);
     });
     await audit.logAction({ tableName: 'dsi_risks', recordId: row.id, action: 'dsi_risk_create', userId: req.user.id, details: { reference: row.reference, criticite: crit } });
     res.status(201).json(row);
