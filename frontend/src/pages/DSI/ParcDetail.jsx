@@ -6,6 +6,7 @@ import Modal from '../../components/Modal.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import DsiSubnav from './DsiSubnav';
 import EquipmentForm from './EquipmentForm.jsx';
+import MaintenanceForm from './MaintenanceForm.jsx';
 import { EquipStatutBadge, BENEFICIAIRE_TYPES, ETATS, beneficiaireLabel } from './dsiLabels.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -17,8 +18,12 @@ export default function ParcDetail() {
   const { t, lang } = useI18n();
   const canEditParc = hasSubModuleLevel(user, 'dsi.parc', 'edition');
   const canAssign = hasSubModuleLevel(user, 'dsi.affectations', 'edition');
+  const canMaint = hasSubModuleLevel(user, 'dsi.maintenance', 'consultation');
+  const canMaintEdit = hasSubModuleLevel(user, 'dsi.maintenance', 'edition');
   const [eq, setEq] = useState(null);
   const [assignments, setAssignments] = useState([]);
+  const [maints, setMaints] = useState([]);
+  const [showMaint, setShowMaint] = useState(false);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null); // 'edit' | 'assign' | 'transfer' | 'return'
   const [lists, setLists] = useState({ categories: [], types: [], brands: [], entities: [], sites: [], suppliers: [], employees: [], bus: [] });
@@ -27,6 +32,7 @@ export default function ParcDetail() {
   const load = () => Promise.all([
     client.get(`/dsi/equipment/${id}`).then(r => setEq(r.data)),
     client.get(`/dsi/equipment/${id}/assignments`).then(r => setAssignments(r.data)),
+    canMaint ? client.get('/dsi/maintenance', { params: { equipment_id: id } }).then(r => setMaints(r.data.items || [])).catch(() => {}) : Promise.resolve(),
   ]).catch(e => setError(e.response?.data?.error || 'Erreur de chargement.'));
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -119,6 +125,35 @@ export default function ParcDetail() {
         </div>
       </section>
 
+      {canMaint && (
+        <section className="card" style={{ maxWidth: 900, marginTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('dsi.maint.title')}</h2>
+            {canMaintEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMaint(true)}>{t('dsi.maint.new')}</button>}
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>{t('dsi.maint.type')}</th><th>{t('dsi.maint.statut')}</th><th>{t('dsi.maint.dateDebut')}</th><th>{t('dsi.maint.dateFin')}</th><th className="num">{t('dsi.maint.cout')}</th><th>{t('dsi.maint.probleme')}</th></tr></thead>
+              <tbody>
+                {maints.map(m => (
+                  <tr key={m.id}>
+                    <td>{m.type_libelle || '—'}</td><td>{m.statut}</td>
+                    <td>{dfmt(m.date_debut)}</td><td>{dfmt(m.date_fin)}</td>
+                    <td className="num">{money(m.cout)}</td><td>{m.probleme || '—'}</td>
+                  </tr>
+                ))}
+                {maints.length === 0 && <tr><td className="empty-row" colSpan={6}>{t('dsi.maint.emptyEq')}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {showMaint && (
+        <MaintenanceForm fixedEquipment={{ id: eq.id, nom: `${eq.numero_inventaire} — ${eq.designation}` }}
+          onClose={() => setShowMaint(false)}
+          onSubmit={async (payload) => { await client.post('/dsi/maintenance', payload); setShowMaint(false); await load(); }} />
+      )}
       {modal === 'edit' && <EquipmentForm initial={eq} lists={lists} onClose={() => setModal(null)} onSubmit={saveEdit} />}
       {(modal === 'assign' || modal === 'transfer') && (
         <AssignForm mode={modal} lists={lists} onClose={() => setModal(null)}

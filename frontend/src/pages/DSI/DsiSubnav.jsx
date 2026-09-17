@@ -9,6 +9,7 @@ const STAFF_TABS = [
   { to: '/dsi/parc', sub: 'dsi.parc', key: 'dsi.nav.parc' },
   { to: '/dsi/affectations', sub: 'dsi.affectations', key: 'dsi.nav.affectations' },
   { to: '/dsi/tickets', sub: 'dsi.tickets', key: 'dsi.nav.tickets' },
+  { to: '/dsi/maintenance', sub: 'dsi.maintenance', key: 'dsi.nav.maintenance' },
   { to: '/dsi/referentiels', sub: 'dsi.referentiels', key: 'dsi.nav.referentiels' },
 ];
 const SELF_TABS = [
