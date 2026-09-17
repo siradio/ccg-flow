@@ -11,6 +11,8 @@ const STAFF_TABS = [
   { to: '/dsi/tickets', sub: 'dsi.tickets', key: 'dsi.nav.tickets' },
   { to: '/dsi/maintenance', sub: 'dsi.maintenance', key: 'dsi.nav.maintenance' },
   { to: '/dsi/activites', sub: 'dsi.activites', key: 'dsi.nav.activites' },
+  { to: '/dsi/projets', sub: 'dsi.projets', key: 'dsi.nav.projets' },
+  { to: '/dsi/risques', sub: 'dsi.risques', key: 'dsi.nav.risques' },
   { to: '/dsi/referentiels', sub: 'dsi.referentiels', key: 'dsi.nav.referentiels' },
 ];
 const SELF_TABS = [
