@@ -96,8 +96,11 @@ async function create(body, userId) {
   return withTransaction(async (tx) => {
     let numero = (body.numero_inventaire || '').trim();
     if (!numero) numero = await nextRef(tx, { scope: 'EQUIP', prefix: 'INV' });
-    const cols = ['numero_inventaire', ...FIELDS, 'created_by'];
-    const vals = [numero, ...FIELDS.map(f => emptyToNull(body[f])), userId];
+    // On n'insère que les champs renseignés : la colonne statut (NOT NULL DEFAULT 'en_stock')
+    // garde son défaut si absente, au lieu de recevoir un NULL explicite.
+    const entries = FIELDS.map(f => [f, emptyToNull(body[f])]).filter(([, v]) => v !== null);
+    const cols = ['numero_inventaire', ...entries.map(([c]) => c), 'created_by'];
+    const vals = [numero, ...entries.map(([, v]) => v), userId];
     const ph = cols.map((_, i) => `$${i + 1}`).join(', ');
     return tx.one(`INSERT INTO dsi_equipment (${cols.join(', ')}) VALUES (${ph}) RETURNING *`, vals);
   });
