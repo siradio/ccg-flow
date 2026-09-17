@@ -83,6 +83,8 @@ import ProjetsList from './pages/DSI/ProjetsList';
 import ProjetDetail from './pages/DSI/ProjetDetail';
 import RisquesList from './pages/DSI/RisquesList';
 import DsiDashboard from './pages/DSI/DsiDashboard';
+import RapportsList from './pages/DSI/RapportsList';
+import RapportDetail from './pages/DSI/RapportDetail';
 
 export default function App() {
   return (
@@ -124,6 +126,8 @@ export default function App() {
         <Route path="dsi/projets" element={<RequireModule subModule="dsi.projets"><ProjetsList /></RequireModule>} />
         <Route path="dsi/projets/:id" element={<RequireModule subModule="dsi.projets"><ProjetDetail /></RequireModule>} />
         <Route path="dsi/risques" element={<RequireModule subModule="dsi.risques"><RisquesList /></RequireModule>} />
+        <Route path="dsi/rapports" element={<RequireModule subModule="dsi.rapports"><RapportsList /></RequireModule>} />
+        <Route path="dsi/rapports/:id" element={<RequireModule subModule="dsi.rapports"><RapportDetail /></RequireModule>} />
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RhDashboard />} />

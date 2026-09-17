@@ -14,6 +14,7 @@ const STAFF_TABS = [
   { to: '/dsi/activites', sub: 'dsi.activites', key: 'dsi.nav.activites' },
   { to: '/dsi/projets', sub: 'dsi.projets', key: 'dsi.nav.projets' },
   { to: '/dsi/risques', sub: 'dsi.risques', key: 'dsi.nav.risques' },
+  { to: '/dsi/rapports', sub: 'dsi.rapports', key: 'dsi.nav.rapports' },
   { to: '/dsi/referentiels', sub: 'dsi.referentiels', key: 'dsi.nav.referentiels' },
 ];
 const SELF_TABS = [
