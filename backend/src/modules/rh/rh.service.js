@@ -1,5 +1,7 @@
 const { one, all } = require('../../db');
 const repo = require('./rh.repository');
+const blob = require('../../storage/blob');
+const audit = require('../audit/audit.service');
 const notifications = require('../notifications/notifications.service');
 const numbering = require('../../utils/numbering');
 const { hasRoleOnEntity, isSuperAdmin } = require('../../middleware/permissions');
@@ -263,6 +265,30 @@ async function cancel(user, id, commentaire) {
   return getDetail(id);
 }
 
+// Suppression définitive : réservée aux RH (rôle `rh`, global ou sur l'entité de la demande) et aux
+// administrateurs (super_admin). Contrairement à l'annulation (réservée au demandeur, conserve la
+// trace), la suppression retire la demande, son historique et ses pièces jointes.
+function canDelete(user, req) {
+  if (isSuperAdmin(user)) return true;
+  return (user.roles || []).some(r => r.role_code === 'rh' && (!r.entity_id || Number(r.entity_id) === Number(req.entity_id)));
+}
+
+async function remove(user, id) {
+  const req = await repo.getById(id);
+  if (!req) throw httpError(404, 'Demande introuvable.');
+  if (!canDelete(user, req)) throw httpError(403, 'Suppression réservée aux RH et aux administrateurs.');
+  // Purge des fichiers stockés (blob) avant la suppression en cascade des lignes.
+  const keys = await repo.attachmentKeys(id);
+  for (const k of keys) { if (k.content_key) await blob.del(k.content_key).catch(() => {}); }
+  await repo.remove(id);
+  // Traçabilité : l'historique de la demande disparaît, on journalise la suppression dans l'audit global.
+  await audit.logAction({
+    tableName: 'rh_requests', recordId: id, action: 'suppression', userId: user.id,
+    details: { numero: req.numero, type: req.type, statut: req.statut, entity_id: req.entity_id },
+  }).catch(() => {});
+  return { ok: true };
+}
+
 async function assertRoleOr403(user, roleCode, entityId) {
   if (!hasRoleOnEntity(user, roleCode, entityId)) throw httpError(403, `Rôle "${roleCode}" requis sur cette entité.`);
 }
@@ -343,7 +369,7 @@ async function getDashboard(user) {
 }
 
 module.exports = {
-  createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel,
-  listMine, listPending, listAll, canSeeAll, workingDays,
+  createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
+  listMine, listPending, listAll, canSeeAll, canDelete, workingDays,
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
 };

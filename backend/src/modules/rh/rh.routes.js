@@ -171,7 +171,7 @@ router.get('/requests/:id', async (req, res, next) => {
     const detail = await service.getDetail(Number(req.params.id));
     if (!detail) return res.status(404).json({ error: 'Demande introuvable.' });
     if (!canView(req.user, detail)) return res.status(403).json({ error: 'Accès refusé.' });
-    res.json(detail);
+    res.json({ ...detail, can_delete: service.canDelete(req.user, detail) });
   } catch (e) { next(e); }
 });
 
@@ -186,6 +186,10 @@ router.post('/requests/:id/reject', async (req, res, next) => {
 });
 router.post('/requests/:id/cancel', async (req, res, next) => {
   try { res.json(await service.cancel(req.user, Number(req.params.id), (req.body || {}).comment)); } catch (e) { next(e); }
+});
+// Suppression définitive — réservée aux RH et aux administrateurs (voir service.canDelete).
+router.delete('/requests/:id', async (req, res, next) => {
+  try { res.json(await service.remove(req.user, Number(req.params.id))); } catch (e) { next(e); }
 });
 
 // Pièces jointes (justificatifs).
