@@ -23,7 +23,7 @@ export const MODULE_SUB_KEYS = {
   kpi: ['kpi.global', 'kpi.achats', 'kpi.rh', 'kpi.stock'],
   comptabilite: ['comptabilite.achats', 'comptabilite.bdc'],
   dsi: [
-    'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets',
+    'dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets',
     'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels',
   ],
   referentiels: [

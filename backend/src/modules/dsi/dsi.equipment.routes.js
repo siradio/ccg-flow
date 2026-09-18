@@ -12,6 +12,7 @@ router.use(requireAuth);
 const canView = requireSubModule('dsi.parc', 'consultation');
 const canEdit = requireSubModule('dsi.parc', 'edition');
 const canAssign = requireSubModule('dsi.affectations', 'edition');
+const canSupport = requireSubModule('dsi.support', 'consultation');
 
 function parseFilters(q) {
   return {
@@ -30,8 +31,8 @@ router.get('/stats', canView, async (req, res, next) => {
   try { res.json(await repo.stats(parseFilters(req.query))); } catch (e) { next(e); }
 });
 
-// Self-service : le matériel affecté à l'utilisateur courant (tout compte authentifié).
-router.get('/mine', async (req, res, next) => {
+// Self-service : le matériel affecté à l'utilisateur courant (accès dsi.support).
+router.get('/mine', canSupport, async (req, res, next) => {
   try {
     if (!req.user.employee_id) return res.json([]);
     res.json(await all(
