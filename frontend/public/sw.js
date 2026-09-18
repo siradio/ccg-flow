@@ -3,7 +3,7 @@
    servir un ancien déploiement), et on ne bascule sur le cache qu'en cas d'échec réseau.
    On ne met en cache que les ressources statiques same-origin (jamais /api : données authentifiées
    et volatiles). */
-const CACHE = 'ccg-flow-v1';
+const CACHE = 'ccg-flow-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
