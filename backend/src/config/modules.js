@@ -89,6 +89,7 @@ const MODULES = [
   {
     key: 'dsi', label: 'DSI',
     subModules: [
+      { key: 'dsi.support', label: 'Espace salarié (signaler un incident, mon matériel)' },
       { key: 'dsi.dashboard', label: 'Tableau de bord DSI' },
       { key: 'dsi.parc', label: 'Parc informatique' },
       { key: 'dsi.affectations', label: 'Affectations' },

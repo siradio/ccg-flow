@@ -85,6 +85,9 @@ import RisquesList from './pages/DSI/RisquesList';
 import DsiDashboard from './pages/DSI/DsiDashboard';
 import RapportsList from './pages/DSI/RapportsList';
 import RapportDetail from './pages/DSI/RapportDetail';
+import RequireRh from './components/RequireRh';
+
+const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 
 export default function App() {
   return (
@@ -110,17 +113,17 @@ export default function App() {
         <Route path="comptabilite/traitement/achats/:id" element={<RequireModule subModule="comptabilite.achats"><AchatsDetail /></RequireModule>} />
         <Route path="comptabilite/traitement/bons-de-commande" element={<RequireModule subModule="comptabilite.bdc"><BdcCommercial /></RequireModule>} />
         {/* Module DSI (L0 : référentiels ; les autres sections arrivent aux lots suivants) */}
-        <Route path="dsi" element={<DsiHome />} />
+        <Route path="dsi" element={<RequireModule subModule={DSI_ANY}><DsiHome /></RequireModule>} />
         <Route path="dsi/tableau-bord" element={<RequireModule subModule="dsi.dashboard"><DsiDashboard /></RequireModule>} />
-        <Route path="dsi/mon-materiel" element={<MonMateriel />} />
+        <Route path="dsi/mon-materiel" element={<RequireModule subModule="dsi.support"><MonMateriel /></RequireModule>} />
         <Route path="dsi/parc" element={<RequireModule subModule="dsi.parc"><ParcList /></RequireModule>} />
         <Route path="dsi/parc/:id" element={<RequireModule subModule="dsi.parc"><ParcDetail /></RequireModule>} />
         <Route path="dsi/affectations" element={<RequireModule subModule="dsi.affectations"><Affectations /></RequireModule>} />
         <Route path="dsi/tickets" element={<RequireModule subModule="dsi.tickets"><TicketsList /></RequireModule>} />
         <Route path="dsi/tickets/:id" element={<RequireModule subModule="dsi.tickets"><TicketDetail /></RequireModule>} />
-        <Route path="dsi/signaler" element={<SignalerIncident />} />
-        <Route path="dsi/mes-tickets" element={<MesTickets />} />
-        <Route path="dsi/mes-tickets/:id" element={<MonTicket />} />
+        <Route path="dsi/signaler" element={<RequireModule subModule="dsi.support"><SignalerIncident /></RequireModule>} />
+        <Route path="dsi/mes-tickets" element={<RequireModule subModule="dsi.support"><MesTickets /></RequireModule>} />
+        <Route path="dsi/mes-tickets/:id" element={<RequireModule subModule="dsi.support"><MonTicket /></RequireModule>} />
         <Route path="dsi/maintenance" element={<RequireModule subModule="dsi.maintenance"><MaintenanceList /></RequireModule>} />
         <Route path="dsi/activites" element={<RequireModule subModule="dsi.activites"><ActivitesList /></RequireModule>} />
         <Route path="dsi/projets" element={<RequireModule subModule="dsi.projets"><ProjetsList /></RequireModule>} />
@@ -130,16 +133,16 @@ export default function App() {
         <Route path="dsi/rapports/:id" element={<RequireModule subModule="dsi.rapports"><RapportDetail /></RequireModule>} />
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
-        <Route path="rh/dashboard" element={<RhDashboard />} />
-        <Route path="rh/mes-demandes" element={<MesDemandes />} />
-        <Route path="rh/a-valider" element={<AValider />} />
-        <Route path="rh/toutes" element={<ToutesDemandes />} />
-        <Route path="rh/parametres" element={<RhParametres />} />
-        <Route path="rh/demandes/absence/new" element={<AbsenceForm />} />
-        <Route path="rh/demandes/conge/new" element={<CongeForm />} />
-        <Route path="rh/demandes/recrutement/new" element={<RecrutementForm />} />
-        <Route path="rh/demandes/cdi/new" element={<CdiForm />} />
-        <Route path="rh/demandes/:id" element={<DemandeDetail />} />
+        <Route path="rh/dashboard" element={<RequireRh><RhDashboard /></RequireRh>} />
+        <Route path="rh/mes-demandes" element={<RequireRh><MesDemandes /></RequireRh>} />
+        <Route path="rh/a-valider" element={<RequireRh><AValider /></RequireRh>} />
+        <Route path="rh/toutes" element={<RequireRh><ToutesDemandes /></RequireRh>} />
+        <Route path="rh/parametres" element={<RequireRh><RhParametres /></RequireRh>} />
+        <Route path="rh/demandes/absence/new" element={<RequireRh><AbsenceForm /></RequireRh>} />
+        <Route path="rh/demandes/conge/new" element={<RequireRh><CongeForm /></RequireRh>} />
+        <Route path="rh/demandes/recrutement/new" element={<RequireRh><RecrutementForm /></RequireRh>} />
+        <Route path="rh/demandes/cdi/new" element={<RequireRh><CdiForm /></RequireRh>} />
+        <Route path="rh/demandes/:id" element={<RequireRh><DemandeDetail /></RequireRh>} />
         {/* Fusionné dans le Tableau de bord (onglets Vue globale/Achats/RH/Stock) — redirige les liens/habitudes existants. */}
         <Route path="kpi" element={<Navigate to="/" replace />} />
         <Route path="stock/referentiels" element={<RequireModule subModule="stock.referentiels"><StockReferentiels /></RequireModule>} />

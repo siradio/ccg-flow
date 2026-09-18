@@ -176,27 +176,60 @@ function assertOwner(user, req) {
   if (req.created_by !== user.id && !isSuperAdmin(user)) throw httpError(403, 'Action réservée au demandeur.');
 }
 
+// Responsable hiérarchique DIRECT du demandeur : employé du compte createur → son manager
+// (employees.manager_employee_id) → le compte utilisateur lié à ce manager. NULL si non configuré.
+async function resolveManagerUserId(req) {
+  if (!req.created_by) return null;
+  const u = await one('SELECT employee_id FROM users WHERE id = $1', [req.created_by]);
+  if (!u || !u.employee_id) return null;
+  const emp = await one('SELECT manager_employee_id FROM employees WHERE id = $1', [u.employee_id]);
+  if (!emp || !emp.manager_employee_id) return null;
+  const mgr = await one('SELECT id FROM users WHERE employee_id = $1 AND actif = true ORDER BY id LIMIT 1', [emp.manager_employee_id]);
+  return mgr ? mgr.id : null;
+}
+
 async function submit(user, id) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
   const premier = chainForRequest(req)[0];
-  await repo.update(id, { statut: 'en_validation', role_courant: premier });
+  // 1re étape = responsable : on cible le responsable hiérarchique DIRECT du demandeur (pas un rôle
+  // partagé). À défaut de manager configuré, repli sur le rôle « responsable » de l'entité.
+  const managerUserId = premier === 'responsable' ? await resolveManagerUserId(req) : null;
+  await repo.update(id, { statut: 'en_validation', role_courant: premier, validateur_user_id: managerUserId });
   await repo.logHistory(id, 'soumission', user.id, null);
-  await notifications.notifyRoleOnEntity(req.entity_id, premier, 'Demande RH à valider',
-    `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
+  if (managerUserId) {
+    await notifications.notify(managerUserId, 'Demande RH à valider',
+      `La demande ${req.numero} de votre collaborateur attend votre validation.`, `/rh/demandes/${id}`);
+  } else {
+    await notifications.notifyRoleOnEntity(req.entity_id, premier, 'Demande RH à valider',
+      `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
+  }
   return getDetail(id);
+}
+
+// Autorise l'action sur l'étape courante : si un validateur précis est ciblé (responsable direct),
+// seul lui (ou un super_admin) peut agir ; sinon, contrôle par rôle sur l'entité.
+async function assertCanAct(user, req) {
+  if (req.validateur_user_id) {
+    if (Number(req.validateur_user_id) !== Number(user.id) && !isSuperAdmin(user)) {
+      throw httpError(403, 'Seul le responsable hiérarchique direct du demandeur peut valider cette étape.');
+    }
+  } else {
+    await assertRoleOr403(user, req.role_courant, req.entity_id);
+  }
 }
 
 async function validate(user, id, commentaire) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
   if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
-  await assertRoleOr403(user, req.role_courant, req.entity_id);
+  await assertCanAct(user, req);
   const suivant = nextRole(chainForRequest(req), req.role_courant);
   if (suivant) {
-    await repo.update(id, { role_courant: suivant });
+    // Les étapes suivantes (rh/daf/dg) sont par rôle : on efface le validateur ciblé.
+    await repo.update(id, { role_courant: suivant, validateur_user_id: null });
     await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
     await notifications.notifyRoleOnEntity(req.entity_id, suivant, 'Demande RH à valider',
       `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
@@ -212,7 +245,7 @@ async function reject(user, id, commentaire) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
   if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
-  await assertRoleOr403(user, req.role_courant, req.entity_id);
+  await assertCanAct(user, req);
   if (!commentaire || !commentaire.trim()) throw httpError(400, 'Un commentaire est obligatoire pour refuser.');
   await repo.update(id, { statut: 'refusee', role_courant: null, decided_by: user.id, decided_at: new Date() });
   await repo.logHistory(id, 'refus', user.id, commentaire);
@@ -245,7 +278,7 @@ function pendingRolePairs(user) {
     .map(r => ({ roleCode: r.role_code, entityId: r.entity_id }));
 }
 async function listMine(user) { return repo.listMine(user.id); }
-async function listPending(user) { return repo.listPending(pendingRolePairs(user)); }
+async function listPending(user) { return repo.listPending(pendingRolePairs(user), user.id); }
 async function listAll(user) {
   if (isSuperAdmin(user)) return repo.listAll(null);
   const entityIds = [...new Set((user.roles || []).filter(r => r.role_code === 'rh' && r.entity_id).map(r => r.entity_id))];

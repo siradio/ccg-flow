@@ -3,12 +3,16 @@
 // informations internes réservées à la DSI).
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
+const { requireSubModule } = require('../../middleware/permissions');
 const { httpError } = require('../../utils/httpError');
 const repo = require('./dsi.tickets.repository');
 const svc = require('./dsi.tickets.service');
 
 const router = express.Router();
 router.use(requireAuth);
+// Espace salarié réservé aux comptes ayant l'accès self-service DSI (attribuable dans Admin →
+// Utilisateurs : sous-module « dsi.support »).
+router.use(requireSubModule('dsi.support', 'consultation'));
 
 router.post('/tickets', async (req, res, next) => {
   try { res.status(201).json(await svc.create(req.user, req.body || {}, { selfService: true })); } catch (e) { next(e); }

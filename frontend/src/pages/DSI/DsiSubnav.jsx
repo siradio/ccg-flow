@@ -27,16 +27,18 @@ export default function DsiSubnav() {
   const { user } = useAuth();
   const { t } = useI18n();
   const staff = STAFF_TABS.filter(x => hasSubModuleLevel(user, x.sub));
+  const self = hasSubModuleLevel(user, 'dsi.support') ? SELF_TABS : [];
   return (
     <nav className="subnav">
       {staff.map(x => <NavLink key={x.to} to={x.to} className={({ isActive }) => isActive ? 'active' : undefined}>{t(x.key)}</NavLink>)}
-      {SELF_TABS.map(x => <NavLink key={x.to} to={x.to} className={({ isActive }) => isActive ? 'active' : undefined}>{t(x.key)}</NavLink>)}
+      {self.map(x => <NavLink key={x.to} to={x.to} className={({ isActive }) => isActive ? 'active' : undefined}>{t(x.key)}</NavLink>)}
     </nav>
   );
 }
 
-// Première destination DSI : section staff accessible sinon l'espace self-service.
+// Première destination DSI : section staff accessible, sinon l'espace self-service (dsi.support).
 export function firstDsiTarget(user) {
   for (const x of STAFF_TABS) if (hasSubModuleLevel(user, x.sub)) return x.to;
-  return '/dsi/mon-materiel';
+  if (hasSubModuleLevel(user, 'dsi.support')) return '/dsi/mon-materiel';
+  return null;
 }

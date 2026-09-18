@@ -101,11 +101,13 @@ export default function Layout() {
           {hasModuleAccess(user, 'production') && <NavLink to={productionLinkTarget(user)} className={navClass} onClick={closeNav}><IconWorkflow /> {t('nav.production')}</NavLink>}
           {hasModuleAccess(user, 'commerce') && <NavLink to={firstCommerceTarget(user) || '/commerce/versements'} className={navClass} onClick={closeNav}><IconTag /> {t('nav.commerce')}</NavLink>}
           {hasModuleAccess(user, 'comptabilite') && <NavLink to="/comptabilite/traitement/achats" className={navClass} onClick={closeNav}><IconAccounting /> {t('nav.accounting')}</NavLink>}
-          {/* DSI : visible à tout salarié (espace self-service : mon matériel, signaler un incident) ;
-              les sections de gestion restent gâtées par sous-module dans la sous-nav/les routes. */}
-          <NavLink to="/dsi" className={navClass} onClick={closeNav}><IconDsi /> {t('nav.dsi')}</NavLink>
+          {/* DSI : visible seulement aux comptes ayant un accès DSI (self-service dsi.support ou une
+              section de gestion). L'accès s'attribue dans Admin → Utilisateurs (sous-modules dsi.*). */}
+          {hasModuleAccess(user, 'dsi') && <NavLink to="/dsi" className={navClass} onClick={closeNav}><IconDsi /> {t('nav.dsi')}</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
-          <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>
+          {/* RH : visible seulement aux détenteurs d'un rôle RH (responsable/rh/daf/dg) ou super_admin.
+              L'accès s'attribue dans Admin → Utilisateurs → Rôles. */}
+          {(admin || (user.roles || []).some(r => ['responsable', 'rh', 'daf', 'dg'].includes(r.role_code))) && <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>}
           {hasLiens && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>
