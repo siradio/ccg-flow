@@ -103,6 +103,17 @@ async function deleteAttachment(id) {
   await run('DELETE FROM rh_attachments WHERE id = $1', [id]);
 }
 
+// Clés blob des pièces jointes d'une demande (pour purger le stockage avant suppression).
+async function attachmentKeys(rhRequestId) {
+  return all('SELECT content_key FROM rh_attachments WHERE rh_request_id = $1 AND content_key IS NOT NULL', [rhRequestId]);
+}
+
+// Suppression définitive d'une demande. L'historique et les pièces jointes (FK ON DELETE CASCADE)
+// sont retirés automatiquement ; les blobs associés doivent être purgés en amont (voir service).
+async function remove(id) {
+  await run('DELETE FROM rh_requests WHERE id = $1', [id]);
+}
+
 // Jours fériés dans une plage (pour le calcul des jours ouvrables).
 async function holidaysBetween(from, to) {
   return all('SELECT date FROM rh_jours_feries WHERE date BETWEEN $1 AND $2', [from, to]);
@@ -125,6 +136,6 @@ async function congeImputableTaken(employeeId, baseDate) {
 
 module.exports = {
   create, setNumero, getById, update, listMine, listPending, listAll,
-  logHistory, getHistory, addAttachment, getAttachments, getAttachment, deleteAttachment, holidaysBetween,
-  congeImputableTaken,
+  logHistory, getHistory, addAttachment, getAttachments, getAttachment, deleteAttachment, attachmentKeys, remove,
+  holidaysBetween, congeImputableTaken,
 };

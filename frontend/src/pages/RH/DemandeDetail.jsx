@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import RhSubnav from './RhSubnav';
 import { RhStatusBadge, RH_TYPE_LABELS } from './rhStatus.jsx';
 import { useI18n } from '../../i18n/I18nContext';
@@ -12,6 +13,7 @@ export default function DemandeDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [r, setR] = useState(null);
   const [error, setError] = useState('');
@@ -29,6 +31,12 @@ export default function DemandeDetail() {
     try { await client.post(`/rh/requests/${id}/${path}`, body || {}); setComment(''); await load(); }
     catch (e) { setError(e.response?.data?.error || t('rh.actionError')); }
     finally { setBusy(false); }
+  }
+  async function removeRequest() {
+    if (!(await confirm(t('rh.deleteConfirm'), { danger: true, title: t('rh.delete'), confirmLabel: t('common.delete') }))) return;
+    setBusy(true); setError('');
+    try { await client.delete(`/rh/requests/${id}`); navigate('/rh/toutes'); }
+    catch (e) { setError(e.response?.data?.error || t('rh.actionError')); setBusy(false); }
   }
   async function openAtt(attId) {
     try { const res = await client.get(`/rh/attachments/${attId}`, { responseType: 'blob' }); const url = URL.createObjectURL(res.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
@@ -132,7 +140,7 @@ export default function DemandeDetail() {
         )}
       </section>
 
-      {(canValidate || isOwner) && (
+      {(canValidate || isOwner || r.can_delete) && (
         <section className="card" style={{ maxWidth: 720, marginTop: 14 }}>
           <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('rh.actions')}</h2>
           {(canValidate || (isOwner && ['brouillon', 'en_validation'].includes(r.statut))) && (
@@ -143,7 +151,9 @@ export default function DemandeDetail() {
             {canValidate && <button className="btn btn-primary" disabled={busy} onClick={() => act('validate', { comment })}>{t('rh.validate')}</button>}
             {canValidate && <button className="btn btn-danger" disabled={busy} onClick={() => act('reject', { comment })}>{t('rh.reject')}</button>}
             {isOwner && ['brouillon', 'en_validation'].includes(r.statut) && <button className="btn btn-danger-ghost" disabled={busy} onClick={() => act('cancel', { comment })}>{t('rh.cancel')}</button>}
+            {r.can_delete && <button className="btn btn-danger" disabled={busy} onClick={removeRequest} style={{ marginLeft: 'auto' }}>{t('rh.delete')}</button>}
           </div>
+          {r.can_delete && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '8px 0 0' }}>{t('rh.deleteHint')}</p>}
         </section>
       )}
 
