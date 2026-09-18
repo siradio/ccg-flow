@@ -45,8 +45,15 @@ export default function DemandeDetail() {
   if (!r) return <div><RhSubnav /><p>{t('rh.loading')}</p></div>;
 
   const isOwner = r.created_by === user.id;
-  const canValidate = r.statut === 'en_validation' && r.role_courant
-    && (user.roles || []).some(role => role.role_code === r.role_courant && Number(role.entity_id) === Number(r.entity_id));
+  // Étape « responsable direct » (validateur ciblé) : seul ce compte valide. Étapes par rôle
+  // (rh/daf/dg) : tout détenteur du rôle sur l'entité. Super_admin toujours autorisé (support).
+  const isSuper = (user.roles || []).some(role => role.role_code === 'super_admin');
+  const canValidate = r.statut === 'en_validation' && (
+    isSuper
+    || (r.validateur_user_id
+      ? Number(r.validateur_user_id) === Number(user.id)
+      : (r.role_courant && (user.roles || []).some(role => role.role_code === r.role_courant && Number(role.entity_id) === Number(r.entity_id))))
+  );
   const empName = `${r.employee_prenom || ''} ${r.employee_nom || ''}`.trim();
 
   return (

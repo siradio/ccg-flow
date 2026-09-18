@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import client from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { useSort, SortTh } from '../../components/useSort.jsx';
-import RhSubnav from './RhSubnav';
+import RhSubnav, { canValidateRh, canSeeAllRh } from './RhSubnav';
 import { RhStatusBadge, RH_TYPE_LABELS } from './rhStatus.jsx';
 
 const empName = (r) => `${r.employee_prenom || ''} ${r.employee_nom || ''}`.trim()
@@ -89,5 +90,13 @@ function RhList({ scope, title, showNew }) {
 }
 
 export function MesDemandes() { const { t } = useI18n(); return <RhList scope="mine" title={t('rh.nav.mine')} showNew />; }
-export function AValider() { const { t } = useI18n(); return <RhList scope="pending" title={t('rh.nav.pending')} />; }
-export function ToutesDemandes() { const { t } = useI18n(); return <RhList scope="all" title={t('rh.nav.all')} />; }
+export function AValider() {
+  const { t } = useI18n(); const { user } = useAuth();
+  if (!canValidateRh(user)) return <Navigate to="/rh/mes-demandes" replace />;
+  return <RhList scope="pending" title={t('rh.nav.pending')} />;
+}
+export function ToutesDemandes() {
+  const { t } = useI18n(); const { user } = useAuth();
+  if (!canSeeAllRh(user)) return <Navigate to="/rh/mes-demandes" replace />;
+  return <RhList scope="all" title={t('rh.nav.all')} />;
+}

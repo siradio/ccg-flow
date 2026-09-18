@@ -6,13 +6,15 @@ const BASE_SELECT = `
          emp.matricule AS employee_matricule, emp.prenom AS employee_prenom, emp.nom AS employee_nom,
          emp.poste AS employee_poste, emp.departement AS employee_departement,
          t.libelle AS type_libelle, t.domaine AS type_domaine, t.code AS type_code,
-         u.prenom AS created_by_prenom, u.nom AS created_by_nom
+         u.prenom AS created_by_prenom, u.nom AS created_by_nom,
+         TRIM(CONCAT(vu.prenom, ' ', vu.nom)) AS validateur_nom
   FROM rh_requests r
   JOIN entities e ON e.id = r.entity_id
   LEFT JOIN business_units bu ON bu.id = r.business_unit_id
   LEFT JOIN employees emp ON emp.id = r.employee_id
   LEFT JOIN rh_types t ON t.id = r.type_id
-  LEFT JOIN users u ON u.id = r.created_by`;
+  LEFT JOIN users u ON u.id = r.created_by
+  LEFT JOIN users vu ON vu.id = r.validateur_user_id`;
 
 async function create(row) {
   const r = await one(
@@ -49,14 +51,19 @@ async function listMine(userId) {
 }
 
 // Demandes en attente d'action pour l'utilisateur : en_validation + rôle courant détenu sur l'entité.
-async function listPending(roleEntityPairs) {
-  if (!roleEntityPairs.length) return [];
+// À valider pour un utilisateur : étapes PAR RÔLE (rh/daf/dg… : role_courant détenu sur l'entité,
+// UNIQUEMENT quand aucun validateur précis n'est ciblé), PLUS l'étape RESPONSABLE DIRECT lorsque le
+// validateur ciblé est cet utilisateur. Ainsi un détenteur du rôle « responsable » ne voit jamais
+// la demande d'un collègue dont il n'est pas le supérieur direct.
+async function listPending(roleEntityPairs, userId) {
   const clauses = [];
   const params = [];
   for (const { roleCode, entityId } of roleEntityPairs) {
     params.push(entityId, roleCode);
-    clauses.push(`(r.entity_id = $${params.length - 1} AND r.role_courant = $${params.length})`);
+    clauses.push(`(r.entity_id = $${params.length - 1} AND r.role_courant = $${params.length} AND r.validateur_user_id IS NULL)`);
   }
+  if (userId) { params.push(userId); clauses.push(`(r.validateur_user_id = $${params.length})`); }
+  if (!clauses.length) return [];
   return all(`${BASE_SELECT} WHERE r.statut = 'en_validation' AND (${clauses.join(' OR ')}) ORDER BY r.created_at DESC`, params);
 }
 
