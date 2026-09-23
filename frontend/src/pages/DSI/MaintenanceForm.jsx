@@ -9,6 +9,9 @@ const STATUTS = [['planifiee', 'Planifiée'], ['en_cours', 'En cours'], ['termin
 
 // Formulaire création/édition d'une maintenance. `fixedEquipment` = {id, nom} pré-sélectionné
 // (depuis la fiche d'un équipement) ; sinon on charge la liste des équipements.
+// Défini au niveau module (identité stable) : sinon React remonte les champs à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
+
 export default function MaintenanceForm({ initial, fixedEquipment, onClose, onSubmit }) {
   const { t } = useI18n();
   const isEdit = !!initial?.id;
@@ -39,7 +42,6 @@ export default function MaintenanceForm({ initial, fixedEquipment, onClose, onSu
     setBusy(true); setErr('');
     try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); }
   }
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
 
   return (
     <Modal title={isEdit ? t('dsi.maint.edit') : t('dsi.maint.new')} onClose={onClose} wide>

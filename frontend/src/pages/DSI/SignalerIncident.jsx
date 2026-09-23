@@ -5,6 +5,9 @@ import SearchableSelect from '../../components/SearchableSelect.jsx';
 import DsiSubnav from './DsiSubnav';
 import { useI18n } from '../../i18n/I18nContext';
 
+// Défini au niveau module (identité stable) : sinon React remonte l'<input> à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>{label}{children}</label>);
+
 // Espace salarié — formulaire volontairement simple pour déclarer un incident / une demande IT.
 export default function SignalerIncident() {
   const { t } = useI18n();
@@ -31,8 +34,6 @@ export default function SignalerIncident() {
       nav(`/dsi/mes-tickets/${r.data.id}`);
     } catch (e2) { setError(e2.response?.data?.error || 'Erreur.'); setBusy(false); }
   }
-
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>{label}{children}</label>);
 
   return (
     <div>

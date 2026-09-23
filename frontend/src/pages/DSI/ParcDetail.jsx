@@ -12,6 +12,9 @@ import { useI18n } from '../../i18n/I18nContext';
 
 const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR'));
 
+// Défini au niveau module (identité stable) : sinon React remonte les champs à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
+
 export default function ParcDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -175,7 +178,6 @@ export function AssignForm({ mode, lists, equipments, onClose, onSubmit }) {
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const sites = useMemo(() => (lists.sites || []).filter(s => !f.entity_id || String(s.entity_id) === String(f.entity_id)), [lists.sites, f.entity_id]);
   async function submit(e) { e.preventDefault(); if (busy) return; if (equipments && !f.equipment_id) { setErr('Équipement requis.'); return; } setBusy(true); setErr(''); try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); } }
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
   return (
     <Modal title={mode === 'assign' ? t('dsi.action.assign') : t('dsi.action.transfer')} onClose={onClose}>
       <form onSubmit={submit}>
@@ -214,7 +216,6 @@ function ReturnForm({ onClose, onSubmit }) {
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   async function submit(e) { e.preventDefault(); if (busy) return; setBusy(true); setErr(''); try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); } }
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
   return (
     <Modal title={t('dsi.action.return')} onClose={onClose}>
       <form onSubmit={submit}>

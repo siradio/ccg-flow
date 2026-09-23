@@ -11,6 +11,9 @@ const CRIT = { faible: ['Faible', 'var(--color-hover)', 'var(--color-text-muted)
 function CritBadge({ v }) { const c = CRIT[v] || CRIT.faible; return <span style={{ background: c[1], color: c[2], padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{c[0]}</span>; }
 const R_STATUTS = [['ouvert', 'Ouvert'], ['en_cours', 'En cours'], ['maitrise', 'Maîtrisé'], ['clos', 'Clos']];
 
+// Défini au niveau module (identité stable) : sinon React remonte les champs à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
+
 export default function RisquesList() {
   const { user } = useAuth();
   const { t, lang } = useI18n();
@@ -93,7 +96,6 @@ function RisqueForm({ initial, onClose, onSaved }) {
     client.get('/dsi/projects').then(r => setProjects(r.data.map(p => ({ id: p.id, nom: `${p.code} — ${p.nom}` })))).catch(() => {});
   }, []);
   async function submit(e) { e.preventDefault(); if (busy) return; if (!f.sujet.trim()) { setErr('Sujet requis.'); return; } setBusy(true); setErr(''); try { if (initial?.id) await client.put(`/dsi/risks/${initial.id}`, f); else await client.post('/dsi/risks', f); onSaved(); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); } }
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
   const scale = [1, 2, 3, 4];
   return (
     <Modal title={initial?.id ? t('dsi.risk.edit') : t('dsi.risk.new')} onClose={onClose} wide>
