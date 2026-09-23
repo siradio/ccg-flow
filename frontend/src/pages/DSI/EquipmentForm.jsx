@@ -7,6 +7,9 @@ const DATE = (v) => (v ? String(v).slice(0, 10) : '');
 
 // Formulaire création/édition d'un équipement (modale). `lists` = {categories, types, brands,
 // entities, sites, suppliers}. onSubmit(payload) doit renvoyer une promesse.
+// Défini au niveau module (identité stable) : sinon React remonte les champs à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
+
 export default function EquipmentForm({ initial, lists, onClose, onSubmit }) {
   const isEdit = !!initial?.id;
   const [f, setF] = useState({
@@ -36,9 +39,6 @@ export default function EquipmentForm({ initial, lists, onClose, onSubmit }) {
     try { await onSubmit(f); } catch (e2) { setErr(e2.response?.data?.error || 'Erreur lors de l’enregistrement.'); setBusy(false); }
   }
 
-  const Field = ({ label, children }) => (
-    <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>
-  );
 
   return (
     <Modal title={isEdit ? 'Modifier l’équipement' : 'Nouvel équipement'} onClose={onClose} wide>

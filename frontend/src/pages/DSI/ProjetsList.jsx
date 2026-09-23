@@ -12,6 +12,9 @@ const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('
 export const PROJ_STATUTS = [['planifie', 'Planifié'], ['en_cours', 'En cours'], ['en_attente', 'En attente'], ['termine', 'Terminé'], ['annule', 'Annulé']];
 const statutLabel = (v) => (PROJ_STATUTS.find(s => s[0] === v)?.[1] || v);
 
+// Défini au niveau module (identité stable) : sinon React remonte les champs à chaque frappe → perte du focus.
+const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
+
 export default function ProjetsList() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -144,7 +147,6 @@ export function ProjetForm({ initial, onClose, onSaved }) {
     try { if (initial?.id) await client.put(`/dsi/projects/${initial.id}`, f); else await client.post('/dsi/projects', f); onSaved(); }
     catch (e2) { setErr(e2.response?.data?.error || 'Erreur.'); setBusy(false); }
   }
-  const Field = ({ label, children }) => (<label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--color-text-muted)' }}>{label}{children}</label>);
   return (
     <Modal title={initial?.id ? t('dsi.proj.edit') : t('dsi.proj.new')} onClose={onClose} wide>
       <form onSubmit={submit}>
