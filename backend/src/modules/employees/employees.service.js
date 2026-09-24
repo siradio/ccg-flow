@@ -89,4 +89,75 @@ async function setLinkedUser(employeeId, userId) {
   if (uid) await run('UPDATE users SET employee_id = $1 WHERE id = $2', [employeeId, uid]);
 }
 
-module.exports = { list, getById, create, update, remove, listLinkableUsers, setLinkedUser };
+// Rattachement automatique des comptes aux fiches employé, par correspondance d'identité :
+// priorité à l'e-mail (le plus fiable), repli sur « prénom + nom » (accents/casse ignorés).
+// On ne relie QUE les correspondances UNIQUES ; les homonymes et les comptes revendiqués par
+// plusieurs fiches sont signalés comme « ambigus » pour traitement manuel. `apply=false` = aperçu.
+// Cœur de l'appariement (fonction PURE, testable sans base) : pour chaque employé, propose l'unique
+// compte correspondant (e-mail prioritaire, repli nom+prénom). Ne modifie rien ; retourne les listes.
+function computeAutoLinks(employees, users) {
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const byEmail = new Map();
+  const byName = new Map();
+  for (const u of users) {
+    if (u.email) { const k = norm(u.email); (byEmail.get(k) || byEmail.set(k, []).get(k)).push(u); }
+    const nk = norm(`${u.prenom} ${u.nom}`); (byName.get(nk) || byName.set(nk, []).get(nk)).push(u);
+  }
+  const uname = (u) => `${u.prenom} ${u.nom} (${u.email || '—'})`;
+  const ename = (e) => `${e.prenom} ${e.nom}${e.matricule ? ` (${e.matricule})` : ''}`;
+
+  const proposals = [];
+  const ambiguous = [];
+  const noMatch = [];
+  const alreadyOk = [];
+
+  for (const e of employees) {
+    let cands = [];
+    let via = null;
+    if (e.email && byEmail.has(norm(e.email))) { cands = byEmail.get(norm(e.email)); via = 'email'; }
+    if (cands.length === 0) { const nk = norm(`${e.prenom} ${e.nom}`); if (byName.has(nk)) { cands = byName.get(nk); via = 'nom'; } }
+    if (cands.length === 0) { noMatch.push({ employee_id: e.id, employee: ename(e), email: e.email || null }); continue; }
+    if (cands.length > 1) { ambiguous.push({ employee_id: e.id, employee: ename(e), via, candidates: cands.map(uname) }); continue; }
+    const cand = cands[0];
+    if (Number(e.linked_user_id) === Number(cand.id)) { alreadyOk.push({ employee_id: e.id, employee: ename(e), user: uname(cand) }); continue; }
+    proposals.push({ e, cand, via });
+  }
+
+  // Conflit : un même compte proposé pour plusieurs fiches → ambigu (aucune décision automatique).
+  const count = new Map();
+  for (const p of proposals) count.set(p.cand.id, (count.get(p.cand.id) || 0) + 1);
+  const linked = [];
+  const toApply = []; // {employeeId, userId} à exécuter si apply
+  for (const p of proposals) {
+    if (count.get(p.cand.id) > 1) {
+      ambiguous.push({ employee_id: p.e.id, employee: ename(p.e), via: p.via, candidates: [`${uname(p.cand)} — proposé pour plusieurs fiches`] });
+      continue;
+    }
+    linked.push({ employee_id: p.e.id, employee: ename(p.e), user: uname(p.cand), via: p.via, was: p.e.linked_user_nom || null });
+    toApply.push({ employeeId: p.e.id, userId: p.cand.id });
+  }
+
+  return {
+    counts: { total: employees.length, aLier: linked.length, dejaOk: alreadyOk.length, ambigus: ambiguous.length, sansMatch: noMatch.length },
+    linked, alreadyOk, ambiguous, noMatch, toApply,
+  };
+}
+
+// Charge les données, calcule l'appariement et (si apply) l'exécute via setLinkedUser.
+async function autoLinkUsersByIdentity({ apply = false } = {}) {
+  const employees = await all(
+    `SELECT e.id, e.matricule, e.prenom, e.nom, e.email,
+            lu.id AS linked_user_id, TRIM(CONCAT(lu.prenom, ' ', lu.nom)) AS linked_user_nom
+     FROM employees e LEFT JOIN users lu ON lu.employee_id = e.id
+     ORDER BY e.nom, e.prenom`
+  );
+  const users = await all('SELECT id, prenom, nom, email, employee_id FROM users WHERE actif = true');
+  const result = computeAutoLinks(employees, users);
+  if (apply) {
+    for (const { employeeId, userId } of result.toApply) await setLinkedUser(employeeId, userId);
+  }
+  const { toApply, ...rest } = result;
+  return { applied: !!apply, ...rest };
+}
+
+module.exports = { list, getById, create, update, remove, listLinkableUsers, setLinkedUser, autoLinkUsersByIdentity, computeAutoLinks };
