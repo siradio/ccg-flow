@@ -217,6 +217,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
                 placeholder={t('emp.linkedUserSearchPlaceholder')}
                 noneLabel={t('emp.linkedUserNone')}
               />
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{t('emp.linkedUserHelp')}</span>
             </label>
             <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
