@@ -32,7 +32,8 @@ function nextRole(chain, current) {
   return (i >= 0 && i < chain.length - 1) ? chain[i + 1] : null;
 }
 
-// Nombre de jours ouvrables entre deux dates incluses (hors week-end + jours fériés paramétrés).
+// Nombre de jours ouvrables entre deux dates incluses. Semaine de travail lundi→samedi :
+// seuls les dimanches et les jours fériés paramétrés sont exclus.
 async function workingDays(from, to) {
   if (!from || !to) return null;
   const start = new Date(from + 'T00:00:00Z');
@@ -43,7 +44,7 @@ async function workingDays(from, to) {
   for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const day = d.getUTCDay(); // 0 dimanche, 6 samedi
     const iso = d.toISOString().slice(0, 10);
-    if (day !== 0 && day !== 6 && !feries.has(iso)) count++;
+    if (day !== 0 && !feries.has(iso)) count++; // samedi compté, dimanche exclu
   }
   return count;
 }
