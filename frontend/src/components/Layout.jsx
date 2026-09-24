@@ -8,6 +8,7 @@ import InstallPWA from './InstallPWA';
 import LanguageSwitcher from './LanguageSwitcher';
 import IdleTimeout from './IdleTimeout';
 import { useI18n } from '../i18n/I18nContext';
+import { hasRhSelfService } from './RequireRh';
 import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
@@ -105,9 +106,9 @@ export default function Layout() {
               section de gestion). L'accès s'attribue dans Admin → Utilisateurs (sous-modules dsi.*). */}
           {hasModuleAccess(user, 'dsi') && <NavLink to="/dsi" className={navClass} onClick={closeNav}><IconDsi /> {t('nav.dsi')}</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
-          {/* RH : visible seulement aux détenteurs d'un rôle RH (responsable/rh/daf/dg) ou super_admin.
-              L'accès s'attribue dans Admin → Utilisateurs → Rôles. */}
-          {(admin || (user.roles || []).some(r => ['responsable', 'rh', 'daf', 'dg'].includes(r.role_code))) && <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>}
+          {/* RH : self-service ouvert à tout salarié (compte relié à une fiche employé) pour faire SES
+              demandes ; les onglets de validation restent réservés aux rôles RH (gardés dans les pages). */}
+          {hasRhSelfService(user) && <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>}
           {hasLiens && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>

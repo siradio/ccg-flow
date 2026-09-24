@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import client from '../../api/client';
-import RhSubnav from './RhSubnav';
+import RhSubnav, { canValidateRh } from './RhSubnav';
+import { useAuth } from '../../auth/AuthContext';
 import { RH_TYPE_LABELS } from './rhStatus.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -38,7 +39,14 @@ function Repartition({ title, rows, labelKey }) {
   );
 }
 
+// Tableau de bord réservé aux valideurs RH ; un simple demandeur est redirigé vers ses demandes.
 export default function RhDashboard() {
+  const { user } = useAuth();
+  if (!canValidateRh(user)) return <Navigate to="/rh/mes-demandes" replace />;
+  return <RhDashboardInner />;
+}
+
+function RhDashboardInner() {
   const { t, lang } = useI18n();
   const [d, setD] = useState(null);
   const [error, setError] = useState('');
