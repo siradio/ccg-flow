@@ -217,6 +217,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
                 placeholder={t('emp.linkedUserSearchPlaceholder')}
                 noneLabel={t('emp.linkedUserNone')}
               />
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{t('emp.linkedUserHelp')}</span>
             </label>
             <label className="field">{t('emp.hireDate')}
               <input type="date" value={form.date_embauche} onChange={e => set('date_embauche', e.target.value)} />
@@ -269,9 +270,11 @@ export default function FormPage({ employeeId, onDone } = {}) {
             </label>
             <label className="field">{t('emp.congeSoldeInitial')}
               <input type="number" step="0.5" min="0" value={form.conge_solde_initial} onChange={e => set('conge_solde_initial', e.target.value)} placeholder="0" />
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{t('emp.congeSoldeInitialHint')}</span>
             </label>
             <label className="field">{t('emp.congeSoldeDate')}
               <input type="date" value={form.conge_solde_date} onChange={e => set('conge_solde_date', e.target.value)} />
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{t('emp.congeSoldeDateHint')}</span>
             </label>
             <label className="field" style={{ alignSelf: 'end' }}>
               <span><input type="checkbox" checked={form.permis_travail} onChange={e => set('permis_travail', e.target.checked)} /> {t('emp.workPermit')}</span>
