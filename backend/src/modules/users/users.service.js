@@ -13,7 +13,7 @@ const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 async function loadUserWithRoles(userId) {
   const user = await one(
-    'SELECT id, nom, prenom, email, actif, access_status, telephone, fonction, employee_id, created_at FROM users WHERE id = $1',
+    'SELECT id, nom, prenom, email, actif, access_status, telephone, fonction, employee_id, session_id, created_at FROM users WHERE id = $1',
     [userId]
   );
   if (!user) return null;
@@ -130,6 +130,12 @@ async function applyAccessBundle(userId, bundle) {
 // Journalise une connexion réussie (statistiques d'utilisation, voir module stats).
 async function recordLogin(userId) {
   await run('INSERT INTO login_events (user_id) VALUES ($1)', [userId]);
+}
+
+// Session unique : enregistre l'identifiant de session courant de l'utilisateur (« dernière
+// connexion gagne »). Tout jeton portant une autre session_id sera refusé par le middleware.
+async function setSessionId(userId, sessionId) {
+  await run('UPDATE users SET session_id = $1 WHERE id = $2', [sessionId, userId]);
 }
 
 async function findByEmail(email) {
@@ -267,5 +273,5 @@ module.exports = {
   loadUserWithRoles, findByEmail, findById, createUser, createPendingUser, setAccessStatus, updateUser,
   addRole, addRoleAllEntities, removeRole, getRoleById, listUsers,
   setSubModuleAccess, revokeSubModuleAccess, grantBusinessUnit, grantAllBusinessUnits, revokeBusinessUnit,
-  getUserAccessBundle, applyAccessBundle, recordLogin,
+  getUserAccessBundle, applyAccessBundle, recordLogin, setSessionId,
 };

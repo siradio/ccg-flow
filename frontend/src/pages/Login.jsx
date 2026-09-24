@@ -41,6 +41,16 @@ export default function Login() {
   // Habillage événementiel de la page (configuré par le super_admin). null = fond par défaut.
   const [bg, setBg] = useState(null);
 
+  // Message éventuel de fin de session (ex. compte utilisé sur un autre appareil), posé par le
+  // client HTTP avant redirection ici. Lu une seule fois puis effacé.
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    try {
+      const n = localStorage.getItem('session_notice');
+      if (n) { setNotice(n); localStorage.removeItem('session_notice'); }
+    } catch { /* stockage indispo */ }
+  }, []);
+
   useEffect(() => {
     client.get('/public/login-background').then(res => setBg(res.data.active)).catch(() => {});
   }, []);
@@ -176,6 +186,7 @@ export default function Login() {
 
         {mode === 'login' && (
           <>
+            {notice && <div className="alert alert-warning" style={{ marginBottom: 12 }}>{notice}</div>}
             <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
               <label className="field">
                 {t('login.email')}
