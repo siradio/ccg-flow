@@ -31,6 +31,28 @@ export default function ListPage() {
     if (saved) { setReloadTick(t => t + 1); showToast(t('ref.saved')); }
   }
 
+  // Rattachement automatique des comptes (aperçu puis application).
+  const [linkPreview, setLinkPreview] = useState(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  async function previewLinks() {
+    setLinkBusy(true);
+    try {
+      const { data } = await client.post('/employees/auto-link-users', { apply: false });
+      setLinkPreview(data);
+    } catch (err) { showToast(err.response?.data?.error || t('emp.autolink.failed')); }
+    finally { setLinkBusy(false); }
+  }
+  async function applyLinks() {
+    setLinkBusy(true);
+    try {
+      const { data } = await client.post('/employees/auto-link-users', { apply: true });
+      setLinkPreview(null);
+      setReloadTick(v => v + 1);
+      showToast(t('emp.autolink.done', { n: data.counts.aLier }));
+    } catch (err) { showToast(err.response?.data?.error || t('emp.autolink.failed')); }
+    finally { setLinkBusy(false); }
+  }
+
   useEffect(() => {
     client.get('/entities').then(res => setEntities(res.data));
     client.get('/business-units').then(res => setBusinessUnits(res.data));
@@ -89,8 +111,54 @@ export default function ListPage() {
           <h1 className="page-title">{t('refx.nav.employees')}</h1>
           <p className="page-subtitle">{t('emp.count', { n: employees.length })}{loading ? '…' : ''}</p>
         </div>
-        {canWrite && <button type="button" className="btn btn-primary" onClick={() => setFormFor(null)}>{t('emp.newEmployee')}</button>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canManageAlert && <button type="button" className="btn btn-secondary" onClick={previewLinks} disabled={linkBusy}>{linkBusy && !linkPreview ? '…' : t('emp.autolink.btn')}</button>}
+          {canWrite && <button type="button" className="btn btn-primary" onClick={() => setFormFor(null)}>{t('emp.newEmployee')}</button>}
+        </div>
       </div>
+
+      {linkPreview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 3000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24, overflow: 'auto' }} onClick={() => !linkBusy && setLinkPreview(null)}>
+          <div className="card" style={{ maxWidth: 720, width: '100%', marginTop: 24 }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0, fontSize: 16 }}>{t('emp.autolink.title')}</h2>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('emp.autolink.intro')}</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+              <span className="badge">{t('emp.autolink.toLink', { n: linkPreview.counts.aLier })}</span>
+              <span className="badge">{t('emp.autolink.ok', { n: linkPreview.counts.dejaOk })}</span>
+              <span className="badge">{t('emp.autolink.ambiguous', { n: linkPreview.counts.ambigus })}</span>
+              <span className="badge">{t('emp.autolink.nomatch', { n: linkPreview.counts.sansMatch })}</span>
+            </div>
+            {linkPreview.linked.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <strong style={{ fontSize: 13 }}>{t('emp.autolink.toLinkList')}</strong>
+                <ul style={{ fontSize: 13, margin: '4px 0 0', paddingLeft: 18, maxHeight: 180, overflow: 'auto' }}>
+                  {linkPreview.linked.map((r, i) => <li key={i}>{r.employee} → <b>{r.user}</b> <span style={{ color: 'var(--color-text-muted)' }}>[{r.via}{r.was ? `, remplace ${r.was}` : ''}]</span></li>)}
+                </ul>
+              </div>
+            )}
+            {linkPreview.ambiguous.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <strong style={{ fontSize: 13 }}>{t('emp.autolink.ambiguousList')}</strong>
+                <ul style={{ fontSize: 13, margin: '4px 0 0', paddingLeft: 18, maxHeight: 140, overflow: 'auto' }}>
+                  {linkPreview.ambiguous.map((r, i) => <li key={i}>{r.employee} : {r.candidates.join(' · ')}</li>)}
+                </ul>
+              </div>
+            )}
+            {linkPreview.noMatch.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <strong style={{ fontSize: 13 }}>{t('emp.autolink.nomatchList')}</strong>
+                <ul style={{ fontSize: 13, margin: '4px 0 0', paddingLeft: 18, maxHeight: 120, overflow: 'auto' }}>
+                  {linkPreview.noMatch.map((r, i) => <li key={i}>{r.employee}{r.email ? ` — ${r.email}` : ''}</li>)}
+                </ul>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="btn btn-primary" onClick={applyLinks} disabled={linkBusy || linkPreview.counts.aLier === 0}>{linkBusy ? '…' : t('emp.autolink.apply', { n: linkPreview.counts.aLier })}</button>
+              <button className="btn btn-secondary" onClick={() => setLinkPreview(null)} disabled={linkBusy}>{t('common.cancel')}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <input

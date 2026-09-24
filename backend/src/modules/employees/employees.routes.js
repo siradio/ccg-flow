@@ -61,6 +61,15 @@ router.get('/linkable-users', requireAuth, async (req, res, next) => {
   try { res.json(await service.listLinkableUsers()); } catch (e) { next(e); }
 });
 
+// Rattachement automatique des comptes aux fiches par e-mail (repli nom+prénom). `apply` absent/false
+// = aperçu (ne modifie rien) ; apply=true applique les correspondances uniques. Niveau édition RH.
+router.post('/auto-link-users', requireEdit, async (req, res, next) => {
+  try {
+    const apply = (req.body && (req.body.apply === true || req.body.apply === 'true')) || false;
+    res.json(await service.autoLinkUsersByIdentity({ apply }));
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const employee = await service.getById(Number(req.params.id));
