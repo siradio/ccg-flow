@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const env = require('../../config/env');
@@ -24,13 +25,18 @@ router.post('/login', async (req, res, next) => {
     if (user.access_status === 'rejected') {
       return res.status(403).json({ error: "Votre demande d'accès a été refusée. Contactez un administrateur." });
     }
+    // Session unique (« dernière connexion gagne ») : on génère une nouvelle session_id, on la
+    // stocke, et on l'embarque dans le JWT. Toute session précédente (autre session_id) devient
+    // invalide → l'ancien appareil est déconnecté à sa prochaine requête (middleware/auth.js).
+    const sid = crypto.randomUUID();
+    await usersService.setSessionId(user.id, sid);
     const full = await usersService.loadUserWithRoles(user.id);
     // Journalise la connexion pour les statistiques d'utilisation. Best-effort : une panne du
     // journal ne doit jamais empêcher un utilisateur de se connecter.
     usersService.recordLogin(full.id).catch(() => {});
-    // Le token ne porte que l'identité : rôles/modules/BU sont relus en base à chaque requête
-    // (voir middleware/auth.js), pour qu'un changement de droits prenne effet immédiatement.
-    const token = jwt.sign({ id: full.id }, env.jwtSecret, { expiresIn: '8h' });
+    // Le token ne porte que l'identité + la session : rôles/modules/BU sont relus en base à chaque
+    // requête (voir middleware/auth.js), pour qu'un changement de droits prenne effet immédiatement.
+    const token = jwt.sign({ id: full.id, sid }, env.jwtSecret, { expiresIn: '8h' });
     res.json({ token, user: full });
   } catch (e) { next(e); }
 });

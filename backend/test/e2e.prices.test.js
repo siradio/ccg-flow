@@ -123,7 +123,6 @@ test("niveau 'edition' : peut corriger et supprimer une ligne d'historique", asy
 });
 
 test("l'ajout de prix ne fait jamais d'upsert : deux ajouts le même jour créent deux lignes distinctes", async () => {
-  const adminToken = await login('admin@test');
   const token = await login('admin@test'); // super_admin = toujours niveau edition
 
   const first = await request(app).post('/api/prices')
@@ -138,7 +137,7 @@ test("l'ajout de prix ne fait jamais d'upsert : deux ajouts le même jour créen
   assert.notEqual(second.body.id, first.body.id, 'contrairement au stock, un second ajout le même jour doit créer une NOUVELLE ligne');
 
   const historyRes = await request(app).get('/api/prices/history')
-    .set('Authorization', auth(adminToken))
+    .set('Authorization', auth(token))
     .query({ product_id: seeded.stockProductId, date_from: '2026-02-01', date_to: '2026-02-01' });
   assert.equal(historyRes.body.length, 2, 'les deux lignes doivent coexister (journal, pas un relevé)');
 });

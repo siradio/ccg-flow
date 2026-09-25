@@ -15,6 +15,12 @@ async function requireAuth(req, res, next) {
     if (!full || !full.actif) {
       return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });
     }
+    // Session unique (« dernière connexion gagne ») : si une session_id est enregistrée pour ce
+    // compte et que le jeton en porte une différente (ou aucune), c'est qu'une connexion plus
+    // récente l'a invalidé sur un autre appareil. On refuse avec un code exploité côté client.
+    if (full.session_id && payload.sid !== full.session_id) {
+      return res.status(401).json({ error: 'Votre compte a été utilisé sur un autre appareil. Vous avez été déconnecté.', code: 'session_replaced' });
+    }
     req.user = {
       id: full.id,
       nom: full.nom,
