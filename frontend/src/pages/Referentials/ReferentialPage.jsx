@@ -7,6 +7,7 @@ import Modal from '../../components/Modal.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import Pagination from '../../components/Pagination.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import { exportReferential, downloadTemplate, ReferentialImportModal } from './referentialIO.jsx';
 
 const PAGE_SIZE = 20;
 import { normalizeForm, normalizeFieldValue } from '../../utils/casing.js';
@@ -31,6 +32,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [formOpen, setFormOpen] = useState(false); // la saisie se fait dans une modale (ajout/édition)
+  const [importOpen, setImportOpen] = useState(false); // modale d'import Excel
   const [toast, setToast] = useState(null);         // confirmation flottante (ajout/modif)
   const [search, setSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
@@ -165,10 +167,26 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
       <div className="page-header">
         <h1 className="page-title">{title}</h1>
-        {canAdd && (
-          <button type="button" className="btn btn-primary" onClick={openAdd}>{t('common.add')}</button>
-        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={items.length === 0}
+            onClick={() => exportReferential(title, items, fields, { entities, sites, lists }, t)}>{t('ref.io.exportBtn')}</button>
+          {canAdd && (
+            <button type="button" className="btn btn-secondary btn-sm"
+              onClick={() => downloadTemplate(title, fields, { entities, sites, lists }, t)}>{t('ref.io.templateBtn')}</button>
+          )}
+          {canAdd && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setImportOpen(true)}>{t('ref.io.importBtn')}</button>
+          )}
+          {canAdd && (
+            <button type="button" className="btn btn-primary" onClick={openAdd}>{t('common.add')}</button>
+          )}
+        </div>
       </div>
+
+      {importOpen && (
+        <ReferentialImportModal endpoint={endpoint} fields={fields} ctx={{ entities, sites, lists }}
+          title={title} onClose={() => setImportOpen(false)} onDone={load} />
+      )}
 
       {items.length > 0 && (
         <div className="form-inline" style={{ marginBottom: 16 }}>
