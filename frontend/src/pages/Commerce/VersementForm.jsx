@@ -64,11 +64,14 @@ export default function VersementForm() {
   const canAdd = hasSubModuleLevel(user, 'commerce.versements', 'ajout');
 
   function buildLines() {
-    return methods.filter(m => Number(amounts[m.id]) > 0).map(m => ({
-      payment_method_id: m.id,
-      amount: Number(amounts[m.id]),
-      ...(m.code === 'banque' ? (bankRows[m.id] || {}) : {}),
-    }));
+    return methods.filter(m => Number(amounts[m.id]) > 0).map(m => {
+      const extra = bankRows[m.id] || {};
+      const line = { payment_method_id: m.id, amount: Number(amounts[m.id]) };
+      if (m.code === 'banque') Object.assign(line, extra);
+      // Tout moyen exigeant une référence (ex. Caisse) transmet sa référence saisie par ligne.
+      else if (m.requiert_reference) line.transaction_reference = extra.transaction_reference || '';
+      return line;
+    });
   }
 
   async function save(soumettre) {
@@ -163,6 +166,14 @@ export default function VersementForm() {
                     <input type="date" value={(bankRows[m.id]?.transaction_date) || ''} onChange={e => setBankRows(br => ({ ...br, [m.id]: { ...br[m.id], transaction_date: e.target.value } }))} />
                   </label>
                 </div>
+              )}
+              {/* Moyen (autre que banque) exigeant une référence : champ dédié, sinon l'enregistrement
+                  échouait avec « Référence obligatoire pour le moyen … » sans champ pour la saisir. */}
+              {m.code !== 'banque' && m.requiert_reference && Number(amounts[m.id]) > 0 && (
+                <label className="field" style={{ flex: '1 1 220px' }}>{t('com.ver.reference')} *
+                  <input value={(bankRows[m.id]?.transaction_reference) || ''} placeholder={t('com.ver.referencePlaceholder')}
+                    onChange={e => setBankRows(br => ({ ...br, [m.id]: { ...br[m.id], transaction_reference: e.target.value } }))} />
+                </label>
               )}
             </div>
           ))}

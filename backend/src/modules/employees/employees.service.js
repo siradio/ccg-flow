@@ -46,6 +46,8 @@ const WRITABLE_FIELDS = [
   'manager_employee_id',
   // Solde de congés (module RH, Lot 2) : amorçage du droit à congés
   'conge_solde_initial', 'conge_solde_date',
+  // Code commercial (si l'employé est un commercial) — alimente le référentiel Commerce.
+  'code_commercial',
 ];
 
 async function create(body) {
