@@ -45,7 +45,7 @@ export default function TicketsList() {
   async function testNotif() {
     setNotifMsg(t('dsi.notif.sending'));
     try {
-      const { data } = await client.post('/dsi/settings/incident-notify/test');
+      const { data } = await client.post('/dsi/settings/incident-notify/test', { emails: notif.emails });
       setNotifMsg(t('dsi.notif.sent', { to: data.to.join(', ') }));
     } catch (e) { setNotifMsg(e.response?.data?.error || t('dsi.notif.sendError')); }
   }
