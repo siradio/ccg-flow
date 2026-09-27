@@ -86,6 +86,7 @@ app.use('/api/dsi/risks', require('./modules/dsi/dsi.risks.routes'));
 app.use('/api/dsi/dashboard', require('./modules/dsi/dsi.dashboard.routes'));
 app.use('/api/dsi/reports', require('./modules/dsi/dsi.reports.routes'));
 app.use('/api/dsi/my', require('./modules/dsi/dsi.self.routes'));
+app.use('/api/dsi/settings', require('./modules/dsi/dsi.settings.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
