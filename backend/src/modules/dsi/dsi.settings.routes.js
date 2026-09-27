@@ -1,7 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule } = require('../../middleware/permissions');
-const { sendMail, renderMailTemplate } = require('../../utils/mailer');
+const { sendTestMail } = require('../../utils/mailer');
 const notify = require('./dsi.notify');
 
 // Paramètres DSI. Notification e-mail à la réception d'un ticket : liste de destinataires
@@ -23,17 +23,18 @@ router.put('/incident-notify', canEdit, async (req, res, next) => {
 });
 
 // Envoi d'un e-mail de test aux destinataires configurés (à défaut, à l'utilisateur connecté).
+// On utilise sendTestMail (hors coupe-circuit) et on remonte l'ERREUR RÉELLE d'envoi (SMTP/Graph)
+// pour permettre le diagnostic, au lieu d'un « Erreur serveur » générique.
 router.post('/incident-notify/test', canEdit, async (req, res, next) => {
   try {
     const { emails } = await notify.getConfig();
     const to = emails.length ? emails : [req.user.email].filter(Boolean);
     if (!to.length) return res.status(400).json({ error: 'Aucun destinataire (renseignez des e-mails ou ayez une adresse sur votre compte).' });
-    await sendMail({
-      to: to.join(','),
-      subject: 'CCG Flow — Test de notification incident',
-      html: renderMailTemplate({ title: 'Test de notification', bodyHtml: '<p>Ceci est un e-mail de test de la notification des tickets DSI. Si vous le recevez, la configuration est opérationnelle.</p>' }),
-      text: 'Test de notification des tickets DSI. Configuration opérationnelle.',
-    });
+    try {
+      await sendTestMail({ to: to.join(',') });
+    } catch (mailErr) {
+      return res.status(502).json({ error: `Échec de l'envoi : ${mailErr.message}` });
+    }
     res.json({ ok: true, to });
   } catch (e) { next(e); }
 });
