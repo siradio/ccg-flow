@@ -6,6 +6,37 @@ import ReferentialsSubnav from '../Referentials/ReferentialsSubnav';
 import EmployeeFormModal from './FormPage.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import { exportReferential, downloadTemplate, ReferentialImportModal } from '../Referentials/referentialIO.jsx';
+
+// Colonnes gérées à l'import/export/modèle Excel des employés (libellés en français, comme les
+// autres documents générés). Les FK (entité/site/BU) sont résolues par nom ; select = valeurs figées.
+const EMP_IO_FIELDS = [
+  { key: 'matricule', label: 'Matricule' },
+  { key: 'code_commercial', label: 'Code commercial' },
+  { key: 'prenom', label: 'Prénom', required: true },
+  { key: 'nom', label: 'Nom', required: true },
+  { key: 'poste', label: 'Poste' },
+  { key: 'departement', label: 'Département' },
+  { key: 'entity_id', label: 'Entité', type: 'entitySelect', required: true },
+  { key: 'site_id', label: 'Site', type: 'siteSelect' },
+  { key: 'business_unit_id', label: 'Business Unit', type: 'fkSelect', listKey: 'businessUnits' },
+  { key: 'type_contrat', label: 'Type de contrat', type: 'select', options: ['CDI', 'CDD', 'Stage'] },
+  { key: 'statut', label: 'Statut', type: 'select', options: ['actif', 'inactif', 'sorti'],
+    optionLabels: { actif: 'Actif', inactif: 'Inactif', sorti: 'Sorti' }, default: 'actif' },
+  { key: 'date_embauche', label: "Date d'embauche", type: 'date' },
+  { key: 'salaire_mensuel', label: 'Salaire mensuel (GNF)', type: 'number' },
+  { key: 'telephone', label: 'Téléphone' },
+  { key: 'email', label: 'Email' },
+  { key: 'adresse', label: 'Adresse' },
+  { key: 'date_naissance', label: 'Date de naissance', type: 'date' },
+  { key: 'nationalite', label: 'Nationalité' },
+  { key: 'numero_cnss', label: 'Numéro CNSS' },
+  { key: 'situation_familiale', label: 'Situation familiale' },
+  { key: 'contact_urgence_nom', label: "Contact d'urgence (nom)" },
+  { key: 'contact_urgence_tel', label: "Contact d'urgence (tél.)" },
+  { key: 'conge_solde_initial', label: 'Solde congés initial (j)', type: 'number' },
+  { key: 'conge_solde_date', label: 'Solde congés à la date du', type: 'date' },
+];
 
 export default function ListPage() {
   const { t } = useI18n();
@@ -16,7 +47,9 @@ export default function ListPage() {
   const { sort, by, apply } = useSort();
   const [employees, setEmployees] = useState([]);
   const [entities, setEntities] = useState([]);
+  const [sites, setSites] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
+  const [importOpen, setImportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [alertCfg, setAlertCfg] = useState({ actif: false, jours: '30', emails: '' });
   const [alertMsg, setAlertMsg] = useState('');
@@ -55,6 +88,7 @@ export default function ListPage() {
 
   useEffect(() => {
     client.get('/entities').then(res => setEntities(res.data));
+    client.get('/sites').then(res => setSites(res.data)).catch(() => {});
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     if (canManageAlert) {
       client.get('/employees/permis-alert/config').then(r => setAlertCfg({
@@ -112,10 +146,20 @@ export default function ListPage() {
           <p className="page-subtitle">{t('emp.count', { n: employees.length })}{loading ? '…' : ''}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={employees.length === 0}
+            onClick={() => exportReferential(t('refx.nav.employees'), employees, EMP_IO_FIELDS, { entities, sites, lists: { businessUnits } }, t)}>{t('ref.io.exportBtn')}</button>
+          {canWrite && <button type="button" className="btn btn-secondary btn-sm"
+            onClick={() => downloadTemplate(t('refx.nav.employees'), EMP_IO_FIELDS, { entities, sites, lists: { businessUnits } }, t)}>{t('ref.io.templateBtn')}</button>}
+          {canWrite && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setImportOpen(true)}>{t('ref.io.importBtn')}</button>}
           {canManageAlert && <button type="button" className="btn btn-secondary" onClick={previewLinks} disabled={linkBusy}>{linkBusy && !linkPreview ? '…' : t('emp.autolink.btn')}</button>}
           {canWrite && <button type="button" className="btn btn-primary" onClick={() => setFormFor(null)}>{t('emp.newEmployee')}</button>}
         </div>
       </div>
+
+      {importOpen && (
+        <ReferentialImportModal endpoint="/employees" fields={EMP_IO_FIELDS} ctx={{ entities, sites, lists: { businessUnits } }}
+          title={t('refx.nav.employees')} onClose={() => setImportOpen(false)} onDone={() => setReloadTick(v => v + 1)} />
+      )}
 
       {linkPreview && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 3000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24, overflow: 'auto' }} onClick={() => !linkBusy && setLinkPreview(null)}>

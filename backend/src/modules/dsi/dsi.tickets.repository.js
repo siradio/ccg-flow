@@ -25,6 +25,7 @@ function buildWhere(f) {
   const params = [];
   const P = (v) => { params.push(v); return `$${params.length}`; };
   if (f.statut) where.push(`t.statut = ${P(f.statut)}`);
+  if (f.nature) where.push(`t.nature = ${P(f.nature)}`);
   if (f.open) where.push(`t.statut NOT IN ('resolu','cloture','annule')`);
   if (f.priorityId) where.push(`t.priority_id = ${P(Number(f.priorityId))}`);
   if (f.categoryId) where.push(`t.category_id = ${P(Number(f.categoryId))}`);
@@ -61,7 +62,8 @@ async function events(ticketId, visibleOnly = false) {
 }
 
 async function stats(f) {
-  const { sql, params } = buildWhere({ ...f, statut: null, open: false, q: null });
+  // La répartition incidents/demandes est toujours calculée en entier (on ignore un filtre nature actif).
+  const { sql, params } = buildWhere({ ...f, statut: null, open: false, q: null, nature: null });
   return one(
     `SELECT COUNT(*)::int AS total,
        COUNT(*) FILTER (WHERE t.statut NOT IN ('resolu','cloture','annule'))::int AS ouverts,
@@ -70,7 +72,11 @@ async function stats(f) {
        COUNT(*) FILTER (WHERE t.statut='resolu')::int AS resolus,
        COUNT(*) FILTER (WHERE t.created_at::date = CURRENT_DATE)::int AS crees_aujourdhui,
        COUNT(*) FILTER (WHERE t.resolved_at::date = CURRENT_DATE)::int AS resolus_aujourdhui,
-       COUNT(*) FILTER (WHERE p.code='critique' AND t.statut NOT IN ('resolu','cloture','annule'))::int AS critiques
+       COUNT(*) FILTER (WHERE p.code='critique' AND t.statut NOT IN ('resolu','cloture','annule'))::int AS critiques,
+       COUNT(*) FILTER (WHERE t.nature='incident')::int AS incidents,
+       COUNT(*) FILTER (WHERE t.nature='demande')::int AS demandes,
+       COUNT(*) FILTER (WHERE t.nature='incident' AND t.statut NOT IN ('resolu','cloture','annule'))::int AS incidents_ouverts,
+       COUNT(*) FILTER (WHERE t.nature='demande' AND t.statut NOT IN ('resolu','cloture','annule'))::int AS demandes_ouvertes
      FROM dsi_tickets t LEFT JOIN dsi_priorities p ON p.id = t.priority_id ${sql}`, params);
 }
 

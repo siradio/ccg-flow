@@ -12,7 +12,7 @@ const canEdit = requireSubModule('dsi.tickets', 'edition');
 
 function parseFilters(q) {
   return {
-    q: q.q || null, statut: q.statut || null, open: q.open === 'true',
+    q: q.q || null, statut: q.statut || null, open: q.open === 'true', nature: q.nature || null,
     priorityId: q.priority_id || null, categoryId: q.category_id || null,
     technicianId: q.technician_id || null, entityId: q.entity_id || null,
     businessUnitId: q.business_unit_id || null,
@@ -61,6 +61,10 @@ router.post('/:id/status', canEdit, async (req, res, next) => {
 });
 router.post('/:id/comment', canEdit, async (req, res, next) => {
   try { res.json(await svc.comment(req.user, Number(req.params.id), req.body?.comment, req.body?.visibilite || 'interne')); } catch (e) { next(e); }
+});
+// Suppression d'un incident — réservée à la DSI (niveau édition du sous-module tickets).
+router.delete('/:id', canEdit, async (req, res, next) => {
+  try { res.json(await svc.remove(req.user, Number(req.params.id))); } catch (e) { next(e); }
 });
 
 module.exports = router;

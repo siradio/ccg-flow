@@ -9,8 +9,20 @@ import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import { CURRENCY_CODES } from '../../config/currencies';
+import { exportReferential, downloadTemplate, ReferentialImportModal } from '../Referentials/referentialIO.jsx';
 
 const DEVISES = CURRENCY_CODES;
+
+// Colonnes import/export/modèle des prix. Lecture snake_case (historique), écriture camelCase
+// (POST /prices) via writeKey. Le produit est résolu par sa désignation.
+const PRICE_IO_FIELDS = [
+  { key: 'product_id', writeKey: 'productId', label: 'Produit', type: 'fkSelect', listKey: 'products', required: true },
+  { key: 'prix', label: 'Prix', type: 'number', required: true },
+  { key: 'devise', label: 'Devise', type: 'select', options: DEVISES, default: 'GNF' },
+  { key: 'date_effet', writeKey: 'dateEffet', label: "Date d'effet", type: 'date', required: true },
+  { key: 'commentaire', label: 'Commentaire', type: 'textarea' },
+  { key: 'business_unit_nom', label: 'Business Unit', readOnly: true },
+];
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -38,10 +50,13 @@ export default function HistoryPage() {
   const [savedAt, setSavedAt] = useState(null);
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [allProducts, setAllProducts] = useState([]); // tous les produits (pour l'import/export prix)
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     client.get('/business-units').then(res => setBusinessUnits(res.data));
     client.get('/product-categories').then(res => setCategories(res.data));
+    client.get('/products').then(res => setAllProducts(res.data.map(p => ({ id: p.id, nom: p.designation })))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -145,8 +160,22 @@ export default function HistoryPage() {
   return (
     <div>
       <ReferentialsSubnav />
-      <h1 className="page-title" style={{ marginBottom: 20 }}>{t('refx.nav.prices')}</h1>
+      <div className="page-header">
+        <h1 className="page-title" style={{ marginBottom: 20 }}>{t('refx.nav.prices')}</h1>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={entries.length === 0}
+            onClick={() => exportReferential(t('refx.nav.prices'), entries, PRICE_IO_FIELDS, { entities: [], sites: [], lists: { products: allProducts } }, t)}>{t('ref.io.exportBtn')}</button>
+          {canAdd && <button type="button" className="btn btn-secondary btn-sm"
+            onClick={() => downloadTemplate(t('refx.nav.prices'), PRICE_IO_FIELDS, { entities: [], sites: [], lists: { products: allProducts } }, t)}>{t('ref.io.templateBtn')}</button>}
+          {canAdd && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setImportOpen(true)}>{t('ref.io.importBtn')}</button>}
+        </div>
+      </div>
       <PricesSubnav />
+
+      {importOpen && (
+        <ReferentialImportModal endpoint="/prices" fields={PRICE_IO_FIELDS} ctx={{ entities: [], sites: [], lists: { products: allProducts } }}
+          title={t('refx.nav.prices')} onClose={() => setImportOpen(false)} onDone={load} />
+      )}
 
       <div className="form-inline" style={{ marginBottom: 16 }}>
         <label className="field" style={{ minWidth: 140 }}>

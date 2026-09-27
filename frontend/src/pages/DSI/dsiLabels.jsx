@@ -59,6 +59,12 @@ export function PriorityBadge({ libelle, couleur }) {
   return <span style={{ background: (couleur || '#6b7280') + '22', color: couleur || '#6b7280', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>{libelle}</span>;
 }
 
+export const natureLabel = (v) => (v === 'demande' ? 'Demande' : 'Incident');
+export function NatureBadge({ nature }) {
+  const c = nature === 'demande' ? COLORS.blue || COLORS.neutral : COLORS.amber;
+  return <span style={{ background: c.bg, color: c.fg, padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>{natureLabel(nature)}</span>;
+}
+
 const SLA_STATE = {
   respecte: { l: 'Respecté', bg: COLORS.green.bg, fg: COLORS.green.fg },
   a_risque: { l: 'À risque', bg: COLORS.amber.bg, fg: COLORS.amber.fg },

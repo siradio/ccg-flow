@@ -5,6 +5,8 @@ const { nextRef } = require('./dsi.numbering');
 const repo = require('./dsi.tickets.repository');
 
 const STATUTS = ['ouvert', 'affecte', 'en_cours', 'en_attente', 'resolu', 'cloture', 'annule'];
+const NATURES = ['incident', 'demande'];
+const cleanNature = (v) => { const n = (v || 'incident'); if (!NATURES.includes(n)) throw httpError(400, 'Nature invalide (incident ou demande).'); return n; };
 
 // ── Calcul SLA (calendaire) ─────────────────────────────────────────────────
 function computeSla(t) {
@@ -59,16 +61,17 @@ async function create(user, body, { selfService = false } = {}) {
   if (!objet) throw httpError(400, "L'objet est obligatoire.");
   const { entityId, siteId, businessUnitId } = await resolveEntitySite(user, body);
   const priorityId = selfService ? null : (body.priority_id || null);
+  const nature = cleanNature(body.nature);
   const created = await withTransaction(async (tx) => {
     const reference = await nextRef(tx, { scope: 'TICKET', prefix: 'INC' });
     const t = await tx.one(
       `INSERT INTO dsi_tickets
         (reference, demandeur_id, category_id, type_id, priority_id, impact, urgence, equipment_id,
-         entity_id, business_unit_id, site_id, objet, description, statut)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'ouvert') RETURNING *`,
+         entity_id, business_unit_id, site_id, objet, description, nature, statut)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ouvert') RETURNING *`,
       [reference, user.id, body.category_id || null, body.type_id || null, priorityId,
        body.impact || null, body.urgence || null, body.equipment_id || null,
-       entityId, businessUnitId, siteId, objet, body.description || null]);
+       entityId, businessUnitId, siteId, objet, body.description || null, nature]);
     await copySla(tx, t.id, priorityId);
     await insertEvent(tx, t.id, { action: 'creation', to: 'ouvert', visibilite: 'public', userId: user.id });
     return t;
@@ -77,10 +80,11 @@ async function create(user, body, { selfService = false } = {}) {
   return withSla(await repo.getById(created.id));
 }
 
-const UPD_FIELDS = ['category_id', 'type_id', 'impact', 'urgence', 'equipment_id', 'entity_id', 'business_unit_id', 'site_id', 'objet', 'description'];
+const UPD_FIELDS = ['category_id', 'type_id', 'impact', 'urgence', 'equipment_id', 'entity_id', 'business_unit_id', 'site_id', 'objet', 'description', 'nature'];
 async function update(user, id, body) {
   const t = await repo.getById(id);
   if (!t) throw httpError(404, 'Ticket introuvable.');
+  if (body.nature !== undefined) cleanNature(body.nature); // valide avant écriture (colonne NOT NULL)
   await withTransaction(async (tx) => {
     const cols = UPD_FIELDS.filter(f => body[f] !== undefined);
     if (cols.length) {
@@ -139,4 +143,17 @@ async function comment(user, id, text, visibilite = 'interne') {
   return withSla(await repo.getById(id));
 }
 
-module.exports = { create, update, assign, setStatus, comment, computeSla, withSla };
+// Suppression définitive d'un ticket (réservée à la DSI — niveau édition du sous-module tickets).
+// Supprime d'abord la timeline (dsi_ticket_events, FK sans CASCADE) puis le ticket, en transaction.
+async function remove(user, id) {
+  const t = await repo.getById(id);
+  if (!t) throw httpError(404, 'Ticket introuvable.');
+  await withTransaction(async (tx) => {
+    await tx.run('DELETE FROM dsi_ticket_events WHERE ticket_id = $1', [id]);
+    await tx.run('DELETE FROM dsi_tickets WHERE id = $1', [id]);
+  });
+  await audit.logAction({ tableName: 'dsi_tickets', recordId: id, action: 'dsi_ticket_delete', userId: user.id, details: { reference: t.reference } });
+  return { ok: true };
+}
+
+module.exports = { create, update, assign, setStatus, comment, remove, computeSla, withSla };

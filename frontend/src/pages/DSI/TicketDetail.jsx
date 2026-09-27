@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import DsiSubnav from './DsiSubnav';
-import { TicketStatutBadge, PriorityBadge, SlaBadge, fmtMin } from './dsiLabels.jsx';
+import { TicketStatutBadge, PriorityBadge, SlaBadge, NatureBadge, fmtMin } from './dsiLabels.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const ACTION_LABEL = {
@@ -25,6 +26,8 @@ export default function TicketDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
   const canEdit = hasSubModuleLevel(user, 'dsi.tickets', 'edition');
   const [tk, setTk] = useState(null);
   const [error, setError] = useState('');
@@ -52,6 +55,13 @@ export default function TicketDetail() {
   if (!tk) return <div><DsiSubnav /><p>{t('dsi.loading')}</p></div>;
 
   const act = async (fn) => { setBusy(true); setError(''); try { await fn(); await load(); } catch (e) { setError(e.response?.data?.error || 'Erreur.'); } finally { setBusy(false); } };
+  // Suppression définitive du ticket (réservée à la DSI). Confirmation puis retour à la liste.
+  const onDelete = async () => {
+    if (!(await confirm(t('dsi.tk.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
+    setBusy(true); setError('');
+    try { await client.delete(`/dsi/tickets/${id}`); navigate('/dsi/tickets'); }
+    catch (e) { setError(e.response?.data?.error || 'Erreur.'); setBusy(false); }
+  };
   const Row = ({ label, children }) => (<><span style={{ color: 'var(--color-text-muted)' }}>{label}</span><span>{children}</span></>);
   const sla = tk.sla;
 
@@ -60,9 +70,12 @@ export default function TicketDetail() {
       <DsiSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <h1 className="page-title" style={{ margin: 0 }}>
-          {tk.reference} <TicketStatutBadge statut={tk.statut} /> <PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} />
+          {tk.reference} <NatureBadge nature={tk.nature} /> <TicketStatutBadge statut={tk.statut} /> <PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} />
         </h1>
-        <Link to="/dsi/tickets" className="btn btn-secondary btn-sm">{t('dsi.action.backList')}</Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/dsi/tickets" className="btn btn-secondary btn-sm">{t('dsi.action.backList')}</Link>
+          {canEdit && <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={onDelete}>{t('dsi.tk.delete')}</button>}
+        </div>
       </div>
       {error && <div className="alert alert-danger" style={{ maxWidth: 720, marginTop: 10 }}>{error}</div>}
 
@@ -137,6 +150,12 @@ export default function TicketDetail() {
                   <SearchableSelect value={tech} onChange={v => setTech(v ?? '')} options={users} getLabel={o => o.nom} placeholder="Technicien…" />
                   <button className="btn btn-primary btn-sm" disabled={busy || !tech} onClick={() => act(() => client.post(`/dsi/tickets/${id}/assign`, { technician_id: tech }))}>{t('dsi.action.assign')}</button>
                 </div>
+              </label>
+              <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>{t('dsi.tk.nature')}
+                <select value={tk.nature || 'incident'} onChange={e => act(() => client.put(`/dsi/tickets/${id}`, { nature: e.target.value }))}>
+                  <option value="incident">{t('dsi.nature.incident')}</option>
+                  <option value="demande">{t('dsi.nature.demande')}</option>
+                </select>
               </label>
               <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>{t('dsi.tk.priorite')}
                 <select value={tk.priority_id || ''} onChange={e => act(() => client.put(`/dsi/tickets/${id}`, { priority_id: e.target.value || '' }))}>
