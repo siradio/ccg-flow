@@ -62,5 +62,9 @@ router.post('/:id/status', canEdit, async (req, res, next) => {
 router.post('/:id/comment', canEdit, async (req, res, next) => {
   try { res.json(await svc.comment(req.user, Number(req.params.id), req.body?.comment, req.body?.visibilite || 'interne')); } catch (e) { next(e); }
 });
+// Suppression d'un incident — réservée à la DSI (niveau édition du sous-module tickets).
+router.delete('/:id', canEdit, async (req, res, next) => {
+  try { res.json(await svc.remove(req.user, Number(req.params.id))); } catch (e) { next(e); }
+});
 
 module.exports = router;

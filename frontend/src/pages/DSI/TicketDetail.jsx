@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import DsiSubnav from './DsiSubnav';
 import { TicketStatutBadge, PriorityBadge, SlaBadge, fmtMin } from './dsiLabels.jsx';
@@ -25,6 +26,8 @@ export default function TicketDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
   const canEdit = hasSubModuleLevel(user, 'dsi.tickets', 'edition');
   const [tk, setTk] = useState(null);
   const [error, setError] = useState('');
@@ -52,6 +55,13 @@ export default function TicketDetail() {
   if (!tk) return <div><DsiSubnav /><p>{t('dsi.loading')}</p></div>;
 
   const act = async (fn) => { setBusy(true); setError(''); try { await fn(); await load(); } catch (e) { setError(e.response?.data?.error || 'Erreur.'); } finally { setBusy(false); } };
+  // Suppression définitive du ticket (réservée à la DSI). Confirmation puis retour à la liste.
+  const onDelete = async () => {
+    if (!(await confirm(t('dsi.tk.confirmDelete'), { danger: true, confirmLabel: t('common.delete') }))) return;
+    setBusy(true); setError('');
+    try { await client.delete(`/dsi/tickets/${id}`); navigate('/dsi/tickets'); }
+    catch (e) { setError(e.response?.data?.error || 'Erreur.'); setBusy(false); }
+  };
   const Row = ({ label, children }) => (<><span style={{ color: 'var(--color-text-muted)' }}>{label}</span><span>{children}</span></>);
   const sla = tk.sla;
 
@@ -62,7 +72,10 @@ export default function TicketDetail() {
         <h1 className="page-title" style={{ margin: 0 }}>
           {tk.reference} <TicketStatutBadge statut={tk.statut} /> <PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} />
         </h1>
-        <Link to="/dsi/tickets" className="btn btn-secondary btn-sm">{t('dsi.action.backList')}</Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/dsi/tickets" className="btn btn-secondary btn-sm">{t('dsi.action.backList')}</Link>
+          {canEdit && <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={onDelete}>{t('dsi.tk.delete')}</button>}
+        </div>
       </div>
       {error && <div className="alert alert-danger" style={{ maxWidth: 720, marginTop: 10 }}>{error}</div>}
 

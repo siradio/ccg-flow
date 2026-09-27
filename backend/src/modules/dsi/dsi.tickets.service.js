@@ -139,4 +139,17 @@ async function comment(user, id, text, visibilite = 'interne') {
   return withSla(await repo.getById(id));
 }
 
-module.exports = { create, update, assign, setStatus, comment, computeSla, withSla };
+// Suppression définitive d'un ticket (réservée à la DSI — niveau édition du sous-module tickets).
+// Supprime d'abord la timeline (dsi_ticket_events, FK sans CASCADE) puis le ticket, en transaction.
+async function remove(user, id) {
+  const t = await repo.getById(id);
+  if (!t) throw httpError(404, 'Ticket introuvable.');
+  await withTransaction(async (tx) => {
+    await tx.run('DELETE FROM dsi_ticket_events WHERE ticket_id = $1', [id]);
+    await tx.run('DELETE FROM dsi_tickets WHERE id = $1', [id]);
+  });
+  await audit.logAction({ tableName: 'dsi_tickets', recordId: id, action: 'dsi_ticket_delete', userId: user.id, details: { reference: t.reference } });
+  return { ok: true };
+}
+
+module.exports = { create, update, assign, setStatus, comment, remove, computeSla, withSla };
