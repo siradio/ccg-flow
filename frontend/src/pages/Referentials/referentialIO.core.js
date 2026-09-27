@@ -85,6 +85,9 @@ export function resolveEntity(ctx, cell) {
 export function rowToPayload(rowObj, fields, headerByField, ctx, t) {
   const payload = {};
   for (const f of importableFields(fields)) {
+    // On lit une colonne d'après sa clé/libellé (`key`) mais on peut écrire le payload sous une autre
+    // clé (`writeKey`) quand l'API de création diffère de la lecture (ex. prix : product_id → productId).
+    const out = f.writeKey || f.key;
     const header = headerByField[f.key];
     const raw = header != null ? rowObj[header] : undefined;
     const empty = raw === undefined || raw === null || String(raw).trim() === '';
@@ -94,22 +97,22 @@ export function rowToPayload(rowObj, fields, headerByField, ctx, t) {
       continue;
     }
     switch (f.type) {
-      case 'number': { const n = Number(String(raw).replace(',', '.')); if (Number.isNaN(n)) throw new Error(t('ref.io.err.number', { col: fieldLabel(f, t) })); payload[f.key] = n; break; }
-      case 'date': { const d = parseDate(raw); if (!d) throw new Error(t('ref.io.err.date', { col: fieldLabel(f, t) })); payload[f.key] = d; break; }
-      case 'checkbox': { const b = parseBool(raw); if (b === null) throw new Error(t('ref.io.err.bool', { col: fieldLabel(f, t) })); payload[f.key] = b; break; }
-      case 'select': { const v = resolveOption(f, raw); if (v === undefined) throw new Error(t('ref.io.err.option', { col: fieldLabel(f, t), val: raw })); payload[f.key] = v; break; }
+      case 'number': { const n = Number(String(raw).replace(',', '.')); if (Number.isNaN(n)) throw new Error(t('ref.io.err.number', { col: fieldLabel(f, t) })); payload[out] = n; break; }
+      case 'date': { const d = parseDate(raw); if (!d) throw new Error(t('ref.io.err.date', { col: fieldLabel(f, t) })); payload[out] = d; break; }
+      case 'checkbox': { const b = parseBool(raw); if (b === null) throw new Error(t('ref.io.err.bool', { col: fieldLabel(f, t) })); payload[out] = b; break; }
+      case 'select': { const v = resolveOption(f, raw); if (v === undefined) throw new Error(t('ref.io.err.option', { col: fieldLabel(f, t), val: raw })); payload[out] = v; break; }
       case 'multiCheck': {
         const arr = String(raw).split(/[;,]/).map(x => x.trim()).filter(Boolean).map(x => { const v = resolveOption(f, x); if (v === undefined) throw new Error(t('ref.io.err.option', { col: fieldLabel(f, t), val: x })); return v; });
-        payload[f.key] = arr; break;
+        payload[out] = arr; break;
       }
-      case 'entitySelect': { const id = resolveEntity(ctx, raw); if (id === undefined) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[f.key] = id; break; }
-      case 'siteSelect': { const s = ctx.sites.find(x => norm(x.nom) === norm(raw)); if (!s) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[f.key] = s.id; break; }
-      case 'fkSelect': { const o = (ctx.lists[f.listKey] || []).find(x => norm(x.nom) === norm(raw)); if (!o) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[f.key] = o.id; break; }
+      case 'entitySelect': { const id = resolveEntity(ctx, raw); if (id === undefined) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[out] = id; break; }
+      case 'siteSelect': { const s = ctx.sites.find(x => norm(x.nom) === norm(raw)); if (!s) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[out] = s.id; break; }
+      case 'fkSelect': { const o = (ctx.lists[f.listKey] || []).find(x => norm(x.nom) === norm(raw)); if (!o) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: raw })); payload[out] = o.id; break; }
       case 'multiEntity': {
         const ids = String(raw).split(/[;,]/).map(x => x.trim()).filter(Boolean).map(x => { const id = resolveEntity(ctx, x); if (id === undefined) throw new Error(t('ref.io.err.fk', { col: fieldLabel(f, t), val: x })); return id; });
         payload.entity_ids = ids; break;
       }
-      default: { payload[f.key] = normalizeFieldValue(f, String(raw).trim()); }
+      default: { payload[out] = normalizeFieldValue(f, String(raw).trim()); }
     }
   }
   return payload;
