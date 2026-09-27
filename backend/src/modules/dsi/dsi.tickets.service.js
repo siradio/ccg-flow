@@ -3,6 +3,7 @@ const audit = require('../audit/audit.service');
 const { httpError } = require('../../utils/httpError');
 const { nextRef } = require('./dsi.numbering');
 const repo = require('./dsi.tickets.repository');
+const notify = require('./dsi.notify');
 
 const STATUTS = ['ouvert', 'affecte', 'en_cours', 'en_attente', 'resolu', 'cloture', 'annule'];
 const NATURES = ['incident', 'demande'];
@@ -77,7 +78,10 @@ async function create(user, body, { selfService = false } = {}) {
     return t;
   });
   await audit.logAction({ tableName: 'dsi_tickets', recordId: created.id, action: 'dsi_ticket_create', userId: user.id, details: { reference: created.reference, selfService } });
-  return withSla(await repo.getById(created.id));
+  const full = await repo.getById(created.id);
+  // Alerte e-mail aux destinataires configurés (best-effort : n'interrompt jamais la création).
+  notify.notifyNewTicket(full).catch(() => {});
+  return withSla(full);
 }
 
 const UPD_FIELDS = ['category_id', 'type_id', 'impact', 'urgence', 'equipment_id', 'entity_id', 'business_unit_id', 'site_id', 'objet', 'description', 'nature'];

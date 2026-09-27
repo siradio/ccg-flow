@@ -5,10 +5,13 @@ import Loading from '../../components/Loading';
 import Pagination from '../../components/Pagination.jsx';
 import DsiSubnav from './DsiSubnav';
 import { TicketStatutBadge, PriorityBadge, SlaBadge, NatureBadge, TICKET_STATUTS } from './dsiLabels.jsx';
+import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 
 export default function TicketsList() {
   const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const canManage = hasSubModuleLevel(user, 'dsi.tickets', 'edition');
   const [data, setData] = useState(null);
   const [stats, setStats] = useState(null);
   const [page, setPage] = useState(1);
@@ -18,10 +21,34 @@ export default function TicketsList() {
   const setF = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setPage(1); };
   const dfmt = (d) => (d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') : '—');
 
+  // Configuration de la notification e-mail à la réception d'un ticket (réservée à la DSI).
+  const [notif, setNotif] = useState({ actif: false, emails: '' });
+  const [notifMsg, setNotifMsg] = useState('');
+
   useEffect(() => {
     client.get('/dsi/referentials/ticket-categories').then(r => setCats(r.data)).catch(() => {});
     client.get('/dsi/referentials/priorities').then(r => setPrios(r.data)).catch(() => {});
-  }, []);
+    if (canManage) {
+      client.get('/dsi/settings/incident-notify')
+        .then(r => setNotif({ actif: !!r.data.actif, emails: (r.data.emails || []).join(', ') }))
+        .catch(() => {});
+    }
+  }, [canManage]);
+
+  async function saveNotif() {
+    setNotifMsg('');
+    try {
+      await client.put('/dsi/settings/incident-notify', { actif: notif.actif, emails: notif.emails });
+      setNotifMsg(t('dsi.notif.saved'));
+    } catch (e) { setNotifMsg(e.response?.data?.error || t('dsi.notif.saveError')); }
+  }
+  async function testNotif() {
+    setNotifMsg(t('dsi.notif.sending'));
+    try {
+      const { data } = await client.post('/dsi/settings/incident-notify/test');
+      setNotifMsg(t('dsi.notif.sent', { to: data.to.join(', ') }));
+    } catch (e) { setNotifMsg(e.response?.data?.error || t('dsi.notif.sendError')); }
+  }
 
   useEffect(() => {
     const params = { page, pageSize: 20 };
@@ -107,6 +134,26 @@ export default function TicketsList() {
         </div>
       </div>
       {data && <Pagination page={data.page} total={data.total} pageSize={data.pageSize} onPage={setPage} />}
+
+      {canManage && (
+        <section className="card" style={{ marginTop: 16, maxWidth: 720 }}>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('dsi.notif.title')}</h2>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('dsi.notif.intro')}</p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="field" style={{ alignSelf: 'center' }}>
+              <span><input type="checkbox" checked={notif.actif} onChange={e => setNotif(n => ({ ...n, actif: e.target.checked }))} /> {t('dsi.notif.enabled')}</span>
+            </label>
+            <label className="field" style={{ flex: '1 1 320px' }}>{t('dsi.notif.recipients')}
+              <input value={notif.emails} placeholder="dsi@ccggroupe.com, support@ccggroupe.com" onChange={e => setNotif(n => ({ ...n, emails: e.target.value }))} />
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-primary" onClick={saveNotif}>{t('common.save')}</button>
+            <button type="button" className="btn btn-secondary" onClick={testNotif}>{t('dsi.notif.test')}</button>
+            {notifMsg && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{notifMsg}</span>}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
