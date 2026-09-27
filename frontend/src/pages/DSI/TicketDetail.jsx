@@ -5,7 +5,7 @@ import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import DsiSubnav from './DsiSubnav';
-import { TicketStatutBadge, PriorityBadge, SlaBadge, fmtMin } from './dsiLabels.jsx';
+import { TicketStatutBadge, PriorityBadge, SlaBadge, NatureBadge, fmtMin } from './dsiLabels.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const ACTION_LABEL = {
@@ -70,7 +70,7 @@ export default function TicketDetail() {
       <DsiSubnav />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <h1 className="page-title" style={{ margin: 0 }}>
-          {tk.reference} <TicketStatutBadge statut={tk.statut} /> <PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} />
+          {tk.reference} <NatureBadge nature={tk.nature} /> <TicketStatutBadge statut={tk.statut} /> <PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} />
         </h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link to="/dsi/tickets" className="btn btn-secondary btn-sm">{t('dsi.action.backList')}</Link>
@@ -150,6 +150,12 @@ export default function TicketDetail() {
                   <SearchableSelect value={tech} onChange={v => setTech(v ?? '')} options={users} getLabel={o => o.nom} placeholder="Technicien…" />
                   <button className="btn btn-primary btn-sm" disabled={busy || !tech} onClick={() => act(() => client.post(`/dsi/tickets/${id}/assign`, { technician_id: tech }))}>{t('dsi.action.assign')}</button>
                 </div>
+              </label>
+              <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>{t('dsi.tk.nature')}
+                <select value={tk.nature || 'incident'} onChange={e => act(() => client.put(`/dsi/tickets/${id}`, { nature: e.target.value }))}>
+                  <option value="incident">{t('dsi.nature.incident')}</option>
+                  <option value="demande">{t('dsi.nature.demande')}</option>
+                </select>
               </label>
               <label className="field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10 }}>{t('dsi.tk.priorite')}
                 <select value={tk.priority_id || ''} onChange={e => act(() => client.put(`/dsi/tickets/${id}`, { priority_id: e.target.value || '' }))}>

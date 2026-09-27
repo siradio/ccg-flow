@@ -12,7 +12,7 @@ const canEdit = requireSubModule('dsi.tickets', 'edition');
 
 function parseFilters(q) {
   return {
-    q: q.q || null, statut: q.statut || null, open: q.open === 'true',
+    q: q.q || null, statut: q.statut || null, open: q.open === 'true', nature: q.nature || null,
     priorityId: q.priority_id || null, categoryId: q.category_id || null,
     technicianId: q.technician_id || null, entityId: q.entity_id || null,
     businessUnitId: q.business_unit_id || null,

@@ -14,7 +14,7 @@ export default function SignalerIncident() {
   const nav = useNavigate();
   const [cats, setCats] = useState([]);
   const [myEq, setMyEq] = useState([]);
-  const [f, setF] = useState({ category_id: '', objet: '', description: '', impact: '', equipment_id: '' });
+  const [f, setF] = useState({ nature: 'incident', category_id: '', objet: '', description: '', impact: '', equipment_id: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
@@ -42,6 +42,13 @@ export default function SignalerIncident() {
       <p className="page-subtitle" style={{ marginBottom: 14 }}>{t('dsi.report.subtitle')}</p>
       <div className="card" style={{ maxWidth: 640 }}>
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
+          <Field label={t('dsi.tk.nature') + ' *'}>
+            <select value={f.nature} onChange={e => set('nature', e.target.value)}>
+              <option value="incident">{t('dsi.nature.incident')}</option>
+              <option value="demande">{t('dsi.nature.demande')}</option>
+            </select>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('dsi.report.natureHint')}</span>
+          </Field>
           <Field label={t('dsi.tk.categorie')}>
             <select value={f.category_id} onChange={e => set('category_id', e.target.value)}>
               <option value="">—</option>

@@ -4,7 +4,7 @@ import client from '../../api/client';
 import Loading from '../../components/Loading';
 import Pagination from '../../components/Pagination.jsx';
 import DsiSubnav from './DsiSubnav';
-import { TicketStatutBadge, PriorityBadge, SlaBadge, TICKET_STATUTS } from './dsiLabels.jsx';
+import { TicketStatutBadge, PriorityBadge, SlaBadge, NatureBadge, TICKET_STATUTS } from './dsiLabels.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 export default function TicketsList() {
@@ -12,7 +12,7 @@ export default function TicketsList() {
   const [data, setData] = useState(null);
   const [stats, setStats] = useState(null);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ q: '', statut: '', priority_id: '', category_id: '', open: true });
+  const [filters, setFilters] = useState({ q: '', statut: '', nature: '', priority_id: '', category_id: '', open: true });
   const [cats, setCats] = useState([]);
   const [prios, setPrios] = useState([]);
   const setF = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setPage(1); };
@@ -42,6 +42,8 @@ export default function TicketsList() {
       {stats && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
           <StatCard label={t('dsi.tk.stat.open')} value={stats.ouverts} />
+          <StatCard label={t('dsi.tk.stat.incidents')} value={`${stats.incidents_ouverts ?? 0} / ${stats.incidents ?? 0}`} accent="var(--status-amber-fg,#b45309)" />
+          <StatCard label={t('dsi.tk.stat.demandes')} value={`${stats.demandes_ouvertes ?? 0} / ${stats.demandes ?? 0}`} accent="#1d4ed8" />
           <StatCard label={t('dsi.tk.stat.inProgress')} value={stats.en_cours} accent="var(--status-amber-fg,#b45309)" />
           <StatCard label={t('dsi.tk.stat.waiting')} value={stats.en_attente} />
           <StatCard label={t('dsi.tk.stat.critical')} value={stats.critiques} accent="#b91c1c" />
@@ -55,6 +57,11 @@ export default function TicketsList() {
         <select value={filters.statut} onChange={e => setF('statut', e.target.value)}>
           <option value="">{t('dsi.f.allStatuses')}</option>
           {TICKET_STATUTS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
+        </select>
+        <select value={filters.nature} onChange={e => setF('nature', e.target.value)}>
+          <option value="">{t('dsi.f.allNatures')}</option>
+          <option value="incident">{t('dsi.nature.incident')}</option>
+          <option value="demande">{t('dsi.nature.demande')}</option>
         </select>
         <select value={filters.priority_id} onChange={e => setF('priority_id', e.target.value)}>
           <option value="">{t('dsi.tk.allPriorities')}</option>
@@ -74,7 +81,7 @@ export default function TicketsList() {
           {!data ? <Loading /> : (
             <table>
               <thead><tr>
-                <th>{t('dsi.tk.ref')}</th><th>{t('dsi.tk.objet')}</th><th>{t('dsi.tk.demandeur')}</th>
+                <th>{t('dsi.tk.ref')}</th><th>{t('dsi.tk.nature')}</th><th>{t('dsi.tk.objet')}</th><th>{t('dsi.tk.demandeur')}</th>
                 <th>{t('dsi.tk.priorite')}</th><th>{t('dsi.tk.statut')}</th><th>SLA</th>
                 <th>{t('dsi.tk.technicien')}</th><th>{t('dsi.tk.cree')}</th><th />
               </tr></thead>
@@ -82,6 +89,7 @@ export default function TicketsList() {
                 {items.map(tk => (
                   <tr key={tk.id}>
                     <td><Link to={`/dsi/tickets/${tk.id}`}><strong>{tk.reference}</strong></Link></td>
+                    <td><NatureBadge nature={tk.nature} /></td>
                     <td>{tk.objet}</td>
                     <td>{tk.demandeur_nom || '—'}</td>
                     <td><PriorityBadge libelle={tk.priorite} couleur={tk.priorite_couleur} /></td>
@@ -92,7 +100,7 @@ export default function TicketsList() {
                     <td><Link to={`/dsi/tickets/${tk.id}`} className="btn btn-secondary btn-sm">{t('dsi.action.open')}</Link></td>
                   </tr>
                 ))}
-                {items.length === 0 && <tr><td className="empty-row" colSpan={9}>{t('dsi.tickets.empty')}</td></tr>}
+                {items.length === 0 && <tr><td className="empty-row" colSpan={10}>{t('dsi.tickets.empty')}</td></tr>}
               </tbody>
             </table>
           )}
