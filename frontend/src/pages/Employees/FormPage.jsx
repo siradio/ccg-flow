@@ -17,6 +17,8 @@ const EMPTY_FORM = {
   manager_employee_id: '',
   // Solde de congés (Lot 2) : amorçage du droit à congés
   conge_solde_initial: '', conge_solde_date: '',
+  // Code commercial (si l'employé est un commercial) — repris dans le module Commerce.
+  code_commercial: '',
   // Compte utilisateur lié (géré depuis le référentiel RH)
   linked_user_id: '',
 };
@@ -67,6 +69,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
         permis_travail: !!e.permis_travail, permis_travail_expiration: e.permis_travail_expiration ? e.permis_travail_expiration.slice(0, 10) : '',
         manager_employee_id: e.manager_employee_id ?? '',
         conge_solde_initial: e.conge_solde_initial ?? '', conge_solde_date: e.conge_solde_date ? e.conge_solde_date.slice(0, 10) : '',
+        code_commercial: e.code_commercial || '',
         linked_user_id: e.linked_user_id ?? '',
       });
       setLoaded(true);
@@ -110,6 +113,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
       manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null,
       conge_solde_initial: form.conge_solde_initial === '' ? 0 : Number(form.conge_solde_initial),
       conge_solde_date: form.conge_solde_date || null,
+      code_commercial: form.code_commercial || null,
       linked_user_id: form.linked_user_id ? Number(form.linked_user_id) : null,
     };
     try {
@@ -175,6 +179,9 @@ export default function FormPage({ employeeId, onDone } = {}) {
             </label>
             <label className="field">{t('emp.th.departement')}
               <input value={form.departement} onChange={e => set('departement', e.target.value)} />
+            </label>
+            <label className="field" title={t('emp.codeCommercialHint')}>{t('emp.codeCommercial')}
+              <input value={form.code_commercial} onChange={e => set('code_commercial', e.target.value)} placeholder={t('emp.codeCommercialPlaceholder')} />
             </label>
             <label className="field">{t('emp.th.entity')}
               <select value={form.entity_id} onChange={e => set('entity_id', e.target.value)} required>
