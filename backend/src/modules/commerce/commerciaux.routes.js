@@ -24,6 +24,8 @@ const BASE_SELECT = `
          e.matricule                        AS matricule,
          e.departement                      AS departement,
          bu.code AS business_unit_code, bu.nom AS business_unit_nom,
+         COALESCE((SELECT array_agg(j.business_unit_id ORDER BY j.business_unit_id)
+                     FROM commercial_business_units j WHERE j.commercial_id = c.id), ARRAY[]::int[]) AS business_unit_ids,
          z.nom  AS zone_nom
     FROM commerciaux c
     LEFT JOIN employees e        ON e.id = c.employee_id
@@ -36,13 +38,24 @@ const EDITABLE = [
 ];
 const emptyToNull = v => (v === '' || v === undefined ? null : v);
 
+// Synchronise les BU couvertes d'un commercial (table de liaison). La BU principale est toujours
+// incluse. `ids` = tableau d'ids (ou undefined pour ne garder que la principale).
+async function syncCommercialBUs(commercialId, ids, principaleId) {
+  const set = new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Boolean));
+  if (principaleId) set.add(Number(principaleId));
+  await run('DELETE FROM commercial_business_units WHERE commercial_id = $1', [commercialId]);
+  for (const buId of set) {
+    await run('INSERT INTO commercial_business_units (commercial_id, business_unit_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [commercialId, buId]);
+  }
+}
+
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const where = [];
     const params = [];
     const visible = visibleBusinessUnitIds(req.user);
-    if (visible) { params.push(visible); where.push(`(c.business_unit_id = ANY($${params.length}) OR c.business_unit_id IS NULL)`); }
-    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`c.business_unit_id = $${params.length}`); }
+    if (visible) { params.push(visible); where.push(`(EXISTS (SELECT 1 FROM commercial_business_units j WHERE j.commercial_id = c.id AND j.business_unit_id = ANY($${params.length})) OR c.business_unit_id = ANY($${params.length}) OR c.business_unit_id IS NULL)`); }
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`EXISTS (SELECT 1 FROM commercial_business_units j2 WHERE j2.commercial_id = c.id AND j2.business_unit_id = $${params.length})`); }
     if (req.query.statut) { params.push(req.query.statut); where.push(`c.statut = $${params.length}`); }
     if (req.query.type) { params.push(req.query.type); where.push(`c.type = $${params.length}`); }
     if (req.query.q) {
@@ -83,6 +96,7 @@ router.post('/', requireAuth, requireCreate, async (req, res, next) => {
       `INSERT INTO commerciaux (${cols}, created_by, updated_by) VALUES (${ph}, $${EDITABLE.length + 1}, $${EDITABLE.length + 1}) RETURNING id`,
       [...vals, req.user.id]
     );
+    await syncCommercialBUs(row.id, b.business_unit_ids, emptyToNull(b.business_unit_id));
     await logAction({ tableName: 'commerciaux', recordId: row.id, action: 'creation', userId: req.user.id, details: { code: b.code } });
     res.status(201).json(await one(BASE_SELECT + ' WHERE c.id = $1', [row.id]));
   } catch (e) {
@@ -109,6 +123,12 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
     sets.push('updated_at = now()');
     params.push(id);
     await run(`UPDATE commerciaux SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
+    // Synchronise les BU couvertes si fournies (ou si la principale a changé, pour la ré-inclure).
+    if ('business_unit_ids' in b || 'business_unit_id' in b) {
+      const principale = 'business_unit_id' in b ? emptyToNull(b.business_unit_id) : existing.business_unit_id;
+      const ids = 'business_unit_ids' in b ? b.business_unit_ids : undefined;
+      await syncCommercialBUs(id, ids, principale);
+    }
     await logAction({ tableName: 'commerciaux', recordId: id, action: 'modification', userId: req.user.id, details: {} });
     res.json(await one(BASE_SELECT + ' WHERE c.id = $1', [id]));
   } catch (e) {
@@ -147,7 +167,9 @@ async function buildFiche(user, idRaw, moisRaw) {
     const commercial = await one(BASE_SELECT + ' WHERE c.id = $1', [id]);
     if (!commercial) return null;
     const visible = visibleBusinessUnitIds(user);
-    if (visible && commercial.business_unit_id && !visible.includes(commercial.business_unit_id)) return null;
+    // Visible si l'une des BU couvertes (ou la principale) est autorisée.
+    const buSet = [...(commercial.business_unit_ids || []), commercial.business_unit_id].filter(Boolean);
+    if (visible && buSet.length && !buSet.some(b => visible.includes(b))) return null;
 
     const affectations = await all(`
       SELECT a.*, bu.nom AS bu_nom, p.designation AS product_nom, z.nom AS zone_nom

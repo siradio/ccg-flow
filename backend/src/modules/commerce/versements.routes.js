@@ -122,6 +122,10 @@ router.post('/', requireAuth, requireSubModule('commerce.versements', 'ajout'), 
     if (!commercial) return res.status(400).json({ error: 'Commercial inconnu.' });
     const buId = b.business_unit_id ? Number(b.business_unit_id) : commercial.business_unit_id;
     if (!buId) return res.status(400).json({ error: 'BU obligatoire (le commercial n’a pas de BU).' });
+    // La BU du versement doit faire partie des BU couvertes par le commercial (principale incluse).
+    const covered = (await all('SELECT business_unit_id FROM commercial_business_units WHERE commercial_id = $1', [commercial.id])).map(r => Number(r.business_unit_id));
+    const allowed = new Set([...covered, commercial.business_unit_id].filter(Boolean).map(Number));
+    if (allowed.size && !allowed.has(buId)) return res.status(400).json({ error: 'La BU choisie ne fait pas partie des BU du commercial.' });
     if (!canWriteBusinessUnit(req.user, buId)) return res.status(403).json({ error: 'BU non autorisée.' });
 
     const { lines, total } = await normalizeLines(b.lines);

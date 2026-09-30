@@ -10,7 +10,8 @@ export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, 
 // Champs manipulables en Excel (on exclut les photos). L'import ignore en plus les champs en
 // lecture seule (ex. code fournisseur auto-généré par le backend).
 export const exportableFields = (fields) => fields.filter(f => f.type !== 'photo');
-export const importableFields = (fields) => fields.filter(f => f.type !== 'photo' && !f.readOnly);
+// multiFk (liste d'ids FK) est exclu de l'import (résolution multiple non gérée) ; il reste exportable.
+export const importableFields = (fields) => fields.filter(f => f.type !== 'photo' && f.type !== 'multiFk' && !f.readOnly);
 
 export const columnsFor = (fields, t) => fields.map(f => ({
   key: f.key, label: fieldLabel(f, t), type: f.type === 'number' ? 'number' : undefined,
@@ -24,6 +25,7 @@ export function exportValue(f, item, ctx) {
     case 'siteSelect': return ctx.sites.find(s => s.id === v)?.nom || (v ?? '');
     case 'fkSelect': return (ctx.lists[f.listKey] || []).find(o => o.id === v)?.nom || (v ?? '');
     case 'multiEntity': return (item.entity_ids || []).map(id => ctx.entities.find(e => e.id === id)?.code).filter(Boolean).join(', ');
+    case 'multiFk': return (v || []).map(id => ((ctx.lists[f.listKey] || []).find(o => o.id === id) || {}).nom).filter(Boolean).join(', ');
     case 'multiCheck': return (v || []).map(x => optLabel(f, x)).join(', ');
     case 'select': return v ? optLabel(f, v) : '';
     case 'checkbox': return v ? 'Oui' : 'Non';

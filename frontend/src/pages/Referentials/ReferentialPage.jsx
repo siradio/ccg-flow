@@ -60,7 +60,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   function formFromItem(item) {
     const next = {};
     for (const f of fields) {
-      if (f.type === 'multiEntity' || f.type === 'multiCheck') next[f.key] = item[f.key] ?? [];
+      if (f.type === 'multiEntity' || f.type === 'multiCheck' || f.type === 'multiFk') next[f.key] = item[f.key] ?? [];
       // Une DATE revient en ISO ("2020-01-15T00:00:00.000Z") ; on la ramène à YYYY-MM-DD, format
       // attendu par <input type="date"> et par la colonne PG (évite tout décalage de fuseau).
       else if (f.type === 'date') next[f.key] = item[f.key] ? String(item[f.key]).slice(0, 10) : '';
@@ -142,7 +142,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   }
 
   // Colonnes triables : tout sauf photo et listes d'entités (pas d'ordre naturel pertinent).
-  const isSortable = (f) => !['photo', 'multiEntity', 'multiCheck'].includes(f.type);
+  const isSortable = (f) => !['photo', 'multiEntity', 'multiCheck', 'multiFk'].includes(f.type);
   // Accesseur de tri : pour un nombre stocké en texte (NUMERIC pg), on force la comparaison numérique
   // (les valeurs vides restent nulles → classées en dernier par useSort).
   const sortGet = (f) => (row) => {
@@ -325,6 +325,7 @@ export function emptyForm(fields, entities = []) {
     // multiEntity : vide par défaut, SAUF si `defaultAll` (ex. fournisseur) -> toutes les entités
     // pré-cochées à la création, pour qu'un nouveau fournisseur soit d'emblée disponible partout.
     f[field.key] = field.type === 'multiEntity' ? (field.defaultAll ? entities.map(e => e.id) : [])
+      : field.type === 'multiFk' ? (field.default || [])
       : field.type === 'multiCheck' ? (field.default || [])
       : field.type === 'checkbox' ? !!field.default
       : (field.default ?? ''); // honore une valeur par défaut (ex. statut = 'actif' sur un select)
@@ -380,6 +381,7 @@ function renderValue(field, item, entities, sites, lists = {}, endpoint = '', t 
   if (field.type === 'siteSelect') return sites.find(s => s.id === value)?.nom || value;
   if (field.type === 'fkSelect') return (lists[field.listKey] || []).find(o => o.id === value)?.nom || (value ? value : '—');
   if (field.type === 'multiEntity') return (item.entity_ids || []).map(id => entities.find(e => e.id === id)?.code).filter(Boolean).join(', ');
+  if (field.type === 'multiFk') return (value || []).map(id => (lists[field.listKey] || []).find(o => o.id === id)?.nom).filter(Boolean).join(', ') || '—';
   if (field.type === 'multiCheck') return (value || []).map(v => optLabel(field, v)).join(', ') || '—';
   if (field.type === 'select') return value ? optLabel(field, value) : value;
   if (field.type === 'checkbox') return value ? t('ref.yes') : t('ref.no');
@@ -551,6 +553,21 @@ export function FieldInput({ field, value, onChange, entities, sites, lists = {}
         <option value="" disabled>{label}…</option>
         {field.options.map(o => <option key={o} value={o}>{optLabel(field, o)}</option>)}
       </select>
+    );
+  }
+  if (field.type === 'multiFk') {
+    const opts = lists[field.listKey] || [];
+    const arr = value || [];
+    return (
+      <span style={{ display: 'inline-flex', gap: 12, flexWrap: 'wrap', paddingTop: 4 }}>
+        {opts.map(o => (
+          <label key={o.id} style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={arr.map(Number).includes(Number(o.id))}
+              onChange={ev => onChange(ev.target.checked ? [...arr, o.id] : arr.filter(x => Number(x) !== Number(o.id)))} />
+            {' '}{o.nom}
+          </label>
+        ))}
+      </span>
     );
   }
   if (field.type === 'multiCheck') {
