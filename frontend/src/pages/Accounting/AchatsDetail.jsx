@@ -12,7 +12,7 @@ async function openAuthenticatedFile(path) {
   window.open(url, '_blank');
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR'));
+const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 4 }));
 
 export default function AchatsDetail() {
   const { id } = useParams();
