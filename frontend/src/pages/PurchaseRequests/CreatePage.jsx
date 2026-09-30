@@ -175,7 +175,7 @@ export default function CreatePage() {
                   )}
                   <label className="field" style={{ flex: '1 1 90px', minWidth: 0 }}>
                     {t('prc.qty')}
-                    <input type="number" min="0" step="0.001" value={l.quantite} onChange={e => setLine(l.key, { quantite: e.target.value })} />
+                    <input type="number" min="0" step="0.0001" value={l.quantite} onChange={e => setLine(l.key, { quantite: e.target.value })} />
                   </label>
                   <label className="field" style={{ flex: '1 1 90px', minWidth: 0 }}>
                     {t('prc.unit')}

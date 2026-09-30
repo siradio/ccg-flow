@@ -38,6 +38,8 @@ const CONFIGS = {
       { key: 'email', label: 'Email' },
       { key: 'adresse', label: 'Adresse' },
       { key: 'business_unit_id', label: 'Business Unit', type: 'fkSelect', listKey: 'businessUnits' },
+      // Un commercial peut couvrir plusieurs BU (la principale ci-dessus est toujours incluse).
+      { key: 'business_unit_ids', label: 'BU couvertes', type: 'multiFk', listKey: 'businessUnits' },
       { key: 'zone_id', label: 'Zone', type: 'fkSelect', listKey: 'zones' },
       { key: 'responsable', label: 'Responsable' },
       { key: 'date_debut', label: "Date de début d'activité", type: 'date' },

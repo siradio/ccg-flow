@@ -23,8 +23,9 @@ export default function VersementForm() {
   const [banks, setBanks] = useState([]);
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState([]);
+  const [bus, setBus] = useState([]); // toutes les BU (pour nommer les BU du commercial)
 
-  const [form, setForm] = useState({ commercial_id: '', product_id: '', payment_date: todayISO(), reference_generale: '', commentaire: '' });
+  const [form, setForm] = useState({ commercial_id: '', business_unit_id: '', product_id: '', payment_date: todayISO(), reference_generale: '', commentaire: '' });
   const [amounts, setAmounts] = useState({});       // { [methodId]: montant }
   const [bankRows, setBankRows] = useState({});      // { [methodId]: { bank_id, transaction_reference, transaction_date } }
   const [error, setError] = useState('');
@@ -38,10 +39,11 @@ export default function VersementForm() {
     client.get('/commerce/banks').then(r => setBanks(r.data.filter(b => b.actif))).catch(() => {});
     client.get('/products').then(r => setProducts(r.data)).catch(() => {});
     client.get('/commerce/settings').then(r => setSettings(r.data)).catch(() => {});
+    client.get('/business-units').then(r => setBus(r.data)).catch(() => {});
     if (editing) {
       client.get(`/commerce/versements/${id}`).then(r => {
         const v = r.data;
-        setForm({ commercial_id: v.commercial_id, product_id: v.product_id || '', payment_date: v.payment_date?.slice(0, 10) || todayISO(), reference_generale: v.reference_generale || '', commentaire: v.commentaire || '' });
+        setForm({ commercial_id: v.commercial_id, business_unit_id: v.business_unit_id || '', product_id: v.product_id || '', payment_date: v.payment_date?.slice(0, 10) || todayISO(), reference_generale: v.reference_generale || '', commentaire: v.commentaire || '' });
         const a = {}; const br = {};
         for (const l of v.lines) { a[l.payment_method_id] = l.amount; if (l.bank_id || l.transaction_reference) br[l.payment_method_id] = { bank_id: l.bank_id || '', transaction_reference: l.transaction_reference || '', transaction_date: l.transaction_date?.slice(0, 10) || '' }; }
         setAmounts(a); setBankRows(br); setExistingAtts(v.attachments || []);
@@ -50,7 +52,21 @@ export default function VersementForm() {
   }, [id, editing]);
 
   const commercial = useMemo(() => commerciaux.find(c => String(c.id) === String(form.commercial_id)), [commerciaux, form.commercial_id]);
-  const buId = commercial?.business_unit_id || null;
+  // BU couvertes par le commercial (principale + liaison), nommées via la liste des BU.
+  const commercialBus = useMemo(() => {
+    if (!commercial) return [];
+    const ids = [...new Set([...(commercial.business_unit_ids || []), commercial.business_unit_id].filter(Boolean).map(Number))];
+    return ids.map(bid => ({ id: bid, nom: (bus.find(b => Number(b.id) === bid)?.nom) || `BU ${bid}` }));
+  }, [commercial, bus]);
+  const buId = Number(form.business_unit_id) || commercial?.business_unit_id || null;
+
+  // À la sélection d'un commercial (ou au chargement des BU), fixe la BU par défaut = principale
+  // si la BU courante n'est pas dans les BU couvertes.
+  useEffect(() => {
+    if (!commercial) return;
+    const ok = commercialBus.some(b => Number(b.id) === Number(form.business_unit_id));
+    if (!ok) setForm(f => ({ ...f, business_unit_id: commercial.business_unit_id || (commercialBus[0]?.id ?? '') }));
+  }, [commercial, commercialBus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Workflow actif pour la BU du commercial (surcharge BU sinon global).
   const workflowActif = useMemo(() => {
@@ -81,7 +97,7 @@ export default function VersementForm() {
     if (!lines.length) { setError(t('com.ver.atLeastAmount')); return; }
     setBusy(true);
     try {
-      const payload = { ...form, lines, soumettre };
+      const payload = { ...form, business_unit_id: buId, lines, soumettre };
       const res = editing
         ? await client.put(`/commerce/versements/${id}`, payload)
         : await client.post('/commerce/versements', payload);
@@ -131,9 +147,18 @@ export default function VersementForm() {
             </label>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="field" style={{ flex: '1 1 200px' }}>{t('com.ver.bu')}
-              <div style={{ padding: '8px 0', fontWeight: 600 }}>{commercial ? (commercial.business_unit_nom || '—') : '—'}</div>
-            </div>
+            {commercialBus.length > 1 ? (
+              <label className="field" style={{ flex: '1 1 200px' }}>{t('com.ver.bu')}
+                <select value={form.business_unit_id || ''} onChange={e => setForm(f => ({ ...f, business_unit_id: e.target.value }))} required>
+                  <option value="" disabled>—</option>
+                  {commercialBus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+                </select>
+              </label>
+            ) : (
+              <div className="field" style={{ flex: '1 1 200px' }}>{t('com.ver.bu')}
+                <div style={{ padding: '8px 0', fontWeight: 600 }}>{commercialBus[0]?.nom || commercial?.business_unit_nom || '—'}</div>
+              </div>
+            )}
             <label className="field" style={{ flex: '2 1 260px' }}>{t('com.ver.product')}
               <select value={form.product_id} onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}>
                 <option value="">—</option>

@@ -219,7 +219,7 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   const [editForm, setEditForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const editable = pr.status === 'brouillon' && isRequester;
   const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
-  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR');
+  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 });
 
   async function addLine(e) {
     e.preventDefault();
@@ -581,7 +581,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
       .then(ok => { if (ok) setForm(emptyQuoteForm); });
   }
-  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR');
+  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 });
 
   return (
     <section className="card">
@@ -642,7 +642,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                       <td>{l.designation || l.description_libre}</td>
                       <td className="num">{l.quantite} {l.unite || ''}</td>
                       <td className="num">
-                        <input type="number" min="0" step="0.01" style={{ width: 130, textAlign: 'right' }}
+                        <input type="number" min="0" step="0.0001" style={{ width: 130, textAlign: 'right' }}
                           value={form.prices[l.id] ?? ''} onChange={e => setForm(f => ({ ...f, prices: { ...f.prices, [l.id]: e.target.value } }))} />
                       </td>
                       <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{money((Number(form.prices[l.id]) || 0) * Number(l.quantite || 0))} {form.devise}</td>
