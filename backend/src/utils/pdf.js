@@ -23,9 +23,13 @@ const COMPANY = {
 // insécable (U+202F) comme séparateur de milliers, un caractère absent de l'encodage WinAnsi des
 // polices standard de pdfkit (Helvetica) — le rendu produisait des "/" à la place des espaces.
 function money(n) {
-  const [intPart, decPart] = Number(n || 0).toFixed(2).split('.');
+  // 2 à 4 décimales : on conserve les décimales réellement présentes (jusqu'à 4) sans afficher de
+  // zéros superflus au-delà de 2 (ex. 1000 -> "1 000,00", 28,6977 -> "28,6977", 9,50 -> "9,50").
+  const [intPart, dec4] = Number(n || 0).toFixed(4).split('.');
+  let dec = dec4.replace(/0+$/, '');
+  if (dec.length < 2) dec = dec.padEnd(2, '0');
   const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${withSpaces},${decPart}`;
+  return `${withSpaces},${dec}`;
 }
 
 // `opts.footerNote` : mention affichée au pied de chaque page avant « Page i/N ». Par défaut
