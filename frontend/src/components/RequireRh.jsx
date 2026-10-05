@@ -8,11 +8,11 @@ export function hasRhAccess(user) {
   return isSuperAdmin(user) || (user?.roles || []).some(r => RH_ROLES.includes(r.role_code));
 }
 
-// Self-service RH : créer et suivre SES propres demandes (congé, absence…). Ouvert à tout compte
-// relié à une fiche employé (tout salarié peut demander), plus les rôles RH et super_admin.
-// C'est le niveau requis pour accéder au module ; les onglets de validation restent réservés.
+// Self-service RH : créer et suivre SES propres demandes (congé, absence…). Ouvert à TOUT compte
+// connecté (chaque salarié peut faire ses demandes). La création nécessite que le compte soit relié
+// à une fiche employé (sinon message explicite) ; les onglets de validation restent réservés aux rôles RH.
 export function hasRhSelfService(user) {
-  return hasRhAccess(user) || !!(user && user.employee_id);
+  return !!user;
 }
 
 export default function RequireRh({ children }) {
