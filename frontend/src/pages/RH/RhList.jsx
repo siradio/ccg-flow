@@ -12,7 +12,10 @@ const empName = (r) => `${r.employee_prenom || ''} ${r.employee_nom || ''}`.trim
 
 function RhList({ scope, title, showNew }) {
   const { t, lang } = useI18n();
+  const { user } = useAuth();
   const { sort, by, apply } = useSort();
+  // Compte non relié à une fiche employé : il peut consulter mais pas créer de demande.
+  const notLinked = scope === 'mine' && !user?.employee_id;
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,8 @@ function RhList({ scope, title, showNew }) {
           </div>
         )}
       </div>
+
+      {notLinked && <div className="alert alert-warning" style={{ maxWidth: 720 }}>{t('rh.notLinked')}</div>}
 
       <div style={{ marginBottom: 16 }}>
         <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={`${t('common.search')}…`} style={{ minWidth: 280 }} />
