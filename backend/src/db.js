@@ -8,9 +8,15 @@ const env = require('./config/env');
 // la chaîne de connexion, pour ne pas dépendre du comportement interne de pg/pg-connection-string.
 // `rejectUnauthorized: false` : approche standard recommandée par Azure pour Node/pg, la chaîne de
 // certification d'Azure n'étant pas systématiquement dans le magasin CA par défaut de Node.
+// Serveur Postgres PARTAGÉ par plusieurs apps avec un max_connections volontairement bas :
+// on borne le pool (max) et on libère vite les connexions inactives (idleTimeoutMillis) pour ne
+// pas monopoliser les slots ; connectionTimeoutMillis évite d'attendre indéfiniment une connexion.
 const pool = new Pool({
   connectionString: env.databaseUrl,
   ssl: /\bsslmode=require\b/.test(env.databaseUrl || '') ? { rejectUnauthorized: false } : false,
+  max: Number(process.env.PG_POOL_MAX) || 8,
+  idleTimeoutMillis: 15000,
+  connectionTimeoutMillis: 12000,
 });
 
 async function all(text, params = []) {
