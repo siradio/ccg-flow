@@ -13,6 +13,7 @@
     "@azure/storage-blob": "^12.33.0",
     "@napi-rs/canvas": "^0.1.100",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dejavu-fonts-ttf": "^2.37.3",
     "dotenv": "^16.4.5",
