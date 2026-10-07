@@ -63,11 +63,14 @@ async function resolveRequesterEmployee(user) {
 async function createRequest(user, type, body) {
   const emp = await resolveRequesterEmployee(user);
   const jours = await workingDays(body.date_debut, body.date_fin);
+  // Remplacement/back-up pendant l'absence (facultatif) : stocké dans le payload JSON.
+  const remplacement = (body.remplacement || '').trim();
+  const payload = remplacement ? { remplacement } : null;
   let req = await repo.create({
     type, employeeId: emp.id, createdBy: user.id, entityId: emp.entity_id,
     businessUnitId: emp.business_unit_id, typeId: body.type_id || null,
     dateDebut: body.date_debut || null, dateFin: body.date_fin || null, jours,
-    motif: body.motif || null, commentaire: body.commentaire || null,
+    motif: body.motif || null, commentaire: body.commentaire || null, payload,
   });
   req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX[type] || 'RH', emp.entity_code || 'CCG', req.id));
   await repo.logHistory(req.id, 'creation', user.id, null);

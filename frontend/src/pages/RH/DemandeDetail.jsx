@@ -107,6 +107,7 @@ export default function DemandeDetail() {
               <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.f.dept')}</span><span>{r.employee_departement || '—'} · {r.entity_code}</span>
               <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.period')}</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)} → {dfmt(r.date_fin)} ({r.jours ?? '—'} {t('rh.daysUnit')})</span>
               {r.motif && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.motif')}</span><span>{r.motif}</span></>}
+              {r.payload?.remplacement && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.remplacement')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.remplacement}</span></>}
             </>
           )}
           {r.commentaire && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.comment')}</span><span>{r.commentaire}</span></>}

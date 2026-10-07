@@ -11,7 +11,7 @@ export default function CongeForm() {
   const navigate = useNavigate();
   const [types, setTypes] = useState([]);
   const [solde, setSolde] = useState(null);
-  const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '' });
+  const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '', remplacement: '' });
   const [jours, setJours] = useState(null);
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
@@ -90,6 +90,10 @@ export default function CongeForm() {
           )}
           <label className="field">{t('rh.absence.motif')}
             <input value={form.motif} onChange={e => set('motif', e.target.value)} placeholder={t('rh.absence.motifPlaceholder')} />
+          </label>
+          <label className="field">{t('rh.remplacement')}
+            <textarea rows={2} value={form.remplacement} onChange={e => set('remplacement', e.target.value)} placeholder={t('rh.remplacementPlaceholder')} />
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t('rh.remplacementHint')}</span>
           </label>
           <label className="field">{t('rh.absence.comment')}
             <textarea rows={2} value={form.commentaire} onChange={e => set('commentaire', e.target.value)} />
