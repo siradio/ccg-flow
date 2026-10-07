@@ -12,8 +12,11 @@ const { httpError } = require('../../utils/httpError');
 // - Recrutement REMPLACEMENT : Responsable → RH → DGA (rôle `dg`).
 // - Recrutement CRÉATION de poste & autres : Responsable → RH → DAF → DGA (engagement budgétaire).
 const DEFAULT_CHAIN = ['responsable', 'rh'];
+// Congé : RH (1er contrôle des soldes/droits) → Responsable → RH (validation finale). Le rôle `rh`
+// apparaît deux fois → la progression se fait par INDEX d'étape (step_index), pas par le rôle seul.
+const CONGE_CHAIN = ['rh', 'responsable', 'rh'];
 // Passage CDD→CDI (engagement permanent) : Responsable → RH → DAF → DGA.
-const CHAINS = { absence: DEFAULT_CHAIN, conge: DEFAULT_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'] };
+const CHAINS = { absence: DEFAULT_CHAIN, conge: CONGE_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'] };
 const RECRUTEMENT_REMPLACEMENT = ['responsable', 'rh', 'dg'];
 const RECRUTEMENT_AUTRE = ['responsable', 'rh', 'daf', 'dg'];
 // Union de tous les rôles pouvant valider (pour la liste « À valider », tous circuits confondus).
@@ -172,7 +175,24 @@ async function getDetail(id) {
   const [history, attachments] = await Promise.all([repo.getHistory(id), repo.getAttachments(id)]);
   // Pour un congé, on joint le solde du demandeur (visible par lui et ses valideurs).
   const solde = (req.type === 'conge' && req.employee_id) ? await getCongeSolde(req.employee_id).catch(() => null) : null;
-  return { ...req, history, attachments, solde };
+  // Fil de validation : la chaîne réelle de CETTE demande + qui peut valider l'étape en cours
+  // (le responsable hiérarchique direct ciblé, sinon les détenteurs du rôle courant sur l'entité).
+  const chain = chainForRequest(req);
+  let currentValidators = [];
+  if (req.statut === 'en_validation' && req.role_courant) {
+    if (req.validateur_user_id) {
+      const u = await one('SELECT prenom, nom FROM users WHERE id = $1', [req.validateur_user_id]);
+      if (u) currentValidators = [{ nom: `${u.prenom || ''} ${u.nom || ''}`.trim(), direct: true }];
+    } else {
+      currentValidators = (await all(
+        `SELECT TRIM(CONCAT(u.prenom,' ',u.nom)) AS nom
+           FROM users u JOIN user_entity_roles r ON r.user_id = u.id
+          WHERE u.actif AND r.role_code = $1 AND r.entity_id = $2
+          ORDER BY u.nom, u.prenom`, [req.role_courant, req.entity_id]
+      )).map(x => ({ nom: x.nom, direct: false }));
+    }
+  }
+  return { ...req, history, attachments, solde, chain, current_validators: currentValidators };
 }
 
 function assertOwner(user, req) {
@@ -191,24 +211,29 @@ async function resolveManagerUserId(req) {
   return mgr ? mgr.id : null;
 }
 
+// Positionne la demande sur l'étape `index` de la chaîne : met à jour role_courant + step_index,
+// cible le responsable hiérarchique DIRECT si l'étape est « responsable » (sinon validation par rôle),
+// et notifie la bonne cible. `req` = snapshot de la demande (demandeur/entité/numéro stables).
+async function applyStep(id, chain, index, req) {
+  const role = chain[index];
+  const managerUserId = role === 'responsable' ? await resolveManagerUserId(req) : null;
+  await repo.update(id, { statut: 'en_validation', role_courant: role, step_index: index, validateur_user_id: managerUserId });
+  if (managerUserId) {
+    await notifications.notify(managerUserId, 'Demande RH à valider',
+      `La demande ${req.numero} de votre collaborateur attend votre validation.`, `/rh/demandes/${id}`);
+  } else {
+    await notifications.notifyRoleOnEntity(req.entity_id, role, 'Demande RH à valider',
+      `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
+  }
+}
+
 async function submit(user, id) {
   const req = await repo.getById(id);
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
-  const premier = chainForRequest(req)[0];
-  // 1re étape = responsable : on cible le responsable hiérarchique DIRECT du demandeur (pas un rôle
-  // partagé). À défaut de manager configuré, repli sur le rôle « responsable » de l'entité.
-  const managerUserId = premier === 'responsable' ? await resolveManagerUserId(req) : null;
-  await repo.update(id, { statut: 'en_validation', role_courant: premier, validateur_user_id: managerUserId });
+  await applyStep(id, chainForRequest(req), 0, req);
   await repo.logHistory(id, 'soumission', user.id, null);
-  if (managerUserId) {
-    await notifications.notify(managerUserId, 'Demande RH à valider',
-      `La demande ${req.numero} de votre collaborateur attend votre validation.`, `/rh/demandes/${id}`);
-  } else {
-    await notifications.notifyRoleOnEntity(req.entity_id, premier, 'Demande RH à valider',
-      `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
-  }
   return getDetail(id);
 }
 
@@ -229,16 +254,17 @@ async function validate(user, id, commentaire) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
   await assertCanAct(user, req);
-  const suivant = nextRole(chainForRequest(req), req.role_courant);
-  if (suivant) {
-    // Les étapes suivantes (rh/daf/dg) sont par rôle : on efface le validateur ciblé.
-    await repo.update(id, { role_courant: suivant, validateur_user_id: null });
-    await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
-    await notifications.notifyRoleOnEntity(req.entity_id, suivant, 'Demande RH à valider',
-      `La demande ${req.numero} attend votre validation.`, `/rh/demandes/${id}`);
+  const chain = chainForRequest(req);
+  // Index courant : step_index s'il concorde avec le rôle courant, sinon repli sur la 1re occurrence
+  // du rôle (demandes en cours créées avant la bascule par index).
+  let idx = (chain[req.step_index] === req.role_courant) ? req.step_index : chain.indexOf(req.role_courant);
+  if (idx < 0) idx = 0;
+  await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
+  const nextIndex = idx + 1;
+  if (nextIndex < chain.length) {
+    await applyStep(id, chain, nextIndex, req); // positionne l'étape suivante + notifie la bonne cible
   } else {
-    await repo.update(id, { statut: 'validee', role_courant: null, decided_by: user.id, decided_at: new Date() });
-    await repo.logHistory(id, `validation_${req.role_courant}`, user.id, commentaire);
+    await repo.update(id, { statut: 'validee', role_courant: null, validateur_user_id: null, decided_by: user.id, decided_at: new Date() });
     await notifyRequester(req, 'Demande RH validée', `Votre demande ${req.numero} a été validée.`);
   }
   return getDetail(id);
