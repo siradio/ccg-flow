@@ -179,21 +179,22 @@ const STEP_LABEL = { responsable: 'rh.step.responsable', rh: 'rh.step.rh', daf: 
 function RhWorkflow({ r, t, dtfmt }) {
   const chain = r.chain || [];
   if (!chain.length) return null;
-  const histByRole = {};
-  for (const h of (r.history || [])) {
-    if (typeof h.action === 'string' && h.action.startsWith('validation_')) histByRole[h.action.slice('validation_'.length)] = h;
-  }
+  // Progression par INDEX (le rôle peut se répéter, ex. congé RH→Responsable→RH). Les validations
+  // sont enregistrées dans l'ordre → la i-ème validation correspond à l'étape i.
+  const validations = (r.history || []).filter(h => typeof h.action === 'string' && h.action.startsWith('validation_'));
   const refus = (r.history || []).find(h => h.action === 'refus');
+  const curIdx = Number(r.step_index) || 0;
   const validators = (r.current_validators || []);
   const whoCurrent = () => {
     if (!validators.length) return t('rh.wf.noValidator');
     if (validators[0].direct) return `${validators[0].nom} ${t('rh.wf.directManager')}`;
     return validators.map(v => v.nom).join(', ');
   };
-  const stateOf = (role) => {
-    if (histByRole[role]) return 'done';
-    if (r.statut === 'en_validation' && role === r.role_courant) return 'current';
-    if (r.statut === 'rejetee' && role === r.role_courant) return 'rejected';
+  const stateOf = (i) => {
+    if (r.statut === 'validee') return 'done';
+    if (i < curIdx) return 'done';
+    if (r.statut === 'en_validation' && i === curIdx) return 'current';
+    if (r.statut === 'refusee' && i === curIdx) return 'rejected';
     return 'future';
   };
   const COLORS = {
@@ -208,11 +209,11 @@ function RhWorkflow({ r, t, dtfmt }) {
       {r.statut === 'brouillon' && <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('rh.wf.draft')}</p>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'stretch' }}>
         {chain.map((role, i) => {
-          const st = stateOf(role);
+          const st = stateOf(i);
           const c = COLORS[st];
-          const h = histByRole[role];
+          const h = validations[i];
           return (
-            <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ minWidth: 130, border: `1px solid ${c.bd}`, background: c.bg, color: c.fg, borderRadius: 8, padding: '8px 10px' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>{st === 'done' ? '✓' : st === 'rejected' ? '✕' : (i + 1)}</span>
