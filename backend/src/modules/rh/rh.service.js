@@ -172,7 +172,24 @@ async function getDetail(id) {
   const [history, attachments] = await Promise.all([repo.getHistory(id), repo.getAttachments(id)]);
   // Pour un congé, on joint le solde du demandeur (visible par lui et ses valideurs).
   const solde = (req.type === 'conge' && req.employee_id) ? await getCongeSolde(req.employee_id).catch(() => null) : null;
-  return { ...req, history, attachments, solde };
+  // Fil de validation : la chaîne réelle de CETTE demande + qui peut valider l'étape en cours
+  // (le responsable hiérarchique direct ciblé, sinon les détenteurs du rôle courant sur l'entité).
+  const chain = chainForRequest(req);
+  let currentValidators = [];
+  if (req.statut === 'en_validation' && req.role_courant) {
+    if (req.validateur_user_id) {
+      const u = await one('SELECT prenom, nom FROM users WHERE id = $1', [req.validateur_user_id]);
+      if (u) currentValidators = [{ nom: `${u.prenom || ''} ${u.nom || ''}`.trim(), direct: true }];
+    } else {
+      currentValidators = (await all(
+        `SELECT TRIM(CONCAT(u.prenom,' ',u.nom)) AS nom
+           FROM users u JOIN user_entity_roles r ON r.user_id = u.id
+          WHERE u.actif AND r.role_code = $1 AND r.entity_id = $2
+          ORDER BY u.nom, u.prenom`, [req.role_courant, req.entity_id]
+      )).map(x => ({ nom: x.nom, direct: false }));
+    }
+  }
+  return { ...req, history, attachments, solde, chain, current_validators: currentValidators };
 }
 
 function assertOwner(user, req) {

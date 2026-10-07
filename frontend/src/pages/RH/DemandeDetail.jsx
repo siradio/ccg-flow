@@ -75,6 +75,8 @@ export default function DemandeDetail() {
       </div>
       {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
 
+      <RhWorkflow r={r} t={t} dtfmt={dtfmt} />
+
       <section className="card" style={{ maxWidth: 720 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 18px', fontSize: 14 }}>
           <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.type')}</span><span style={{ fontWeight: 600 }}>{r.type_libelle || t(RH_TYPE_LABELS[r.type] || 'rh.type.absence')}</span>
@@ -169,5 +171,66 @@ export default function DemandeDetail() {
         </ul>
       </section>
     </div>
+  );
+}
+
+// Fil de validation (stepper) : chaîne réelle de la demande, étape en cours et chez qui.
+const STEP_LABEL = { responsable: 'rh.step.responsable', rh: 'rh.step.rh', daf: 'rh.step.daf', dg: 'rh.step.dg' };
+function RhWorkflow({ r, t, dtfmt }) {
+  const chain = r.chain || [];
+  if (!chain.length) return null;
+  const histByRole = {};
+  for (const h of (r.history || [])) {
+    if (typeof h.action === 'string' && h.action.startsWith('validation_')) histByRole[h.action.slice('validation_'.length)] = h;
+  }
+  const refus = (r.history || []).find(h => h.action === 'refus');
+  const validators = (r.current_validators || []);
+  const whoCurrent = () => {
+    if (!validators.length) return t('rh.wf.noValidator');
+    if (validators[0].direct) return `${validators[0].nom} ${t('rh.wf.directManager')}`;
+    return validators.map(v => v.nom).join(', ');
+  };
+  const stateOf = (role) => {
+    if (histByRole[role]) return 'done';
+    if (r.statut === 'en_validation' && role === r.role_courant) return 'current';
+    if (r.statut === 'rejetee' && role === r.role_courant) return 'rejected';
+    return 'future';
+  };
+  const COLORS = {
+    done: { bg: 'var(--status-green-bg,#dcfce7)', fg: 'var(--status-green-fg,#15803d)', bd: 'var(--status-green-fg,#15803d)' },
+    current: { bg: '#dbeafe', fg: '#1d4ed8', bd: '#1d4ed8' },
+    rejected: { bg: '#fee2e2', fg: '#b91c1c', bd: '#b91c1c' },
+    future: { bg: 'var(--color-hover)', fg: 'var(--color-text-muted)', bd: 'var(--color-border)' },
+  };
+  return (
+    <section className="card" style={{ maxWidth: 720, marginBottom: 14 }}>
+      <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('rh.wf.title')}</h2>
+      {r.statut === 'brouillon' && <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('rh.wf.draft')}</p>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'stretch' }}>
+        {chain.map((role, i) => {
+          const st = stateOf(role);
+          const c = COLORS[st];
+          const h = histByRole[role];
+          return (
+            <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ minWidth: 130, border: `1px solid ${c.bd}`, background: c.bg, color: c.fg, borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>{st === 'done' ? '✓' : st === 'rejected' ? '✕' : (i + 1)}</span>
+                  {t(STEP_LABEL[role] || role, role)}
+                </div>
+                <div style={{ fontSize: 11, marginTop: 3, lineHeight: 1.3 }}>
+                  {st === 'done' && h && <>{t('rh.wf.validatedBy')} {h.user_prenom} {h.user_nom}<br />{dtfmt(h.created_at)}</>}
+                  {st === 'current' && <><strong>{t('rh.wf.waiting')}</strong><br />{whoCurrent()}</>}
+                  {st === 'rejected' && refus && <>{t('rh.wf.rejectedBy')} {refus.user_prenom} {refus.user_nom}</>}
+                  {st === 'future' && <span>{t('rh.wf.upcoming')}</span>}
+                </div>
+              </div>
+              {i < chain.length - 1 && <span style={{ color: 'var(--color-text-muted)' }}>→</span>}
+            </div>
+          );
+        })}
+      </div>
+      {r.statut === 'validee' && <p style={{ fontSize: 13, color: 'var(--status-green-fg,#15803d)', fontWeight: 600, margin: '10px 0 0' }}>{t('rh.wf.allDone')}</p>}
+    </section>
   );
 }
