@@ -152,10 +152,19 @@ router.get('/employees', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Solde de congés du demandeur (pour le formulaire de demande de congé).
-router.get('/conge-solde', async (req, res, next) => {
-  try { res.json(await service.getMyCongeSolde(req.user)); }
+// Membres de l'équipe du responsable (subordonnés directs) — pour faire une demande à leur place.
+router.get('/my-team', async (req, res, next) => {
+  try { res.json(await service.listMyTeam(req.user)); }
   catch (e) { next(e); }
+});
+
+// Solde de congés : du demandeur par défaut, ou d'un membre de son équipe si ?employee_id= (contrôlé).
+router.get('/conge-solde', async (req, res, next) => {
+  try {
+    res.json(req.query.employee_id
+      ? await service.getTeamMemberCongeSolde(req.user, req.query.employee_id)
+      : await service.getMyCongeSolde(req.user));
+  } catch (e) { next(e); }
 });
 
 // Tableau de bord RH (agrégats) — réservé aux détenteurs d'un rôle de validation RH / super_admin.
