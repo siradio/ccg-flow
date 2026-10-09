@@ -28,7 +28,14 @@ function chainForRequest(req) {
   if (req.type === 'recrutement') {
     return req.type_code === 'remplacement' ? RECRUTEMENT_REMPLACEMENT : RECRUTEMENT_AUTRE;
   }
-  return CHAINS[req.type] || DEFAULT_CHAIN;
+  let chain = CHAINS[req.type] || DEFAULT_CHAIN;
+  // Congé initié par le responsable POUR un membre de son équipe : son étape de validation est
+  // passée (c'est lui l'initiateur). On retire l'étape 'responsable' puis on dédoublonne les rôles
+  // consécutifs identiques (ex. ['rh','responsable','rh'] -> ['rh','rh'] -> ['rh']).
+  if (req.payload && req.payload.bypass_responsable) {
+    chain = chain.filter(r => r !== 'responsable').filter((r, i, a) => i === 0 || r !== a[i - 1]);
+  }
+  return chain;
 }
 function nextRole(chain, current) {
   const i = chain.indexOf(current);
@@ -77,7 +84,54 @@ async function createRequest(user, type, body) {
   return getDetail(req.id);
 }
 async function createAbsence(user, body) { return createRequest(user, 'absence', body); }
-async function createConge(user, body) { return createRequest(user, 'conge', body); }
+async function createConge(user, body) {
+  if (body.on_behalf_employee_id) return createCongeOnBehalf(user, body);
+  return createRequest(user, 'conge', body);
+}
+
+// Membres de l'équipe d'un utilisateur : subordonnés directs (employees.manager_employee_id = sa
+// fiche). Sert au responsable pour faire une demande de congé à la place d'un membre sans accès PC.
+async function listMyTeam(user) {
+  if (!user.employee_id) return [];
+  return all(
+    `SELECT e.id, e.matricule, e.prenom, e.nom, e.entity_id, ent.code AS entity_code
+       FROM employees e JOIN entities ent ON ent.id = e.entity_id
+      WHERE e.manager_employee_id = $1 AND e.statut <> 'sorti'
+      ORDER BY e.nom, e.prenom`, [user.employee_id]);
+}
+
+// Le demandeur (responsable) est-il autorisé à initier une demande POUR cet employé ?
+// super_admin, OU manager direct de l'employé, OU détenteur du rôle 'responsable' sur son entité.
+function canCreateForEmployee(user, target) {
+  if (isSuperAdmin(user)) return true;
+  if (target.manager_employee_id && Number(target.manager_employee_id) === Number(user.employee_id)) return true;
+  return hasRoleOnEntity(user, 'responsable', target.entity_id);
+}
+
+// Congé initié par le responsable pour un membre de son équipe : la demande concerne l'employé
+// ciblé, l'étape 'responsable' est retirée du circuit (bypass_responsable), le solde contrôlé est
+// celui de l'employé. Trace l'initiateur dans le payload.
+async function createCongeOnBehalf(user, body) {
+  const target = await one('SELECT * FROM employees WHERE id = $1', [Number(body.on_behalf_employee_id)]);
+  if (!target) throw httpError(400, 'Employé introuvable.');
+  if (!canCreateForEmployee(user, target)) throw httpError(403, "Vous n'êtes pas le responsable de cet employé.");
+  const jours = await workingDays(body.date_debut, body.date_fin);
+  const payload = {
+    bypass_responsable: true,
+    initiated_by: `${user.prenom || ''} ${user.nom || ''}`.trim(),
+  };
+  const remplacement = (body.remplacement || '').trim();
+  if (remplacement) payload.remplacement = remplacement;
+  let req = await repo.create({
+    type: 'conge', employeeId: target.id, createdBy: user.id, entityId: target.entity_id,
+    businessUnitId: target.business_unit_id, typeId: body.type_id || null,
+    dateDebut: body.date_debut || null, dateFin: body.date_fin || null, jours,
+    motif: body.motif || null, commentaire: body.commentaire || null, payload,
+  });
+  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.conge, target.entity_code || 'CCG', req.id));
+  await repo.logHistory(req.id, 'creation', user.id, null);
+  return getDetail(req.id);
+}
 
 // Demande de recrutement (ouverture de poste) : les champs spécifiques vont dans `payload` (le
 // recrutement ne concerne pas une fiche employé existante → employee_id nul, entité = celle du
@@ -398,8 +452,16 @@ async function getDashboard(user) {
   };
 }
 
+// Solde de congés d'un membre de l'équipe (pour le formulaire « demande pour un membre »).
+async function getTeamMemberCongeSolde(user, employeeId) {
+  const target = await one('SELECT * FROM employees WHERE id = $1', [Number(employeeId)]);
+  if (!target) throw httpError(404, 'Employé introuvable.');
+  if (!canCreateForEmployee(user, target)) throw httpError(403, "Vous n'êtes pas le responsable de cet employé.");
+  return getCongeSolde(target.id);
+}
+
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
-  listMine, listPending, listAll, canSeeAll, canDelete, workingDays,
+  listMine, listPending, listAll, canSeeAll, canDelete, workingDays, listMyTeam, getTeamMemberCongeSolde,
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
 };
