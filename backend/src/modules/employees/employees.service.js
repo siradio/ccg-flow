@@ -50,6 +50,20 @@ const WRITABLE_FIELDS = [
   'code_commercial',
 ];
 
+// Attribue automatiquement le rôle `responsable` (toutes entités) au compte lié à un employé —
+// utilisé quand cet employé devient manager de quelqu'un, pour qu'il voie les demandes à valider.
+// Best-effort : un échec ne doit jamais bloquer l'enregistrement de la fiche.
+async function grantResponsableToEmployeeAccount(employeeId) {
+  if (!employeeId) return;
+  try {
+    const u = await one('SELECT id FROM users WHERE employee_id = $1 AND actif = true', [Number(employeeId)]);
+    if (!u) return;
+    await run(
+      `INSERT INTO user_entity_roles (user_id, entity_id, role_code)
+       SELECT $1, id, 'responsable' FROM entities ON CONFLICT DO NOTHING`, [u.id]);
+  } catch (e) { console.error('[employees] grant responsable auto échoué:', e.message); }
+}
+
 async function create(body) {
   const cols = WRITABLE_FIELDS.filter(f => body[f] !== undefined);
   const values = cols.map(f => body[f]);
@@ -58,6 +72,7 @@ async function create(body) {
     `INSERT INTO employees (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id`,
     values
   );
+  if (body.manager_employee_id) await grantResponsableToEmployeeAccount(body.manager_employee_id);
   return getById(row.id);
 }
 
@@ -68,6 +83,8 @@ async function update(id, body) {
   if (cols.length === 0) return getById(id);
   const setClause = cols.map((f, i) => `${f} = $${i + 1}`).join(', ');
   await run(`UPDATE employees SET ${setClause} WHERE id = $${cols.length + 1}`, [...cols.map(f => body[f]), id]);
+  // Si on vient de désigner un responsable (manager) pour cette fiche, ce manager devient responsable.
+  if ('manager_employee_id' in body && body.manager_employee_id) await grantResponsableToEmployeeAccount(body.manager_employee_id);
   return getById(id);
 }
 
@@ -89,6 +106,11 @@ async function setLinkedUser(employeeId, userId) {
   const uid = userId ? Number(userId) : null;
   await run('UPDATE users SET employee_id = NULL WHERE employee_id = $1', [employeeId]);
   if (uid) await run('UPDATE users SET employee_id = $1 WHERE id = $2', [employeeId, uid]);
+  // Si cette fiche est déjà manager de quelqu'un, le compte fraîchement lié devient responsable.
+  if (uid) {
+    const isManager = await one('SELECT 1 FROM employees WHERE manager_employee_id = $1 LIMIT 1', [employeeId]);
+    if (isManager) await grantResponsableToEmployeeAccount(employeeId);
+  }
 }
 
 // Rattachement automatique des comptes aux fiches employé, par correspondance d'identité :
