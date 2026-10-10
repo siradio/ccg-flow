@@ -1,6 +1,6 @@
 const { all, one, withTransaction } = require('../../../db');
 const { notify } = require('../../notifications/notifications.service');
-const { hasRoleAnywhere, isSuperAdmin, visibleBusinessUnitIds } = require('../../../middleware/permissions');
+const { hasRoleAnywhere, hasRoleOnEntity, isSuperAdmin, visibleBusinessUnitIds } = require('../../../middleware/permissions');
 const pdf = require('./commande.pdf');
 
 // Orchestration du workflow des bons de commande commerciaux.
@@ -13,6 +13,18 @@ const pdf = require('./commande.pdf');
 //  - Notifications envoyées APRÈS commit (jamais si la transaction échoue).
 
 const err = (msg, status = 400, extra = {}) => Object.assign(new Error(msg), { status, ...extra });
+
+// Autorisation d'agir sur une étape. Le contrôle de gestion est restreint à l'entité du bon ;
+// les autres rôles du circuit (responsable_commercial, gestionnaire_stock) sont cross-BU/global.
+// Repli « anywhere » si l'entité n'est pas renseignée (anciens bons), pour ne jamais bloquer.
+function canActOnStep(user, step, c) {
+  if (isSuperAdmin(user)) return true;
+  if (!step || !step.role_code_requis) return false;
+  if (step.code === 'controle_gestion' && c.entity_id) {
+    return hasRoleOnEntity(user, 'controle_gestion', c.entity_id);
+  }
+  return hasRoleAnywhere(user, step.role_code_requis);
+}
 const LIEN = (id) => `/commerce/commandes/${id}`;
 const TYPE_NOTIF = 'Bon de commande';
 
@@ -136,7 +148,7 @@ async function validateStep(commandeId, user, { commentaire } = {}) {
     const step = await currentStep(tx, c);
     if (!step || !step.role_code_requis) throw err('Aucune étape de validation active.', 409);
     if (step.code === 'controle_stock') throw err('Étape stock : utilisez la confirmation de disponibilité par BU.', 409);
-    if (!hasRoleAnywhere(user, step.role_code_requis)) throw err('Vous n\'avez pas le rôle requis pour valider cette étape.', 403);
+    if (!canActOnStep(user, step, c)) throw err('Vous n\'avez pas le rôle requis (ou la bonne entité) pour valider cette étape.', 403);
     const pending = await tx.one(`SELECT id FROM commande_validations WHERE commande_id = $1 AND step_id = $2 AND statut = 'en_attente' ORDER BY id DESC LIMIT 1`, [c.id, step.id]);
     if (!pending) throw err('Étape déjà traitée.', 409);
     await tx.run('UPDATE commande_validations SET statut = $1, decided_by = $2, decided_at = now(), commentaire = $3 WHERE id = $4', ['validee', user.id, commentaire || null, pending.id]);
@@ -189,8 +201,7 @@ async function returnStep(commandeId, user, { target_step_code, commentaire } = 
     if (c.statut !== 'en_validation') throw err('Cette commande n\'est pas en cours de validation.', 409);
     const step = await currentStep(tx, c);
     if (!step) throw err('Aucune étape active.', 409);
-    const allowed = isSuperAdmin(user) || (step.role_code_requis && hasRoleAnywhere(user, step.role_code_requis));
-    if (!allowed) throw err('Vous ne pouvez pas retourner à cette étape.', 403);
+    if (!canActOnStep(user, step, c)) throw err('Vous ne pouvez pas retourner à cette étape.', 403);
     // Clôt la validation en attente de l'étape courante.
     await tx.run(`UPDATE commande_validations SET statut = 'retournee', decided_by = $1, decided_at = now(), commentaire = $2 WHERE commande_id = $3 AND step_id = $4 AND statut = 'en_attente'`, [user.id, commentaire, c.id, step.id]);
 
@@ -219,7 +230,7 @@ async function cancelOrder(commandeId, user, { motif } = {}) {
     if (!c) throw err('Commande introuvable.', 404);
     if (!['en_validation', 'brouillon'].includes(c.statut)) throw err('Cette commande ne peut plus être annulée.', 409);
     const step = await currentStep(tx, c);
-    const allowed = isSuperAdmin(user) || c.created_by === user.id || (step && step.role_code_requis && hasRoleAnywhere(user, step.role_code_requis));
+    const allowed = c.created_by === user.id || canActOnStep(user, step, c);
     if (!allowed) throw err('Vous ne pouvez pas annuler ce bon.', 403);
     await tx.run(`UPDATE commande_validations SET statut = 'rejetee', decided_by = $1, decided_at = now() WHERE commande_id = $2 AND statut = 'en_attente'`, [user.id, c.id]);
     await tx.run('UPDATE commandes_commerciales SET statut = $1, motif_annulation = $2, updated_at = now() WHERE id = $3', ['annulee', motif, c.id]);

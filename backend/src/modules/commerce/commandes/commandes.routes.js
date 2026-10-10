@@ -17,6 +17,13 @@ const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('comm
 const UNITE_BY_TYPE = { yaourt: 'casier', divers: 'carton' };
 const err400 = (msg) => { const e = new Error(msg); e.status = 400; return e; };
 
+// Entité de rattachement des bons commerciaux : l'entité commerciale du groupe (CCG).
+// Sert au contrôle de gestion restreint par entité (voir commande.workflow.canActOnStep).
+async function defaultEntityId() {
+  const row = await one(`SELECT id FROM entities WHERE code = 'CCG'`);
+  return row ? row.id : null;
+}
+
 async function getSetting(cle, def) {
   const row = await one(`SELECT valeur FROM commerce_settings WHERE cle = $1 AND business_unit_id IS NULL`, [cle]);
   return row ? row.valeur : def;
@@ -243,6 +250,7 @@ router.post('/', requireCreate, async (req, res, next) => {
     const computed = await computeLines(b.type_formulaire, b.beneficiaire_type, b.lines);
     const qty = computed.unite === 'casier' ? computed.total_casiers : computed.total_cartons;
     const { capacite, taux } = await fillRate(b.vehicle_id, computed.unite, qty);
+    const entityId = await defaultEntityId();
     const id = await withTransaction(async (tx) => {
       const row = await tx.one(
         `INSERT INTO commandes_commerciales
@@ -252,7 +260,7 @@ router.post('/', requireCreate, async (req, res, next) => {
         [b.type_formulaire, b.beneficiaire_type,
          b.beneficiaire_type === 'commercial' ? Number(b.commercial_id) : null,
          b.beneficiaire_type === 'grossiste' ? Number(b.grossiste_id) : null,
-         b.entity_id || null, b.business_unit_id || null, b.vehicle_id || null, capacite,
+         entityId, b.business_unit_id || null, b.vehicle_id || null, capacite,
          computed.montant_total, computed.total_casiers, computed.total_cartons, taux, req.user.id]);
       await writeLines(tx, row.id, computed.lines);
       return row.id;
@@ -328,14 +336,16 @@ router.post('/:id/submit', requireEdit, async (req, res, next) => {
     const tpl = await one(`SELECT id FROM workflow_templates WHERE module_code = 'bon_commande_commercial' AND actif`);
     const step1 = tpl ? await one(`SELECT id, code, nom, role_code_requis FROM workflow_steps WHERE workflow_template_id = $1 ORDER BY ordre LIMIT 1`, [tpl.id]) : null;
 
+    const entId = c.entity_id || await defaultEntityId();
     const numero = await withTransaction(async (tx) => {
       const num = await nextRef(tx, { scope: 'bon_commande_commercial', prefix: 'BC-COM', pad: 4 });
       await tx.run(
         `UPDATE commandes_commerciales SET
            numero=$1, statut='en_validation', workflow_template_id=$2, current_step_id=$3,
-           capacite_figee=$4, taux_remplissage=$5, motif_sous_charge=$6, submitted_at=now(), updated_at=now()
-         WHERE id=$7`,
-        [num, tpl ? tpl.id : null, step1 ? step1.id : null, capacite, taux, motif, id]);
+           capacite_figee=$4, taux_remplissage=$5, motif_sous_charge=$6, entity_id=COALESCE(entity_id,$7),
+           submitted_at=now(), updated_at=now()
+         WHERE id=$8`,
+        [num, tpl ? tpl.id : null, step1 ? step1.id : null, capacite, taux, motif, entId, id]);
       // Ouvre la 1re étape du circuit (ligne de validation « en attente ») dans la même transaction.
       if (step1 && step1.role_code_requis) {
         await workflow.openFirstStep(tx, { ...c, numero: num, montant_total: computed.montant_total }, step1, computed.lines, req.user.id);
