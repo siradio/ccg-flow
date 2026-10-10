@@ -53,6 +53,7 @@ import ProductionReleve from './pages/Production/ProductionReleve';
 import CommerceIndex from './pages/Commerce/CommerceIndex';
 import TarifsPage from './pages/Commerce/TarifsPage';
 import CommandesList from './pages/Commerce/CommandesList';
+import CommandesDashboard from './pages/Commerce/CommandesDashboard';
 import CommandeForm from './pages/Commerce/CommandeForm';
 import CommandeDetail from './pages/Commerce/CommandeDetail';
 import CommerceParametres from './pages/Commerce/CommerceParametres';
@@ -174,6 +175,7 @@ export default function App() {
         <Route path="commerce/commerciaux/:id" element={<RequireModule subModule="commerce.commerciaux"><CommercialFiche /></RequireModule>} />
         <Route path="commerce/tarifs" element={<RequireModule subModule="commerce.parametres"><TarifsPage /></RequireModule>} />
         <Route path="commerce/commandes" element={<RequireModule subModule="commerce.commandes"><CommandesList /></RequireModule>} />
+        <Route path="commerce/commandes/dashboard" element={<RequireModule subModule="commerce.commandes"><CommandesDashboard /></RequireModule>} />
         <Route path="commerce/commandes/new/:type" element={<RequireModule subModule="commerce.commandes" minNiveau="ajout"><CommandeForm /></RequireModule>} />
         <Route path="commerce/commandes/:id" element={<RequireModule subModule="commerce.commandes"><CommandeDetail /></RequireModule>} />
         <Route path="commerce/commandes/:id/edit" element={<RequireModule subModule="commerce.commandes" minNiveau="edition"><CommandeForm /></RequireModule>} />

@@ -13,15 +13,16 @@ export default function CommandesList() {
   const canAdd = hasSubModuleLevel(user, 'commerce.commandes', 'ajout');
   const nav = useNavigate();
   const [rows, setRows] = useState([]);
-  const [mine, setMine] = useState(true);
+  const [scope, setScope] = useState('mine'); // mine | a_valider | toutes
   const [loading, setLoading] = useState(false);
 
   function load() {
     setLoading(true);
-    client.get('/commerce/commandes', { params: mine ? { mine: 1 } : {} })
+    const params = scope === 'mine' ? { mine: 1 } : scope === 'a_valider' ? { a_valider: 1 } : {};
+    client.get('/commerce/commandes', { params })
       .then(r => setRows(r.data)).catch(() => setRows([])).finally(() => setLoading(false));
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [mine]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [scope]);
 
   const benef = c => c.beneficiaire_type === 'commercial'
     ? `${c.commercial_code || ''} ${c.commercial_nom || ''}`.trim() || '—'
@@ -34,13 +35,15 @@ export default function CommandesList() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
           <h2 style={{ margin: 0 }}>Bons de commande</h2>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={() => nav('/commerce/commandes/dashboard')}>Tableau de bord</button>
             {canAdd && <button className="btn btn-primary" onClick={() => nav('/commerce/commandes/new/yaourt')}>+ Yaourt</button>}
             {canAdd && <button className="btn btn-primary" onClick={() => nav('/commerce/commandes/new/divers')}>+ Divers</button>}
           </div>
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ marginRight: 16 }}><input type="radio" checked={mine} onChange={() => setMine(true)} /> Mes commandes</label>
-          <label><input type="radio" checked={!mine} onChange={() => setMine(false)} /> Toutes</label>
+        <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+          {[['mine', 'Mes commandes'], ['a_valider', 'Mes validations'], ['toutes', 'Toutes']].map(([k, label]) => (
+            <button key={k} className={scope === k ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'} onClick={() => setScope(k)}>{label}</button>
+          ))}
         </div>
         <div className="table-wrap">
           <table className="table" style={{ width: '100%' }}>

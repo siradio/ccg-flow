@@ -1,7 +1,7 @@
 const express = require('express');
 const { all, one, withTransaction } = require('../../../db');
 const { requireAuth } = require('../../../middleware/auth');
-const { requireSubModule, requireSubModuleWrite } = require('../../../middleware/permissions');
+const { requireSubModule, requireSubModuleWrite, isSuperAdmin } = require('../../../middleware/permissions');
 const { logAction } = require('../../audit/audit.service');
 const { nextRef } = require('../../dsi/dsi.numbering');
 const workflow = require('./commande.workflow');
@@ -95,6 +95,16 @@ router.get('/', async (req, res, next) => {
     const where = [];
     const params = [];
     if (req.query.mine === '1') { params.push(req.user.id); where.push(`c.created_by = $${params.length}`); }
+    // File « Mes validations » : bons en cours dont l'étape courante requiert un rôle que je détiens.
+    if (req.query.a_valider === '1') {
+      where.push(`c.statut = 'en_validation'`);
+      if (!isSuperAdmin(req.user)) {
+        const roles = [...new Set((req.user.roles || []).map(r => r.role_code))];
+        if (roles.length === 0) return res.json([]);
+        params.push(roles);
+        where.push(`EXISTS (SELECT 1 FROM workflow_steps ws WHERE ws.id = c.current_step_id AND ws.role_code_requis = ANY($${params.length}))`);
+      }
+    }
     if (req.query.statut) { params.push(req.query.statut); where.push(`c.statut = $${params.length}`); }
     if (req.query.type) { params.push(req.query.type); where.push(`c.type_formulaire = $${params.length}`); }
     const sql = DETAIL_SELECT + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ' ORDER BY c.created_at DESC';
@@ -118,6 +128,52 @@ router.get('/catalogue', async (req, res, next) => {
        WHERE p.type_article = 'produit_fini' AND p.actif AND p.business_unit_id = ANY($1)
        ORDER BY bu.nom NULLS LAST, p.designation`, [buIds]);
     res.json({ unite: UNITE_BY_TYPE[type], products });
+  } catch (e) { next(e); }
+});
+
+// Tableau de bord : agrégats (filtres période / type / BU).
+router.get('/stats', async (req, res, next) => {
+  try {
+    const where = [];
+    const params = [];
+    if (req.query.from) { params.push(req.query.from); where.push(`c.created_at >= $${params.length}`); }
+    if (req.query.to) { params.push(req.query.to); where.push(`c.created_at <= ($${params.length}::date + 1)`); }
+    if (req.query.type) { params.push(req.query.type); where.push(`c.type_formulaire = $${params.length}`); }
+    if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`c.business_unit_id = $${params.length}`); }
+    const W = where.length ? ' WHERE ' + where.join(' AND ') : '';
+
+    const totaux = await one(`
+      SELECT COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE statut='brouillon')::int     AS brouillon,
+             COUNT(*) FILTER (WHERE statut='en_validation')::int AS en_validation,
+             COUNT(*) FILTER (WHERE statut='valide')::int        AS valide,
+             COUNT(*) FILTER (WHERE statut='rejetee')::int       AS rejetee,
+             COUNT(*) FILTER (WHERE statut='annulee')::int       AS annulee,
+             COALESCE(SUM(montant_total) FILTER (WHERE statut NOT IN ('annulee','rejetee')),0) AS montant_total,
+             COALESCE(SUM(total_casiers),0)::int AS casiers,
+             COALESCE(SUM(total_cartons),0)::int AS cartons,
+             AVG(EXTRACT(EPOCH FROM (updated_at - submitted_at))/86400.0)
+               FILTER (WHERE statut='valide' AND submitted_at IS NOT NULL) AS delai_moyen_jours
+        FROM commandes_commerciales c ${W}`, params);
+
+    const parType = await all(`
+      SELECT c.type_formulaire AS type, COUNT(*)::int AS count,
+             COALESCE(SUM(c.montant_total) FILTER (WHERE statut NOT IN ('annulee','rejetee')),0) AS montant
+        FROM commandes_commerciales c ${W} GROUP BY c.type_formulaire ORDER BY c.type_formulaire`, params);
+
+    const parEtape = await all(`
+      SELECT ws.code, ws.nom, COUNT(*)::int AS count
+        FROM commandes_commerciales c JOIN workflow_steps ws ON ws.id = c.current_step_id
+       ${W ? W + ' AND' : ' WHERE'} c.statut='en_validation'
+       GROUP BY ws.code, ws.nom, ws.ordre ORDER BY ws.ordre`, params);
+
+    const parBu = await all(`
+      SELECT bu.nom AS business_unit_nom, COUNT(*)::int AS count,
+             COALESCE(SUM(c.montant_total) FILTER (WHERE statut NOT IN ('annulee','rejetee')),0) AS montant
+        FROM commandes_commerciales c LEFT JOIN business_units bu ON bu.id = c.business_unit_id
+       ${W} GROUP BY bu.nom ORDER BY count DESC`, params);
+
+    res.json({ totaux, parType, parEtape, parBu });
   } catch (e) { next(e); }
 });
 
