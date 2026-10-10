@@ -131,6 +131,24 @@ router.get('/catalogue', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Circuit de validation configuré + titulaires de chaque rôle (visibilité « config approbateurs »).
+// Signale une étape sans titulaire actif (qui bloquerait l'avancement du bon).
+router.get('/circuit', async (req, res, next) => {
+  try {
+    const tpl = await one(`SELECT id FROM workflow_templates WHERE module_code = 'bon_commande_commercial' AND actif`);
+    if (!tpl) return res.json({ steps: [] });
+    const steps = await all(`SELECT ordre, code, nom, role_code_requis FROM workflow_steps WHERE workflow_template_id = $1 ORDER BY ordre`, [tpl.id]);
+    for (const s of steps) {
+      s.holders = s.role_code_requis
+        ? (await all(`SELECT DISTINCT TRIM(CONCAT(u.prenom,' ',u.nom)) AS nom
+                        FROM users u JOIN user_entity_roles uer ON uer.user_id = u.id
+                       WHERE u.actif = true AND uer.role_code = $1 ORDER BY 1`, [s.role_code_requis])).map(r => r.nom)
+        : [];
+    }
+    res.json({ steps });
+  } catch (e) { next(e); }
+});
+
 // Tableau de bord : agrégats (filtres période / type / BU).
 router.get('/stats', async (req, res, next) => {
   try {

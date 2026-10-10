@@ -21,10 +21,14 @@ export default function CommandesDashboard() {
   const nav = useNavigate();
   const [stats, setStats] = useState(null);
   const [businessUnits, setBusinessUnits] = useState([]);
+  const [circuit, setCircuit] = useState([]);
   const [f, setF] = useState({ from: '', to: '', type: '', business_unit_id: '' });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { client.get('/business-units/mine').then(r => setBusinessUnits(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    client.get('/business-units/mine').then(r => setBusinessUnits(r.data)).catch(() => {});
+    client.get('/commerce/commandes/circuit').then(r => setCircuit(r.data.steps || [])).catch(() => {});
+  }, []);
   function load() {
     setLoading(true);
     const params = {};
@@ -108,6 +112,34 @@ export default function CommandesDashboard() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Circuit de validation & approbateurs */}
+        {circuit.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <h3>Circuit de validation & approbateurs</h3>
+            <div className="table-wrap">
+              <table className="table" style={{ width: '100%' }}>
+                <thead><tr><th>Étape</th><th>Rôle</th><th>Approbateurs habilités</th></tr></thead>
+                <tbody>
+                  {circuit.filter(s => s.role_code_requis).map(s => (
+                    <tr key={s.code}>
+                      <td>{s.ordre}. {s.nom}</td>
+                      <td>{s.role_code_requis}</td>
+                      <td>
+                        {s.holders && s.holders.length
+                          ? s.holders.join(', ')
+                          : <span style={{ color: 'var(--color-danger)' }}>⚠ Aucun approbateur habilité (bloquant)</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              Les approbateurs se configurent en attribuant les rôles (Admin → Utilisateurs → Rôles par entité).
+            </p>
+          </div>
         )}
       </div>
     </div>
