@@ -1,6 +1,7 @@
 const { all, one, withTransaction } = require('../../../db');
 const { notify } = require('../../notifications/notifications.service');
 const { hasRoleAnywhere, isSuperAdmin } = require('../../../middleware/permissions');
+const pdf = require('./commande.pdf');
 
 // Orchestration du workflow des bons de commande commerciaux.
 // 3 étapes métier (responsable commercial cross-BU → contrôle de gestion → contrôle stock manuel
@@ -79,7 +80,7 @@ async function advance(exec, c, steps, fromStep, actorId) {
       await setState(exec, c.id, step.id, 'valide');
       await logEvent(exec, { commandeId: c.id, eventType: 'validation_finale', toStatut: 'valide', stepCode: step.code, actorId });
       notifs.push({ userId: c.created_by, message: `Votre bon ${c.numero || ''} est validé.` });
-      return { statut: 'valide', notifs, stepCode: step.code };
+      return { statut: 'valide', notifs, stepCode: step.code, finalized: true };
     }
     const sig = signatureForStep(step.code, c, lines);
     const prior = await exec.one(
@@ -95,11 +96,11 @@ async function advance(exec, c, steps, fromStep, actorId) {
     await openStepAuto(exec, c, step, lines);
     await setState(exec, c.id, step.id, 'en_validation');
     notifs.push({ role: step.role_code_requis, message: `Bon ${c.numero || ''} : votre validation est requise (${step.nom}).` });
-    return { statut: 'en_validation', notifs, stepCode: step.code };
+    return { statut: 'en_validation', notifs, stepCode: step.code, finalized: false };
   }
   await setState(exec, c.id, null, 'valide');
   notifs.push({ userId: c.created_by, message: `Votre bon ${c.numero || ''} est validé.` });
-  return { statut: 'valide', notifs, stepCode: null };
+  return { statut: 'valide', notifs, stepCode: null, finalized: true };
 }
 
 // Notifie tous les titulaires actifs d'un rôle (cross-entité).
@@ -142,9 +143,10 @@ async function validateStep(commandeId, user, { commentaire } = {}) {
     await logEvent(tx, { commandeId: c.id, eventType: 'validation', stepCode: step.code, actorId: user.id, commentaire });
     const steps = await loadSteps(tx, c.workflow_template_id);
     const res = await advance(tx, c, steps, step, user.id);
-    return { notifs: res.notifs, statut: res.statut };
+    return { notifs: res.notifs, statut: res.statut, finalized: res.finalized };
   });
   await dispatch(commandeId, out.notifs);
+  if (out.finalized) { try { await pdf.generateAndStore(commandeId, user.id); } catch (e) { console.error('[commande pdf]', e.message); } }
   return out;
 }
 
@@ -168,9 +170,10 @@ async function confirmStock(commandeId, user, { business_unit_id, disponible, co
     if (pending) await tx.run('UPDATE commande_validations SET statut = $1, decided_by = $2, decided_at = now(), commentaire = $3 WHERE id = $4', ['validee', user.id, 'Toutes les BU confirmées disponibles', pending.id]);
     const steps = await loadSteps(tx, c.workflow_template_id);
     const res = await advance(tx, c, steps, step, user.id);
-    return { notifs: res.notifs, statut: res.statut };
+    return { notifs: res.notifs, statut: res.statut, finalized: res.finalized };
   });
   await dispatch(commandeId, out.notifs);
+  if (out.finalized) { try { await pdf.generateAndStore(commandeId, user.id); } catch (e) { console.error('[commande pdf]', e.message); } }
   return out;
 }
 

@@ -53,6 +53,12 @@ export default function CommandeDetail() {
     try { await client.delete(`/commerce/commandes/${id}`); nav('/commerce/commandes'); }
     catch (e) { setError(e?.response?.data?.error || 'Erreur.'); }
   }
+  async function openPdf() {
+    try {
+      const res = await client.get(`/commerce/commandes/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { setError('PDF indisponible (disponible après validation complète).'); }
+  }
 
   if (error && !c) return <div><CommerceSubnav /><p style={{ padding: 16, color: 'var(--color-danger)' }}>{error}</p></div>;
   if (!c) return <div><CommerceSubnav /><p style={{ padding: 16 }}>Chargement…</p></div>;
@@ -89,6 +95,7 @@ export default function CommandeDetail() {
           <h2 style={{ margin: 0 }}>{c.numero || 'Brouillon'} — {c.type_formulaire === 'yaourt' ? 'Yaourt' : 'Divers'}</h2>
           <span className="badge" style={{ background: STATUT_COLOR[c.statut] || '#6b7280', color: '#fff' }}>{STATUT_LABEL[c.statut] || c.statut}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {c.statut === 'valide' && <button className="btn btn-primary" onClick={openPdf}>Télécharger le PDF</button>}
             {c.statut === 'brouillon' && canEdit && <button className="btn" onClick={() => nav(`/commerce/commandes/${id}/edit`)}>Modifier</button>}
             {c.statut === 'brouillon' && canEdit && <button className="btn btn-primary" onClick={submit} disabled={busy}>Soumettre</button>}
             {c.statut === 'brouillon' && canEdit && <button className="btn btn-danger-ghost" onClick={remove} disabled={busy}>Supprimer</button>}

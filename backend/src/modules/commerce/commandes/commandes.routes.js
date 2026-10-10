@@ -5,6 +5,7 @@ const { requireSubModule, requireSubModuleWrite } = require('../../../middleware
 const { logAction } = require('../../audit/audit.service');
 const { nextRef } = require('../../dsi/dsi.numbering');
 const workflow = require('./commande.workflow');
+const commandePdf = require('./commande.pdf');
 
 // Bons de commande commerciaux — saisie (Lot 2). Deux formulaires (Yaourt = casiers,
 // Divers = cartons) partageant un modèle. Recalcul des montants et gel des prix CÔTÉ SERVEUR :
@@ -278,6 +279,25 @@ router.delete('/:id', requireEdit, async (req, res, next) => {
     await withTransaction(async (tx) => { await tx.run('DELETE FROM commandes_commerciales WHERE id = $1', [id]); });
     await logAction({ tableName: 'commandes_commerciales', recordId: id, action: 'suppression', userId: req.user.id, details: {} });
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// Téléchargement du bon de commande PDF (généré à la validation complète ; régénéré si absent).
+router.get('/:id/pdf', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const c = await one('SELECT numero, statut FROM commandes_commerciales WHERE id = $1', [id]);
+    if (!c) return res.status(404).json({ error: 'Commande introuvable.' });
+    let doc = await commandePdf.getStored(id);
+    if (!doc || !doc.contenu) {
+      if (c.statut !== 'valide') return res.status(409).json({ error: 'Le bon de commande PDF est disponible après validation complète.' });
+      await commandePdf.generateAndStore(id, req.user.id);
+      doc = await commandePdf.getStored(id);
+    }
+    if (!doc || !doc.contenu) return res.status(404).json({ error: 'Document indisponible.' });
+    res.setHeader('Content-Type', doc.mime || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${(c.numero || 'BC_' + id).replace(/\s+/g, '_')}.pdf"`);
+    res.send(doc.contenu);
   } catch (e) { next(e); }
 });
 

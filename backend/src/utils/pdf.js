@@ -239,6 +239,37 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
   });
 }
 
+// Bon de commande commercial (après validation complète du circuit). Réutilise l'en-tête, le
+// tableau de lignes (avec prix) et le bloc signature communs. Quantités en casiers (Yaourt) ou
+// cartons (Divers) ; montants en GNF.
+async function generateCommandeCommercialePdf({ commande, lignes, beneficiaireLabel, logoBuffer, signatureBuffer, stampBuffer }) {
+  const lines = (lignes || []).map(l => ({
+    designation: l.libelle_fige, quantite: l.quantite, unite: l.unite, prix_unitaire_final: l.prix_unitaire_fige,
+  }));
+  const unite = commande.type_formulaire === 'yaourt' ? 'casier' : 'carton';
+  const totalQ = commande.type_formulaire === 'yaourt' ? commande.total_casiers : commande.total_cartons;
+  return renderPdf(doc => {
+    renderLetterhead(doc, 'Bon de commande commercial', logoBuffer);
+    doc.fontSize(11).font('Helvetica').fillColor('black');
+    doc.text(`Numéro : ${commande.numero || '—'}`);
+    doc.text(`Type : ${commande.type_formulaire === 'yaourt' ? 'Yaourt' : 'Divers'}`);
+    doc.text(`Bénéficiaire : ${beneficiaireLabel || '—'} (${commande.beneficiaire_type})`);
+    if (commande.vehicle_immatriculation) {
+      doc.text(`Véhicule : ${commande.vehicle_immatriculation}${commande.vehicle_marque ? ' — ' + commande.vehicle_marque : ''}`);
+    }
+    if (commande.capacite_figee) {
+      doc.text(`Remplissage : ${totalQ} / ${commande.capacite_figee} ${unite}s (${commande.taux_remplissage}%)`);
+    }
+    doc.text(`Date : ${new Date(commande.submitted_at || Date.now()).toLocaleDateString('fr-FR')}`);
+    linesTable(doc, lines, { showPrices: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
+      .text(`Montant total : ${money(commande.montant_total)} ${commande.devise || 'GNF'}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+    doc.fillColor('black');
+    renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom: COMPANY.nom });
+  });
+}
+
 // Petit tableau générique (en-tête bleu + lignes zébrées) pour les documents de synthèse.
 function simpleTable(doc, columns, rows) {
   const startX = 50;
@@ -308,7 +339,7 @@ async function generateCommercialFichePdf({ commercial, metrics, mensuel, journa
 }
 
 module.exports = {
-  generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf,
+  generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf, generateCommandeCommercialePdf,
   // Helpers réutilisables (ex. module Reporting) :
   renderPdf, renderLetterhead, simpleTable, money,
   BRAND_BLUE, BRAND_NAVY, MUTED_GRAY, PAGE_WIDTH,
