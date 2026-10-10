@@ -17,6 +17,8 @@ export const NAV = [
   ['/commerce/moyens', 'com.nav.moyens', 'commerce.parametres'],
   ['/commerce/banques', 'com.nav.banques', 'commerce.parametres'],
   ['/commerce/zones', 'com.nav.zones', 'commerce.parametres'],
+  ['/commerce/grossistes', 'com.nav.grossistes', 'commerce.parametres'],
+  ['/commerce/tarifs', 'com.nav.tarifs', 'commerce.parametres'],
   ['/commerce/parametres', 'com.nav.parametres', 'commerce.parametres'],
 ];
 

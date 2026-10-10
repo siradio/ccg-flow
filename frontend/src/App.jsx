@@ -51,6 +51,7 @@ import StockImport from './pages/Stock/StockImport';
 import StockReleveJour from './pages/Stock/StockReleveJour';
 import ProductionReleve from './pages/Production/ProductionReleve';
 import CommerceIndex from './pages/Commerce/CommerceIndex';
+import TarifsPage from './pages/Commerce/TarifsPage';
 import CommerceParametres from './pages/Commerce/CommerceParametres';
 import VersementsList from './pages/Commerce/VersementsList';
 import VersementForm from './pages/Commerce/VersementForm';
@@ -168,6 +169,7 @@ export default function App() {
         <Route path="commerce/import" element={<RequireModule subModule="commerce.versements" minNiveau="ajout"><CommerceImport /></RequireModule>} />
         <Route path="commerce/parametres" element={<RequireModule subModule="commerce.parametres"><CommerceParametres /></RequireModule>} />
         <Route path="commerce/commerciaux/:id" element={<RequireModule subModule="commerce.commerciaux"><CommercialFiche /></RequireModule>} />
+        <Route path="commerce/tarifs" element={<RequireModule subModule="commerce.parametres"><TarifsPage /></RequireModule>} />
         <Route path="commerce/:type" element={<RequireModule subModule={['commerce.commerciaux', 'commerce.parametres']}><CommerceIndex /></RequireModule>} />
         <Route path="production/releve" element={<RequireModule subModule="production.releve"><ProductionReleve /></RequireModule>} />
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />
