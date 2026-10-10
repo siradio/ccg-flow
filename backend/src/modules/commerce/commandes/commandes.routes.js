@@ -4,6 +4,7 @@ const { requireAuth } = require('../../../middleware/auth');
 const { requireSubModule, requireSubModuleWrite } = require('../../../middleware/permissions');
 const { logAction } = require('../../audit/audit.service');
 const { nextRef } = require('../../dsi/dsi.numbering');
+const workflow = require('./commande.workflow');
 
 // Bons de commande commerciaux — saisie (Lot 2). Deux formulaires (Yaourt = casiers,
 // Divers = cartons) partageant un modèle. Recalcul des montants et gel des prix CÔTÉ SERVEUR :
@@ -240,7 +241,7 @@ router.post('/:id/submit', requireEdit, async (req, res, next) => {
     }
 
     const tpl = await one(`SELECT id FROM workflow_templates WHERE module_code = 'bon_commande_commercial' AND actif`);
-    const step1 = tpl ? await one(`SELECT id FROM workflow_steps WHERE workflow_template_id = $1 ORDER BY ordre LIMIT 1`, [tpl.id]) : null;
+    const step1 = tpl ? await one(`SELECT id, code, nom, role_code_requis FROM workflow_steps WHERE workflow_template_id = $1 ORDER BY ordre LIMIT 1`, [tpl.id]) : null;
 
     const numero = await withTransaction(async (tx) => {
       const num = await nextRef(tx, { scope: 'bon_commande_commercial', prefix: 'BC-COM', pad: 4 });
@@ -250,9 +251,16 @@ router.post('/:id/submit', requireEdit, async (req, res, next) => {
            capacite_figee=$4, taux_remplissage=$5, motif_sous_charge=$6, submitted_at=now(), updated_at=now()
          WHERE id=$7`,
         [num, tpl ? tpl.id : null, step1 ? step1.id : null, capacite, taux, motif, id]);
+      // Ouvre la 1re étape du circuit (ligne de validation « en attente ») dans la même transaction.
+      if (step1 && step1.role_code_requis) {
+        await workflow.openFirstStep(tx, { ...c, numero: num, montant_total: computed.montant_total }, step1, computed.lines, req.user.id);
+      }
       return num;
     });
     await logAction({ tableName: 'commandes_commerciales', recordId: id, action: 'soumission', userId: req.user.id, details: { numero } });
+    if (step1 && step1.role_code_requis) {
+      try { await workflow.notifyRole(step1.role_code_requis, 'Bon de commande', `Nouveau bon ${numero} à valider (${step1.nom}).`, `/commerce/commandes/${id}`); } catch (e) { /* non bloquant */ }
+    }
     res.json(await one(DETAIL_SELECT + ' WHERE c.id = $1', [id]));
   } catch (e) {
     if (e.status === 400) return res.status(400).json({ error: e.message });
@@ -272,5 +280,29 @@ router.delete('/:id', requireEdit, async (req, res, next) => {
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
+
+// ── Workflow ────────────────────────────────────────────────────────────────
+router.get('/:id/workflow', async (req, res, next) => {
+  try {
+    const wf = await workflow.getWorkflow(Number(req.params.id));
+    if (!wf) return res.status(404).json({ error: 'Commande introuvable.' });
+    res.json(wf);
+  } catch (e) { next(e); }
+});
+
+const action = (fn) => async (req, res, next) => {
+  try {
+    const out = await fn(Number(req.params.id), req.user, req.body || {});
+    res.json({ ok: true, ...out });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    next(e);
+  }
+};
+
+router.post('/:id/validate', action(workflow.validateStep));
+router.post('/:id/stock-confirm', action(workflow.confirmStock));
+router.post('/:id/return', action(workflow.returnStep));
+router.post('/:id/cancel', action(workflow.cancelOrder));
 
 module.exports = router;

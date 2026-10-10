@@ -21,6 +21,9 @@ const PERMS = {
   rh:                ['rh_view_all', 'rh_valider', 'rh_gerer'],
   daf:               ['rh_view_all', 'rh_valider'],
   dg:                ['rh_view_all', 'rh_valider'],
+  // Rôles du workflow « Bons de commande commerciaux » (cross-BU / global, non rattachés à une BU).
+  responsable_commercial: ['bc_valider_commercial'],
+  gestionnaire_stock:     ['bc_valider_stock'],
 };
 
 function isSuperAdmin(user) {
@@ -46,6 +49,14 @@ function hasRoleOnEntity(user, roleCode, entityId) {
 function hasAnyRoleOnEntity(user, entityId) {
   if (isSuperAdmin(user)) return true;
   return (user.roles || []).some(r => Number(r.entity_id) === Number(entityId));
+}
+
+// L'utilisateur détient-il ce rôle sur AU MOINS UNE entité (rôle « global / cross-BU ») ?
+// Utilisé par le workflow des bons de commande commerciaux (responsable_commercial,
+// gestionnaire_stock) qui ne sont pas rattachés à une entité/BU précise.
+function hasRoleAnywhere(user, roleCode) {
+  if (isSuperAdmin(user)) return true;
+  return (user.roles || []).some(r => r.role_code === roleCode);
 }
 
 function hasPerm(roleCode, perm) {
@@ -156,6 +167,7 @@ module.exports = {
   isUserAdmin,
   hasRoleOnEntity,
   hasAnyRoleOnEntity,
+  hasRoleAnywhere,
   hasPerm,
   hasPermAnywhere,
   subModuleNiveau,
