@@ -66,6 +66,7 @@ const MODULES = [
     subModules: [
       { key: 'commerce.tableau_bord', label: 'Tableau de bord commercial' },
       { key: 'commerce.versements', label: 'Versements commerciaux' },
+      { key: 'commerce.commandes', label: 'Bons de commande' },
       { key: 'commerce.objectifs', label: 'Objectifs commerciaux' },
       { key: 'commerce.commerciaux', label: 'Commerciaux' },
       { key: 'commerce.commissions', label: 'Commissions' },
