@@ -13,6 +13,7 @@ const router = simpleCrudRouter({
   columns: [
     'immatriculation', 'numero_chassis', 'type_id', 'marque', 'modele', 'annee',
     'entity_id', 'site_id', 'statut', 'compteur_km', 'capacite_reservoir',
+    'capacite_casiers', 'capacite_cartons',
     'date_mise_circulation', 'date_acquisition',
   ],
   filterColumn: 'type_id',

@@ -41,6 +41,8 @@ const CONFIGS = {
       // Un commercial peut couvrir plusieurs BU (la principale ci-dessus est toujours incluse).
       { key: 'business_unit_ids', label: 'BU couvertes', type: 'multiFk', listKey: 'businessUnits' },
       { key: 'zone_id', label: 'Zone', type: 'fkSelect', listKey: 'zones' },
+      // Véhicule habituel : pré-remplit le bon de commande et affiche la capacité (casiers/cartons).
+      { key: 'vehicle_id', label: 'Véhicule', type: 'fkSelect', listKey: 'vehicles' },
       { key: 'responsable', label: 'Responsable' },
       { key: 'date_debut', label: "Date de début d'activité", type: 'date' },
       { key: 'statut', label: 'Statut', type: 'select', options: ['actif', 'inactif'], default: 'actif',
@@ -92,6 +94,24 @@ const CONFIGS = {
       { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
     ],
   },
+  grossistes: {
+    title: 'Grossistes', endpoint: '/commerce/grossistes', subModuleKey: 'commerce.parametres',
+    filters: ['business_unit_id', 'zone_id', 'statut'],
+    fields: [
+      { key: 'code', label: 'Code', required: true },
+      { key: 'raison_sociale', label: 'Raison sociale', required: true },
+      { key: 'contact_nom', label: 'Contact' },
+      { key: 'telephone', label: 'Téléphone' },
+      { key: 'email', label: 'Email' },
+      { key: 'adresse', label: 'Adresse' },
+      { key: 'zone_id', label: 'Zone', type: 'fkSelect', listKey: 'zones' },
+      { key: 'business_unit_id', label: 'Business Unit', type: 'fkSelect', listKey: 'businessUnits' },
+      { key: 'statut', label: 'Statut', type: 'select', options: ['actif', 'inactif'], default: 'actif',
+        optionLabels: { actif: 'Actif', inactif: 'Inactif' } },
+      { key: 'date_debut', label: 'Date de début', type: 'date' },
+      { key: 'observations', label: 'Observations', type: 'textarea' },
+    ],
+  },
 };
 
 export default function CommerceIndex() {
@@ -103,10 +123,12 @@ export default function CommerceIndex() {
   const [zones, setZones] = useState([]);
   const [products, setProducts] = useState([]);
   const [commerciaux, setCommerciaux] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
 
   useEffect(() => {
     client.get('/business-units/mine').then(r => setBusinessUnits(r.data)).catch(() => {});
     client.get('/commerce/zones').then(r => setZones(r.data.map(z => ({ id: z.id, nom: z.nom })))).catch(() => {});
+    client.get('/vehicles').then(r => setVehicles(r.data.map(v => ({ id: v.id, nom: `${v.immatriculation}${v.marque ? ' — ' + v.marque : ''}` })))).catch(() => {});
     // Employés (pour les commerciaux internes) — dégradé gracieux sans accès RH (liste vide). Les
     // champs `_*` alimentent l'auto-remplissage (voir `autofill` sur le champ employee_id).
     client.get('/employees').then(r => setEmployees(r.data.map(e => ({
@@ -130,8 +152,8 @@ export default function CommerceIndex() {
       .sort((a, b) => a.group.localeCompare(b.group) || a.nom.localeCompare(b.nom));
   }, [products, businessUnits]);
 
-  const lists = useMemo(() => ({ employees, businessUnits, zones, products, productsFinis, commerciaux }),
-    [employees, businessUnits, zones, products, productsFinis, commerciaux]);
+  const lists = useMemo(() => ({ employees, businessUnits, zones, products, productsFinis, commerciaux, vehicles }),
+    [employees, businessUnits, zones, products, productsFinis, commerciaux, vehicles]);
 
   const config = CONFIGS[type];
   if (!config) {

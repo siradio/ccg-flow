@@ -36,6 +36,9 @@ const CONFIGS = {
       { key: 'statut', label: 'Statut', type: 'select', options: STATUTS, default: 'Disponible' },
       { key: 'compteur_km', label: 'Compteur (km)', type: 'number' },
       { key: 'capacite_reservoir', label: 'Capacité réservoir (L)', type: 'number' },
+      // Capacité de charge — sert au contrôle de remplissage des bons de commande commerciaux.
+      { key: 'capacite_casiers', label: 'Capacité (casiers)', type: 'number' },
+      { key: 'capacite_cartons', label: 'Capacité (cartons)', type: 'number' },
       { key: 'date_mise_circulation', label: 'Mise en circulation', type: 'date' },
       { key: 'date_acquisition', label: "Date d'acquisition", type: 'date' },
       { key: 'photo', label: 'Photo', type: 'photo' },

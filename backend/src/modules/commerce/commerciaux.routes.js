@@ -26,15 +26,18 @@ const BASE_SELECT = `
          bu.code AS business_unit_code, bu.nom AS business_unit_nom,
          COALESCE((SELECT array_agg(j.business_unit_id ORDER BY j.business_unit_id)
                      FROM commercial_business_units j WHERE j.commercial_id = c.id), ARRAY[]::int[]) AS business_unit_ids,
-         z.nom  AS zone_nom
+         z.nom  AS zone_nom,
+         v.immatriculation AS vehicle_immatriculation, v.marque AS vehicle_marque,
+         v.capacite_casiers AS vehicle_capacite_casiers, v.capacite_cartons AS vehicle_capacite_cartons
     FROM commerciaux c
     LEFT JOIN employees e        ON e.id = c.employee_id
     LEFT JOIN business_units bu  ON bu.id = c.business_unit_id
-    LEFT JOIN zones_commerciales z ON z.id = c.zone_id`;
+    LEFT JOIN zones_commerciales z ON z.id = c.zone_id
+    LEFT JOIN vehicles v         ON v.id = c.vehicle_id`;
 
 const EDITABLE = [
   'code', 'type', 'employee_id', 'nom', 'prenom', 'telephone', 'email', 'adresse',
-  'business_unit_id', 'zone_id', 'responsable', 'date_debut', 'statut', 'observations',
+  'business_unit_id', 'zone_id', 'vehicle_id', 'responsable', 'date_debut', 'statut', 'observations',
 ];
 const emptyToNull = v => (v === '' || v === undefined ? null : v);
 
