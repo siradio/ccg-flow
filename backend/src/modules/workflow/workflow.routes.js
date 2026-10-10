@@ -1,11 +1,13 @@
 const express = require('express');
 const { pool, one, all } = require('../../db');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSuperAdmin, requireSubModule } = require('../../middleware/permissions');
+const { requireSuperAdmin } = require('../../middleware/permissions');
+const { CATALOG, getEntry } = require('./workflow.catalog');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireSubModule('achats'));
+// Plus de gate 'achats' ici : lire une définition de circuit n'est pas sensible (sert aussi à
+// afficher les frises de validation), et l'édition (PUT) reste réservée au super_admin.
 
 // SLA (délai cible de l'étape) en jours : entier positif, ou NULL si non défini (« pas de SLA »).
 function slaJours(s) {
@@ -14,6 +16,18 @@ function slaJours(s) {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
 }
+
+// Liste des workflows configurables (module « Workflows »). Admin uniquement.
+router.get('/catalog', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const rows = [];
+    for (const [module_code, e] of Object.entries(CATALOG)) {
+      const tpl = await one('SELECT nom FROM workflow_templates WHERE module_code = $1 AND actif = true', [module_code]);
+      rows.push({ module_code, label: e.label, locked: e.locked, nom: tpl ? tpl.nom : e.label, exists: !!tpl, roleOptions: e.roleOptions, protectedCodes: e.protectedCodes });
+    }
+    res.json(rows);
+  } catch (e) { next(e); }
+});
 
 // Un template par module_code peut être "archivé" (actif = false) lors d'un versionnement (voir
 // PUT ci-dessous) — au-delà de ce cas, il n'y en a jamais qu'un seul actif à la fois (contrainte
@@ -64,11 +78,31 @@ router.get('/by-id/:templateId', requireAuth, async (req, res, next) => {
 // un état incohérent.
 // Body: { steps: [{ id?, ordre, code, nom, role_code_requis, commentaire_obligatoire_si_refus, comportement_si_refus, retour_step_code }, ...] }
 router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next) => {
+  const entry = getEntry(req.params.moduleCode);
+  if (!entry) return res.status(400).json({ error: 'Workflow non configurable.' });
   const template = await one('SELECT * FROM workflow_templates WHERE module_code = $1 AND actif = true', [req.params.moduleCode]);
   if (!template) return res.status(404).json({ error: 'Workflow introuvable.' });
   const { steps } = req.body || {};
   if (!Array.isArray(steps) || steps.length === 0) {
     return res.status(400).json({ error: 'steps (tableau non vide) requis.' });
+  }
+
+  // Circuit FIGÉ (ex. bon de commande) : étapes pilotées par le code du moteur. On n'applique que
+  // le nom affiché, le SLA et l'obligation de commentaire sur les étapes EXISTANTES — jamais
+  // d'ajout/suppression/réordonnancement ni de changement de code/rôle.
+  if (entry.locked) {
+    try {
+      const existing = await all('SELECT id FROM workflow_steps WHERE workflow_template_id = $1', [template.id]);
+      const existingIds = new Set(existing.map(s => s.id));
+      for (const s of steps) {
+        if (!existingIds.has(s.id)) continue;
+        await pool.query(
+          'UPDATE workflow_steps SET nom = $1, sla_jours = $2, commentaire_obligatoire_si_refus = $3 WHERE id = $4 AND workflow_template_id = $5',
+          [s.nom, slaJours(s), !!s.commentaire_obligatoire_si_refus, s.id, template.id]);
+      }
+      const updatedSteps = await all('SELECT * FROM workflow_steps WHERE workflow_template_id = $1 ORDER BY ordre', [template.id]);
+      return res.json({ ...template, steps: updatedSteps, versioned: false });
+    } catch (e) { return next(e); }
   }
   const codes = steps.map(s => s.code);
   if (codes.some(c => !c) || new Set(codes).size !== codes.length) {
@@ -103,13 +137,12 @@ router.put('/:moduleCode', requireAuth, requireSuperAdmin, async (req, res, next
 
     let needsVersioning = false;
     if (removedIds.length > 0) {
-      const { rows: refs } = await client.query(
-        `SELECT 1 FROM approvals WHERE workflow_step_id = ANY($1::int[])
-         UNION ALL
-         SELECT 1 FROM purchase_requests WHERE current_step_id = ANY($1::int[])
-         LIMIT 1`,
-        [removedIds]
-      );
+      // Une étape retirée est-elle déjà référencée quelque part ? Les tables/colonnes viennent du
+      // catalogue (jamais d'entrée utilisateur) → interpolation sûre.
+      const unionSql = entry.usage
+        .map(u => `SELECT 1 FROM ${u.table} WHERE ${u.col} = ANY($1::int[])`)
+        .join(' UNION ALL ') + ' LIMIT 1';
+      const { rows: refs } = await client.query(unionSql, [removedIds]);
       needsVersioning = refs.length > 0;
     }
 

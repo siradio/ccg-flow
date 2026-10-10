@@ -1463,6 +1463,8 @@ export const translations = {
     'adm.role.rh': 'RH',
     'adm.role.daf': 'DAF',
     'adm.role.dg': 'DGA (Direction générale adjointe)',
+    'adm.role.responsable_commercial': 'Responsable commercial',
+    'adm.role.gestionnaire_stock': 'Gestionnaire de stock',
     // Niveaux d'accès module
     'adm.niveau.none': '— (aucun accès)',
     'adm.niveau.consultation': 'Consultation (lecture seule)',
@@ -3754,6 +3756,8 @@ export const translations = {
     'adm.role.rh': 'HR',
     'adm.role.daf': 'CFO',
     'adm.role.dg': 'DGA (Deputy GM)',
+    'adm.role.responsable_commercial': 'Sales manager',
+    'adm.role.gestionnaire_stock': 'Stock manager',
     // Module access levels
     'adm.niveau.none': '— (no access)',
     'adm.niveau.consultation': 'View only (read)',
