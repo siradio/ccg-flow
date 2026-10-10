@@ -74,6 +74,7 @@ app.use('/api/commerce/commerciaux', require('./modules/commerce/commerciaux.rou
 app.use('/api/commerce/assignments', require('./modules/commerce/assignments.routes'));
 app.use('/api/commerce/grossistes', require('./modules/commerce/grossistes.routes'));
 app.use('/api/commerce/tarifs', require('./modules/commerce/tarifs.routes'));
+app.use('/api/commerce/commandes', require('./modules/commerce/commandes/commandes.routes'));
 app.use('/api/commerce/versements', require('./modules/commerce/versements.routes'));
 app.use('/api/commerce/objectifs', require('./modules/commerce/objectifs.routes'));
 app.use('/api/commerce/dashboard', require('./modules/commerce/dashboard.routes'));

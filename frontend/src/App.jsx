@@ -52,6 +52,9 @@ import StockReleveJour from './pages/Stock/StockReleveJour';
 import ProductionReleve from './pages/Production/ProductionReleve';
 import CommerceIndex from './pages/Commerce/CommerceIndex';
 import TarifsPage from './pages/Commerce/TarifsPage';
+import CommandesList from './pages/Commerce/CommandesList';
+import CommandeForm from './pages/Commerce/CommandeForm';
+import CommandeDetail from './pages/Commerce/CommandeDetail';
 import CommerceParametres from './pages/Commerce/CommerceParametres';
 import VersementsList from './pages/Commerce/VersementsList';
 import VersementForm from './pages/Commerce/VersementForm';
@@ -170,6 +173,10 @@ export default function App() {
         <Route path="commerce/parametres" element={<RequireModule subModule="commerce.parametres"><CommerceParametres /></RequireModule>} />
         <Route path="commerce/commerciaux/:id" element={<RequireModule subModule="commerce.commerciaux"><CommercialFiche /></RequireModule>} />
         <Route path="commerce/tarifs" element={<RequireModule subModule="commerce.parametres"><TarifsPage /></RequireModule>} />
+        <Route path="commerce/commandes" element={<RequireModule subModule="commerce.commandes"><CommandesList /></RequireModule>} />
+        <Route path="commerce/commandes/new/:type" element={<RequireModule subModule="commerce.commandes" minNiveau="ajout"><CommandeForm /></RequireModule>} />
+        <Route path="commerce/commandes/:id" element={<RequireModule subModule="commerce.commandes"><CommandeDetail /></RequireModule>} />
+        <Route path="commerce/commandes/:id/edit" element={<RequireModule subModule="commerce.commandes" minNiveau="edition"><CommandeForm /></RequireModule>} />
         <Route path="commerce/:type" element={<RequireModule subModule={['commerce.commerciaux', 'commerce.parametres']}><CommerceIndex /></RequireModule>} />
         <Route path="production/releve" element={<RequireModule subModule="production.releve"><ProductionReleve /></RequireModule>} />
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />
