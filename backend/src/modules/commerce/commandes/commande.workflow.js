@@ -1,6 +1,6 @@
 const { all, one, withTransaction } = require('../../../db');
 const { notify } = require('../../notifications/notifications.service');
-const { hasRoleAnywhere, isSuperAdmin } = require('../../../middleware/permissions');
+const { hasRoleAnywhere, isSuperAdmin, visibleBusinessUnitIds } = require('../../../middleware/permissions');
 const pdf = require('./commande.pdf');
 
 // Orchestration du workflow des bons de commande commerciaux.
@@ -158,6 +158,10 @@ async function confirmStock(commandeId, user, { business_unit_id, disponible, co
     const step = await currentStep(tx, c);
     if (!step || step.code !== 'controle_stock') throw err('La commande n\'est pas à l\'étape de contrôle stock.', 409);
     if (!hasRoleAnywhere(user, 'gestionnaire_stock')) throw err('Rôle gestionnaire de stock requis.', 403);
+    // Restriction par BU : un gestionnaire avec des BU accordées ne confirme que CELLES-CI.
+    // (Sans aucune BU accordée => non restreint, comportement inchangé ; super_admin partout.)
+    const visible = visibleBusinessUnitIds(user);
+    if (visible && !visible.includes(Number(business_unit_id))) throw err('Vous n\'êtes pas habilité sur cette Business Unit.', 403);
     const row = await tx.one('SELECT id FROM commande_controle_stock WHERE commande_id = $1 AND business_unit_id = $2', [c.id, Number(business_unit_id)]);
     if (!row) throw err('BU non concernée par ce bon.', 400);
     await tx.run('UPDATE commande_controle_stock SET disponible = $1, confirme_par = $2, commentaire = $3, confirmed_at = now() WHERE id = $4',

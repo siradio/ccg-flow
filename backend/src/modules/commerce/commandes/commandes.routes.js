@@ -1,7 +1,7 @@
 const express = require('express');
 const { all, one, withTransaction } = require('../../../db');
 const { requireAuth } = require('../../../middleware/auth');
-const { requireSubModule, requireSubModuleWrite, isSuperAdmin } = require('../../../middleware/permissions');
+const { requireSubModule, requireSubModuleWrite, isSuperAdmin, visibleBusinessUnitIds } = require('../../../middleware/permissions');
 const { logAction } = require('../../audit/audit.service');
 const { nextRef } = require('../../dsi/dsi.numbering');
 const workflow = require('./commande.workflow');
@@ -107,6 +107,16 @@ router.get('/', async (req, res, next) => {
     }
     if (req.query.statut) { params.push(req.query.statut); where.push(`c.statut = $${params.length}`); }
     if (req.query.type) { params.push(req.query.type); where.push(`c.type_formulaire = $${params.length}`); }
+    // Visibilité par BU (vue « Toutes ») : un utilisateur restreint à des BU ne voit que les bons
+    // qu'il a créés, rattachés à ses BU, ou comportant une ligne de ses BU. « Mes commandes » et
+    // « Mes validations » ont déjà leur propre filtrage. Sans restriction de BU => voit tout.
+    const visible = visibleBusinessUnitIds(req.user);
+    if (visible && req.query.mine !== '1' && req.query.a_valider !== '1') {
+      params.push(req.user.id); const pUser = params.length;
+      params.push(visible); const pBu = params.length;
+      where.push(`(c.created_by = $${pUser} OR c.business_unit_id = ANY($${pBu})
+                   OR EXISTS (SELECT 1 FROM commande_lignes l WHERE l.commande_id = c.id AND l.business_unit_id = ANY($${pBu})))`);
+    }
     const sql = DETAIL_SELECT + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ' ORDER BY c.created_at DESC';
     res.json(await all(sql, params));
   } catch (e) { next(e); }

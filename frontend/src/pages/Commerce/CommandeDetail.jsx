@@ -15,6 +15,10 @@ export default function CommandeDetail() {
   const canEdit = hasSubModuleLevel(user, 'commerce.commandes', 'edition');
   const sa = (user?.roles || []).some(r => r.role_code === 'super_admin');
   const hasRole = code => sa || (user?.roles || []).some(r => r.role_code === code);
+  // BU habilitées : si l'utilisateur a des BU accordées, il ne confirme le stock que pour celles-ci
+  // (sans octroi de BU => non restreint, comme la couche d'accès Stock existante).
+  const buGrants = (user?.businessUnits || []).map(Number);
+  const canConfirmBU = buId => sa || buGrants.length === 0 || buGrants.includes(Number(buId));
 
   const [c, setC] = useState(null);
   const [wf, setWf] = useState(null);
@@ -144,8 +148,10 @@ export default function CommandeDetail() {
                       <td>{s.commentaire || '—'}</td>
                       {canStock && (
                         <td style={{ whiteSpace: 'nowrap' }}>
-                          <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => call('stock-confirm', { business_unit_id: s.business_unit_id, disponible: true })}>Disponible</button>{' '}
-                          <button className="btn btn-sm btn-danger-ghost" disabled={busy} onClick={() => { const m = window.prompt('Commentaire (indisponibilité) :') || ''; call('stock-confirm', { business_unit_id: s.business_unit_id, disponible: false, commentaire: m }); }}>Indispo.</button>
+                          {canConfirmBU(s.business_unit_id) ? (<>
+                            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => call('stock-confirm', { business_unit_id: s.business_unit_id, disponible: true })}>Disponible</button>{' '}
+                            <button className="btn btn-sm btn-danger-ghost" disabled={busy} onClick={() => { const m = window.prompt('Commentaire (indisponibilité) :') || ''; call('stock-confirm', { business_unit_id: s.business_unit_id, disponible: false, commentaire: m }); }}>Indispo.</button>
+                          </>) : <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>— autre BU —</span>}
                         </td>
                       )}
                     </tr>
