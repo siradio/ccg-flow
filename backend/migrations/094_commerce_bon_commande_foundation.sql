@@ -18,9 +18,12 @@ ALTER TABLE user_entity_roles ADD CONSTRAINT user_entity_roles_role_code_check
 
 -- 2) Circuit de validation (réutilise le moteur générique, sans le modifier).
 --    3 étapes métier + 1 étape système (génération du bon de commande).
+-- NB : depuis la migration 016, l'unicité de module_code est un index PARTIEL (WHERE actif),
+-- il n'y a donc plus de contrainte totale à cibler → ON CONFLICT DO NOTHING sans cible
+-- (couvre l'index partiel et reste idempotent : un 2e template actif du même module est ignoré).
 INSERT INTO workflow_templates (module_code, nom, actif)
 VALUES ('bon_commande_commercial', 'Bon de commande commercial', true)
-ON CONFLICT (module_code) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO workflow_steps
   (workflow_template_id, ordre, code, nom, role_code_requis,
