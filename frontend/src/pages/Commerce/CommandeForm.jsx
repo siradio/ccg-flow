@@ -237,7 +237,7 @@ export default function CommandeForm() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
-                <tr style={{ background: 'var(--color-navy)', color: '#fff' }}>
+                <tr style={{ background: '#2454e0', color: '#fff' }}>
                   <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase' }}>Produit</th>
                   <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase' }}>Prix unitaire</th>
                   <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', width: 130 }}>Quantité ({unite}s)</th>
@@ -296,7 +296,7 @@ export default function CommandeForm() {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ background: 'var(--color-navy)', color: '#fff', fontWeight: 700 }}>
+                <tr style={{ background: '#2454e0', color: '#fff', fontWeight: 700 }}>
                   <td style={{ padding: '11px 14px' }}>Total · {fmt(totals.lignes)} ligne(s)</td>
                   <td></td>
                   <td style={{ padding: '11px 14px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{fmt(totals.q)} {unite}s</td>
