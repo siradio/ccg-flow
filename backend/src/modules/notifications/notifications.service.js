@@ -1,5 +1,9 @@
 const { all, one, run } = require('../../db');
 const mailer = require('../../utils/mailer');
+const env = require('../../config/env');
+
+const escapeHtml = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 async function notify(userId, type, message, lien) {
   await one(
@@ -7,12 +11,21 @@ async function notify(userId, type, message, lien) {
     [userId, type, message, lien || null]
   );
   const user = await one('SELECT email, nom, prenom FROM users WHERE id = $1', [userId]);
-  if (user) {
-    try {
-      await mailer.sendMail({ to: user.email, subject: `[CCG Flow] ${type}`, text: message });
-    } catch (e) {
-      console.error(`Échec envoi email de notification à ${user.email} :`, e.message);
-    }
+  // On n'envoie l'e-mail QUE si le compte a une adresse : un `to` vide fait échouer l'envoi et
+  // déclenche le coupe-circuit du mailer (60 s), ce qui priverait d'e-mail les destinataires
+  // suivants de la même cascade de validation (bug observé sur le workflow RH).
+  if (!user || !user.email || !String(user.email).trim()) return;
+  try {
+    const url = env.appUrl && lien ? `${env.appUrl}${lien.startsWith('/') ? '' : '/'}${lien}` : null;
+    const html = mailer.renderMailTemplate({
+      title: type,
+      bodyHtml: `<p>${escapeHtml(message)}</p>${url
+        ? `<p style="margin-top:22px;"><a href="${url}" style="display:inline-block;background:#2454e0;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:6px;font-weight:bold;">Ouvrir dans CCG Flow</a></p>`
+        : ''}`,
+    });
+    await mailer.sendMail({ to: user.email, subject: `[CCG Flow] ${type}`, text: message + (url ? `\n\n${url}` : ''), html });
+  } catch (e) {
+    console.error(`Échec envoi email de notification à ${user.email} :`, e.message);
   }
 }
 
