@@ -30,21 +30,18 @@ export default function CommandeForm() {
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(!editing);
 
-  // Référentiels bénéficiaires + véhicules.
   useEffect(() => {
     client.get('/commerce/commerciaux').then(r => setCommerciaux(r.data)).catch(() => {});
     client.get('/commerce/grossistes', { params: { statut: 'actif' } }).then(r => setGrossistes(r.data)).catch(() => {});
     client.get('/vehicles').then(r => setVehicles(r.data)).catch(() => {});
   }, []);
 
-  // Catalogue du formulaire (dépend du type).
   useEffect(() => {
     client.get('/commerce/commandes/catalogue', { params: { type } })
       .then(r => { setCatalogue(r.data.products || []); setUnite(r.data.unite || 'casier'); })
       .catch(() => setCatalogue([]));
   }, [type]);
 
-  // En édition : charge la commande existante.
   useEffect(() => {
     if (!editing) return;
     client.get(`/commerce/commandes/${id}`).then(r => {
@@ -59,7 +56,6 @@ export default function CommandeForm() {
 
   const vehicleById = useMemo(() => Object.fromEntries(vehicles.map(v => [v.id, v])), [vehicles]);
 
-  // Pré-remplit le véhicule depuis le commercial sélectionné (si non déjà choisi).
   function onSelectCommercial(cid) {
     setCommercialId(cid);
     const c = commerciaux.find(x => String(x.id) === String(cid));
@@ -69,15 +65,15 @@ export default function CommandeForm() {
   const priceOf = p => (beneficiaireType === 'grossiste' ? p.prix_grossiste : p.prix_commercial);
 
   const totals = useMemo(() => {
-    let q = 0, montant = 0;
+    let q = 0, montant = 0, lignes = 0;
     for (const p of catalogue) {
       const n = Number(qty[p.product_id]);
       if (!Number.isInteger(n) || n <= 0) continue;
       const prix = Number(priceOf(p));
       if (!Number.isFinite(prix)) continue;
-      q += n; montant += n * prix;
+      q += n; montant += n * prix; lignes += 1;
     }
-    return { q, montant };
+    return { q, montant, lignes };
   }, [catalogue, qty, beneficiaireType]);
 
   const capacity = useMemo(() => {
@@ -87,11 +83,12 @@ export default function CommandeForm() {
     return cap && cap > 0 ? cap : null;
   }, [vehicleById, vehicleId, unite]);
   const taux = capacity ? Math.round((totals.q / capacity) * 1000) / 10 : null;
-  const gaugeColor = taux == null ? '#9ca3af' : taux > 100 ? '#dc2626' : taux >= 100 ? '#128a54' : '#b45309';
+  const gaugeColor = taux == null ? '#9ca3af' : taux > 100 ? '#dc2626' : taux >= 100 ? '#16a34a' : '#d97706';
+  const tarifsManquants = useMemo(() => catalogue.filter(p => priceOf(p) == null).length, [catalogue, beneficiaireType]);
 
   function setQ(pid, v) {
     if (v === '') { setQty({ ...qty, [pid]: '' }); return; }
-    if (!/^\d+$/.test(v)) return;                 // entier positif uniquement
+    if (!/^\d+$/.test(v)) return;
     setQty({ ...qty, [pid]: v });
   }
 
@@ -160,7 +157,6 @@ export default function CommandeForm() {
 
   if (!loaded) return <div><CommerceSubnav /><p style={{ padding: 16 }}>Chargement…</p></div>;
 
-  // Regroupe le catalogue par BU (utile surtout pour Divers).
   const groups = [];
   const byGroup = {};
   for (const p of catalogue) {
@@ -169,98 +165,151 @@ export default function CommandeForm() {
     byGroup[g].push(p);
   }
 
+  const card = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10 };
+  const lbl = { fontSize: 11, fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--color-text-muted)', display: 'block', marginBottom: 4 };
+  const sel = { display: 'block', width: '100%', padding: '7px 9px', borderRadius: 7, border: '1px solid var(--color-border-strong)', background: 'var(--color-bg)', color: 'var(--color-text)' };
+
   return (
     <div>
       <CommerceSubnav />
-      <div style={{ padding: 16 }}>
-        <h2 style={{ marginTop: 0 }}>{editing ? 'Modifier' : 'Nouveau'} bon de commande — {TYPE_LABEL[type]} <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>({unite}s)</span></h2>
+      <div style={{ padding: '16px 16px 48px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>{editing ? 'Modifier' : 'Nouveau'} bon de commande</h2>
+          <span style={{ background: 'var(--color-primary-soft)', color: 'var(--color-primary)', fontWeight: 700, padding: '4px 12px', borderRadius: 999, fontSize: 14 }}>
+            {TYPE_LABEL[type]} · {unite}s
+          </span>
+          {tarifsManquants > 0 && (
+            <span style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)', padding: '4px 10px', borderRadius: 999, fontSize: 12.5, fontWeight: 600 }}>
+              {tarifsManquants} tarif(s) manquant(s)
+            </span>
+          )}
+        </div>
 
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-          <label>Bénéficiaire
-            <select value={beneficiaireType} onChange={e => setBeneficiaireType(e.target.value)} style={{ display: 'block' }}>
+        {/* Bénéficiaire + véhicule + jauge */}
+        <div style={{ ...card, padding: 16, marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14, alignItems: 'start' }}>
+          <div>
+            <label style={lbl}>Bénéficiaire</label>
+            <select value={beneficiaireType} onChange={e => setBeneficiaireType(e.target.value)} style={sel}>
               <option value="commercial">Commercial</option>
               <option value="grossiste">Grossiste</option>
             </select>
-          </label>
+          </div>
           {beneficiaireType === 'commercial' ? (
-            <label>Commercial
-              <select value={commercialId} onChange={e => onSelectCommercial(e.target.value)} style={{ display: 'block' }}>
+            <div>
+              <label style={lbl}>Commercial</label>
+              <select value={commercialId} onChange={e => onSelectCommercial(e.target.value)} style={sel}>
                 <option value="">— choisir —</option>
                 {commerciaux.map(c => <option key={c.id} value={c.id}>{c.code} — {c.prenom_affiche || ''} {c.nom_affiche || ''}</option>)}
               </select>
-            </label>
+            </div>
           ) : (
-            <label>Grossiste
-              <select value={grossisteId} onChange={e => setGrossisteId(e.target.value)} style={{ display: 'block' }}>
+            <div>
+              <label style={lbl}>Grossiste</label>
+              <select value={grossisteId} onChange={e => setGrossisteId(e.target.value)} style={sel}>
                 <option value="">— choisir —</option>
                 {grossistes.map(g => <option key={g.id} value={g.id}>{g.code} — {g.raison_sociale}</option>)}
               </select>
-            </label>
+            </div>
           )}
-          <label>Véhicule
-            <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={{ display: 'block' }}>
+          <div>
+            <label style={lbl}>Véhicule</label>
+            <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={sel}>
               <option value="">— aucun —</option>
               {vehicles.map(v => <option key={v.id} value={v.id}>{v.immatriculation}{v.marque ? ' — ' + v.marque : ''}</option>)}
             </select>
-          </label>
-        </div>
-
-        {/* Jauge de remplissage */}
-        <div style={{ marginBottom: 16, maxWidth: 520 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-            <span>Remplissage véhicule</span>
-            <span style={{ color: gaugeColor, fontWeight: 600 }}>
-              {capacity ? `${fmt(totals.q)} / ${fmt(capacity)} ${unite}s (${taux}%)` : `${fmt(totals.q)} ${unite}s — capacité non définie`}
-            </span>
           </div>
-          <div style={{ height: 10, background: 'var(--color-hover)', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(taux || 0, 100)}%`, height: '100%', background: gaugeColor, transition: 'width .2s' }} />
+          <div>
+            <label style={lbl}>Remplissage véhicule</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+              <span style={{ color: gaugeColor, fontWeight: 700, fontSize: 14 }}>
+                {capacity ? `${fmt(totals.q)} / ${fmt(capacity)} (${taux}%)` : `${fmt(totals.q)} ${unite}s`}
+              </span>
+              {!capacity && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>capacité n.d.</span>}
+            </div>
+            <div style={{ height: 12, background: 'var(--color-hover)', borderRadius: 999, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+              <div style={{ width: `${Math.min(taux || 0, 100)}%`, height: '100%', background: gaugeColor, transition: 'width .25s ease' }} />
+            </div>
           </div>
         </div>
 
-        <div className="table-wrap">
-          <table className="table" style={{ width: '100%' }}>
-            <thead>
-              <tr><th>Produit</th><th style={{ textAlign: 'right' }}>Prix unitaire</th><th style={{ width: 120 }}>Quantité ({unite}s)</th><th style={{ textAlign: 'right' }}>Montant</th></tr>
-            </thead>
-            <tbody>
-              {catalogue.length === 0 && <tr><td colSpan={4}>Aucun produit fini pour ce formulaire. Vérifiez les Business Units et les tarifs.</td></tr>}
-              {groups.map(g => (
-                <Fragment key={'grp' + g}>
-                  {groups.length > 1 && <tr><td colSpan={4} style={{ fontWeight: 600, background: 'var(--color-hover)' }}>{g}</td></tr>}
-                  {byGroup[g].map(p => {
-                    const prix = priceOf(p);
-                    const missing = prix == null;
-                    const n = Number(qty[p.product_id]);
-                    const montant = Number.isInteger(n) && n > 0 && !missing ? n * Number(prix) : 0;
-                    return (
-                      <tr key={p.product_id}>
-                        <td>{p.code ? `${p.code} — ` : ''}{p.designation}</td>
-                        <td style={{ textAlign: 'right', color: missing ? '#dc2626' : undefined }}>{missing ? 'tarif manquant' : fmt(prix) + ' GNF'}</td>
-                        <td>
-                          <input type="text" inputMode="numeric" value={qty[p.product_id] ?? ''} disabled={missing}
-                            onChange={e => setQ(p.product_id, e.target.value)} style={{ width: 90 }} />
-                        </td>
-                        <td style={{ textAlign: 'right' }}>{montant ? fmt(montant) + ' GNF' : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </Fragment>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ fontWeight: 700 }}>
-                <td>Total</td><td></td>
-                <td>{fmt(totals.q)} {unite}s</td>
-                <td style={{ textAlign: 'right' }}>{fmt(totals.montant)} GNF</td>
-              </tr>
-            </tfoot>
-          </table>
+        {/* Grille produits */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: '#2454e0', color: '#fff' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase' }}>Produit</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase' }}>Prix unitaire</th>
+                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', width: 130 }}>Quantité ({unite}s)</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: 11.5, letterSpacing: '.04em', textTransform: 'uppercase', width: 150 }}>Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogue.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    Aucun produit fini pour ce formulaire. Vérifiez les Business Units et les tarifs.
+                  </td></tr>
+                )}
+                {groups.map(g => (
+                  <Fragment key={'grp' + g}>
+                    {groups.length > 1 && (
+                      <tr><td colSpan={4} style={{ padding: '6px 14px', fontWeight: 700, fontSize: 12, letterSpacing: '.03em', textTransform: 'uppercase', color: 'var(--color-primary)', background: 'var(--color-primary-soft)' }}>{g}</td></tr>
+                    )}
+                    {byGroup[g].map((p, i) => {
+                      const prix = priceOf(p);
+                      const missing = prix == null;
+                      const n = Number(qty[p.product_id]);
+                      const filled = Number.isInteger(n) && n > 0 && !missing;
+                      const montant = filled ? n * Number(prix) : 0;
+                      return (
+                        <tr key={p.product_id} style={{
+                          background: filled ? 'var(--color-primary-soft)' : (i % 2 ? 'var(--color-hover)' : 'transparent'),
+                          borderLeft: filled ? '3px solid var(--color-primary)' : '3px solid transparent',
+                          borderBottom: '1px solid var(--color-border)',
+                        }}>
+                          <td style={{ padding: '7px 14px' }}>
+                            <span style={{ color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{p.code}</span>
+                            {p.code ? '  ' : ''}<span style={{ fontWeight: filled ? 600 : 400 }}>{p.designation}</span>
+                          </td>
+                          <td style={{ padding: '7px 14px', textAlign: 'right' }}>
+                            {missing
+                              ? <span style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>tarif manquant</span>
+                              : <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(prix)} <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>GNF</span></span>}
+                          </td>
+                          <td style={{ padding: '6px 14px', textAlign: 'center' }}>
+                            <input type="text" inputMode="numeric" value={qty[p.product_id] ?? ''} disabled={missing}
+                              onChange={e => setQ(p.product_id, e.target.value)}
+                              style={{
+                                width: 78, padding: '6px 8px', textAlign: 'center', borderRadius: 7,
+                                border: `1.5px solid ${filled ? 'var(--color-primary)' : 'var(--color-border-strong)'}`,
+                                background: missing ? 'var(--color-hover)' : 'var(--color-bg)', color: 'var(--color-text)',
+                                fontVariantNumeric: 'tabular-nums', fontWeight: filled ? 700 : 400,
+                              }} />
+                          </td>
+                          <td style={{ padding: '7px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: filled ? 700 : 400, color: filled ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                            {montant ? `${fmt(montant)} GNF` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#2454e0', color: '#fff', fontWeight: 700 }}>
+                  <td style={{ padding: '11px 14px' }}>Total · {fmt(totals.lignes)} ligne(s)</td>
+                  <td></td>
+                  <td style={{ padding: '11px 14px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{fmt(totals.q)} {unite}s</td>
+                  <td style={{ padding: '11px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 15 }}>{fmt(totals.montant)} GNF</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
 
-        {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--color-danger)', marginTop: 12, fontWeight: 500 }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={() => nav('/commerce/commandes')} disabled={busy}>Annuler</button>
           <button className="btn" onClick={onSaveDraft} disabled={busy}>Enregistrer le brouillon</button>
           <button className="btn btn-primary" onClick={onSubmit} disabled={busy}>Soumettre</button>
