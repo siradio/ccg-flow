@@ -20,6 +20,7 @@ export default function RhSubnav() {
       <NavLink to="/rh/mes-demandes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.mine')}</NavLink>
       {canValidateRh(user) && <NavLink to="/rh/a-valider" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.pending')}</NavLink>}
       {canSeeAllRh(user) && <NavLink to="/rh/toutes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.all')}</NavLink>}
+      {canManageRhTypes(user) && <NavLink to="/rh/competences" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.competences')}</NavLink>}
       {canManageRhTypes(user) && <NavLink to="/rh/parametres" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.params')}</NavLink>}
     </nav>
   );

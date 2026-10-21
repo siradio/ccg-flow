@@ -36,6 +36,7 @@ import RecrutementForm from './pages/RH/RecrutementForm';
 import CdiForm from './pages/RH/CdiForm';
 import RhDashboard from './pages/RH/RhDashboard';
 import RhParametres from './pages/RH/RhParametres';
+import Competences from './pages/RH/Competences';
 import DemandeDetail from './pages/RH/DemandeDetail';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
@@ -143,6 +144,7 @@ export default function App() {
         <Route path="rh/a-valider" element={<RequireRh><AValider /></RequireRh>} />
         <Route path="rh/toutes" element={<RequireRh><ToutesDemandes /></RequireRh>} />
         <Route path="rh/parametres" element={<RequireRh><RhParametres /></RequireRh>} />
+        <Route path="rh/competences" element={<RequireRh><Competences /></RequireRh>} />
         <Route path="rh/demandes/absence/new" element={<RequireRh><AbsenceForm /></RequireRh>} />
         <Route path="rh/demandes/conge/new" element={<RequireRh><CongeForm /></RequireRh>} />
         <Route path="rh/demandes/recrutement/new" element={<RequireRh><RecrutementForm /></RequireRh>} />
