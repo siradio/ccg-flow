@@ -29,6 +29,8 @@ app.use('/api/employees', require('./modules/employees/employees.routes'));
 app.use('/api/rh', require('./modules/rh/rh.routes'));
 app.use('/api/rh/evaluation', require('./modules/rh/evaluation/evaluation.referentials.routes'));
 app.use('/api/rh/evaluation/templates', require('./modules/rh/evaluation/evaluation.templates.routes'));
+app.use('/api/rh/evaluation/campaigns', require('./modules/rh/evaluation/evaluation.campaigns.routes'));
+app.use('/api/rh/evaluation/fiches', require('./modules/rh/evaluation/evaluation.routes'));
 app.use('/api/products', require('./modules/referentials/products.routes'));
 app.use('/api/product-categories', require('./modules/referentials/product-categories.routes'));
 app.use('/api/business-units', require('./modules/referentials/business-units.routes'));
