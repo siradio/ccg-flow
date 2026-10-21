@@ -5,6 +5,7 @@ const { isSuperAdmin } = require('../../../middleware/permissions');
 const { logAction } = require('../../audit/audit.service');
 const { nextRef } = require('../../dsi/dsi.numbering');
 const { notify, notifyRoleOnEntity } = require('../../notifications/notifications.service');
+const evalPdf = require('./evaluation.pdf');
 
 // Fiches d'évaluation annuelle. Circuit : brouillon → auto_evaluation (employé, ou manager si pas de
 // compte) → evaluation_manager → avis_rh → cloturee. Autorisation par acteur/étape, notifications.
@@ -72,6 +73,20 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Fiches d'un employé (onglet « Évaluations » de la fiche employé). Accès : RH, manager, ou l'employé.
+router.get('/by-employee/:employeeId', async (req, res, next) => {
+  try {
+    const employeeId = Number(req.params.employeeId);
+    if (!(isRh(req.user) || isSuperAdmin(req.user))) {
+      const mgr = await resolveManagerUser(employeeId);
+      const me = await one('SELECT employee_id FROM users WHERE id = $1', [req.user.id]);
+      const isSelf = me && Number(me.employee_id) === employeeId;
+      if (Number(mgr) !== Number(req.user.id) && !isSelf) return res.status(403).json({ error: 'Accès non autorisé.' });
+    }
+    res.json(await all(DETAIL + ' WHERE e.employee_id = $1 ORDER BY e.annee DESC, e.id DESC', [employeeId]));
+  } catch (e) { next(e); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const e = await one(DETAIL + ' WHERE e.id = $1', [Number(req.params.id)]);
@@ -88,6 +103,26 @@ router.get('/:id', async (req, res, next) => {
     e.is_employe = euid != null && Number(euid) === Number(req.user.id);
     e.is_rh = isRh(req.user);
     res.json(e);
+  } catch (e) { next(e); }
+});
+
+// Téléchargement du PDF de la fiche finalisée (régénéré si absent).
+router.get('/:id/pdf', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const e = await one('SELECT id, numero, statut, employee_id, manager_user_id FROM rh_evaluations WHERE id = $1', [id]);
+    if (!e) return res.status(404).json({ error: 'Fiche introuvable.' });
+    if (!await canView(e, req.user)) return res.status(403).json({ error: 'Accès non autorisé.' });
+    let docu = await evalPdf.getStored(id);
+    if (!docu || !docu.contenu) {
+      if (e.statut !== 'cloturee') return res.status(409).json({ error: 'Le PDF est disponible après finalisation.' });
+      await evalPdf.generateAndStore(id, req.user.id);
+      docu = await evalPdf.getStored(id);
+    }
+    if (!docu || !docu.contenu) return res.status(404).json({ error: 'Document indisponible.' });
+    res.setHeader('Content-Type', docu.mime || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${(e.numero || 'EVL_' + id).replace(/\s+/g, '_')}.pdf"`);
+    res.send(docu.contenu);
   } catch (e) { next(e); }
 });
 
@@ -209,6 +244,7 @@ router.post('/:id/submit', async (req, res, next) => {
         if (e.manager_user_id) await notify(e.manager_user_id, 'Évaluation finalisée', `L'évaluation ${e.numero} est finalisée.`, LIEN(id));
       }
     } catch (ne) { console.error('[eval notif]', ne.message); }
+    if (out.nextStatut === 'cloturee') { try { await evalPdf.generateAndStore(id, req.user.id); } catch (pe) { console.error('[eval pdf]', pe.message); } }
     res.json(await one(DETAIL + ' WHERE e.id = $1', [id]));
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });

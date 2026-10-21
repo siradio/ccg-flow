@@ -63,6 +63,10 @@ export default function EvaluationDetail() {
     const m = window.prompt("Motif d'annulation (obligatoire) :"); if (!m || !m.trim()) return;
     try { await client.post(`/rh/evaluation/fiches/${id}/cancel`, { motif: m.trim() }); load(); } catch (err) { setError(err?.response?.data?.error || 'Erreur.'); }
   }
+  async function openPdf() {
+    try { const r = await client.get(`/rh/evaluation/fiches/${id}/pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(r.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
+    catch (err) { setError('PDF indisponible (disponible après finalisation).'); }
+  }
 
   // Regroupe les lignes par catégorie.
   const groups = []; const byCat = {};
@@ -151,6 +155,7 @@ export default function EvaluationDetail() {
           {e.can_act && e.statut in SUBMIT_LABEL && <button className="btn btn-primary" onClick={submit} disabled={busy}>{SUBMIT_LABEL[e.statut]}</button>}
           {e.can_act && e.statut !== 'brouillon' && e.statut !== 'cloturee' && e.statut !== 'annulee' && <button className="btn btn-secondary" onClick={doReturn} disabled={busy}>Retourner</button>}
           {(e.is_manager || e.is_rh) && e.statut !== 'cloturee' && e.statut !== 'annulee' && <button className="btn btn-danger-ghost" onClick={cancel} disabled={busy}>Annuler la fiche</button>}
+          {e.statut === 'cloturee' && <button className="btn btn-primary" onClick={openPdf}>Télécharger le PDF</button>}
         </div>
 
         {/* Historique */}
