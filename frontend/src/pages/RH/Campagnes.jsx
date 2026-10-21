@@ -12,6 +12,8 @@ export default function Campagnes() {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ libelle: '', annee: new Date().getFullYear(), date_debut: '', date_fin: '', echelle_max: 5, template_defaut_id: '' });
   const [error, setError] = useState('');
+  const [report, setReport] = useState(null);
+  const [gening, setGening] = useState(0);
 
   function load() { client.get('/rh/evaluation/campaigns').then(r => setRows(r.data)).catch(() => setRows([])); }
   useEffect(() => { load(); client.get('/rh/evaluation/templates', { params: { actif: 1 } }).then(r => setTemplates(r.data)).catch(() => {}); }, []);
@@ -27,6 +29,13 @@ export default function Campagnes() {
   async function toggleStatut(c) {
     try { await client.put(`/rh/evaluation/campaigns/${c.id}`, { statut: c.statut === 'ouverte' ? 'close' : 'ouverte' }); load(); }
     catch (e) { window.alert(e?.response?.data?.error || 'Erreur.'); }
+  }
+  async function generate(c) {
+    if (!window.confirm(`Générer les fiches pour « ${c.libelle} » ?\nUne fiche brouillon sera créée pour chaque employé actif ayant un manager, à partir du modèle par défaut.`)) return;
+    setReport(null); setGening(c.id);
+    try { const r = await client.post(`/rh/evaluation/campaigns/${c.id}/generate`, {}); setReport({ campagne: c.libelle, ...r.data }); load(); }
+    catch (e) { window.alert(e?.response?.data?.error || 'Erreur.'); }
+    finally { setGening(0); }
   }
 
   return (
@@ -56,6 +65,20 @@ export default function Campagnes() {
           </div>
         )}
 
+        {report && (
+          <div className="alert alert-success" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div>
+              <strong>Campagne « {report.campagne} »</strong> — {report.created} fiche(s) créée(s), {report.skipped} ignorée(s) sur {report.total}.
+              {report.errors && report.errors.length > 0 && (
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  À compléter : {report.errors.length} employé(s) sans manager/compte lié (fiche non générée).
+                </div>
+              )}
+            </div>
+            <button onClick={() => setReport(null)} className="btn-icon" aria-label="Fermer">×</button>
+          </div>
+        )}
+
         <div className="table-wrap">
           <table className="table" style={{ width: '100%' }}>
             <thead><tr><th>Libellé</th><th>Année</th><th>Période</th><th>Barème</th><th>Modèle défaut</th><th>Fiches</th><th>Statut</th>{isRh && <th></th>}</tr></thead>
@@ -67,7 +90,10 @@ export default function Campagnes() {
                     <td style={{ fontSize: 13 }}>{(c.date_debut || '—')} → {(c.date_fin || '—')}</td>
                     <td>1 → {c.echelle_max}</td><td>{c.template_defaut_nom || '—'}</td><td>{c.nb_fiches}</td>
                     <td><span className="badge" style={{ background: c.statut === 'ouverte' ? '#128a54' : '#6b7280', color: '#fff' }}>{c.statut === 'ouverte' ? 'Ouverte' : 'Close'}</span></td>
-                    {isRh && <td><button className="btn btn-secondary btn-sm" onClick={() => toggleStatut(c)}>{c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir'}</button></td>}
+                    {isRh && <td style={{ whiteSpace: 'nowrap' }}>
+                      {c.statut === 'ouverte' && <button className="btn btn-primary btn-sm" disabled={gening === c.id} onClick={() => generate(c)}>{gening === c.id ? '…' : 'Générer les fiches'}</button>}{' '}
+                      <button className="btn btn-secondary btn-sm" onClick={() => toggleStatut(c)}>{c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir'}</button>
+                    </td>}
                   </tr>
                 ))}
             </tbody>
