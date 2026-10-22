@@ -1,8 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CCG Flow">
-  <!-- Fond plein (l'OS applique son propre masque : pas d'arrondi ici) -->
-  <rect width="512" height="512" fill="#16308f"/>
-  <!-- Marque CCG (flux), blanche, centrée dans la zone de sécurité maskable -->
-  <g transform="translate(256 256) scale(6) translate(-24 -23)">
-    <path fill="#ffffff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"/>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CCG Flow">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d63f0"/>
+      <stop offset="1" stop-color="#143bb0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.22" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#bcd1ff"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond plein (pas d'arrondi : l'OS applique son propre masque) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+
+  <!-- Motif réseau/flux centré dans la zone de sécurité maskable -->
+  <g transform="translate(256 256) scale(0.82) translate(-256 -256)">
+    <path d="M150 372 C 214 320, 236 300, 268 268 S 334 206, 378 150"
+          fill="none" stroke="url(#flow)" stroke-width="22" stroke-linecap="round"/>
+    <path d="M268 268 L 196 214" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-opacity="0.75"/>
+    <path d="M268 268 L 326 338" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-opacity="0.55"/>
+    <circle cx="150" cy="372" r="30" fill="#ffffff"/>
+    <circle cx="196" cy="214" r="18" fill="#ffffff" fill-opacity="0.9"/>
+    <circle cx="326" cy="338" r="16" fill="#ffffff" fill-opacity="0.8"/>
+    <circle cx="268" cy="268" r="24" fill="#ffffff"/>
+    <circle cx="378" cy="150" r="42" fill="#ffffff"/>
+    <circle cx="378" cy="150" r="42" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="10"/>
+    <circle cx="378" cy="150" r="18" fill="#2d63f0"/>
   </g>
 </svg>
