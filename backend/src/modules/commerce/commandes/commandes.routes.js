@@ -252,16 +252,18 @@ router.post('/', requireCreate, async (req, res, next) => {
     const { capacite, taux } = await fillRate(b.vehicle_id, computed.unite, qty);
     const entityId = await defaultEntityId();
     const id = await withTransaction(async (tx) => {
+      // Numéro de série attribué dès la CRÉATION : chaque bon (brouillon compris) porte son n°.
+      const numero = await nextRef(tx, { scope: 'bon_commande_commercial', prefix: 'BC-COM', pad: 4 });
       const row = await tx.one(
         `INSERT INTO commandes_commerciales
            (type_formulaire, beneficiaire_type, commercial_id, grossiste_id, entity_id, business_unit_id,
-            vehicle_id, capacite_figee, statut, montant_total, total_casiers, total_cartons, taux_remplissage, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'brouillon',$9,$10,$11,$12,$13) RETURNING id`,
+            vehicle_id, capacite_figee, statut, montant_total, total_casiers, total_cartons, taux_remplissage, created_by, numero)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'brouillon',$9,$10,$11,$12,$13,$14) RETURNING id`,
         [b.type_formulaire, b.beneficiaire_type,
          b.beneficiaire_type === 'commercial' ? Number(b.commercial_id) : null,
          b.beneficiaire_type === 'grossiste' ? Number(b.grossiste_id) : null,
          entityId, b.business_unit_id || null, b.vehicle_id || null, capacite,
-         computed.montant_total, computed.total_casiers, computed.total_cartons, taux, req.user.id]);
+         computed.montant_total, computed.total_casiers, computed.total_cartons, taux, req.user.id, numero]);
       await writeLines(tx, row.id, computed.lines);
       return row.id;
     });
@@ -338,7 +340,8 @@ router.post('/:id/submit', requireEdit, async (req, res, next) => {
 
     const entId = c.entity_id || await defaultEntityId();
     const numero = await withTransaction(async (tx) => {
-      const num = await nextRef(tx, { scope: 'bon_commande_commercial', prefix: 'BC-COM', pad: 4 });
+      // Le n° est désormais posé à la création ; on le garde (repli nextRef pour d'anciens brouillons sans n°).
+      const num = c.numero || await nextRef(tx, { scope: 'bon_commande_commercial', prefix: 'BC-COM', pad: 4 });
       await tx.run(
         `UPDATE commandes_commerciales SET
            numero=$1, statut='en_validation', workflow_template_id=$2, current_step_id=$3,

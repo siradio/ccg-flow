@@ -21,6 +21,7 @@ export default function ListPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [noEmailOnly, setNoEmailOnly] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState({ active: true, inactive: true, pending: true, rejected: true });
   const [rejectPanel, setRejectPanel] = useState({}); // { [userId]: note } — panneau de rejet ouvert (ligne dépliée)
@@ -37,11 +38,17 @@ export default function ListPage() {
     return map;
   }, [moduleCatalog]);
 
+  const hasEmail = (u) => !!(u.email && String(u.email).trim());
+  // Comptes ACTIFS (hors demandes d'accès en attente) sans adresse e-mail : ils ne recevront
+  // aucune notification par mail tant qu'une adresse n'est pas renseignée.
+  const noEmailCount = users.filter(u => u.actif && u.access_status !== 'pending' && !hasEmail(u)).length;
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search || `${u.prenom} ${u.nom} ${u.email}`.toLowerCase().includes(search.toLowerCase());
     const matchesRole = !roleFilter || u.roles.some(r => r.role_code === roleFilter);
     const matchesStatus = statusFilter[userStatus(u)];
-    return matchesSearch && matchesRole && matchesStatus;
+    const matchesEmail = !noEmailOnly || !hasEmail(u);
+    return matchesSearch && matchesRole && matchesStatus && matchesEmail;
   });
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
   // Tri appliqué à la liste filtrée AVANT la pagination (le tri porte sur tout le jeu, pas la page).
@@ -54,7 +61,7 @@ export default function ListPage() {
   }, [page, totalPages]);
   // Changer un filtre repart de la page 1 — sinon on peut se retrouver sur une page 3 devenue
   // incohérente avec les nouveaux résultats filtrés.
-  useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter]);
+  useEffect(() => { setPage(1); }, [search, roleFilter, statusFilter, noEmailOnly]);
 
   function load() { client.get('/users').then(res => setUsers(res.data)); }
   function loadProfiles() { client.get('/access-profiles').then(res => setProfiles(res.data)); }
@@ -264,10 +271,22 @@ export default function ListPage() {
             );
           })}
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+          <input type="checkbox" checked={noEmailOnly} onChange={e => setNoEmailOnly(e.target.checked)} />
+          {t('adm.users.noEmailOnly')}
+        </label>
         <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
           {t('adm.users.countFiltered', { shown: filteredUsers.length, total: users.length, word: users.length > 1 ? t('adm.users.usersWord') : t('adm.users.userWord') })}
         </span>
       </div>
+
+      {noEmailCount > 0 && (
+        <button type="button" onClick={() => setNoEmailOnly(true)}
+          className="alert alert-warning"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 16, cursor: 'pointer', border: 'none', textAlign: 'left' }}>
+          ✉️ {t('adm.users.noEmailWarn', { n: noEmailCount })}
+        </button>
+      )}
 
       <div className="card" style={{ padding: 0 }}>
         <div className="table-wrap">
@@ -319,7 +338,12 @@ function UserRow({ u, roleSummary, moduleSummary, sendingId, rejectPanel, setRej
   return (
     <>
       <tr>
-        <td>{u.nom}</td>
+        <td>
+          {u.nom}
+          {!(u.email && String(u.email).trim()) && (
+            <span className="badge" style={{ marginLeft: 6, background: 'var(--color-warning-bg)', color: 'var(--color-warning-fg)', fontSize: 11 }}>{t('adm.users.noEmail')}</span>
+          )}
+        </td>
         <td>{u.prenom}</td>
         <td>{roleSummary(u)}</td>
         <td><StatusBadge status={userStatus(u)} /></td>

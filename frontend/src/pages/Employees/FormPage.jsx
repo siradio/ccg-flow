@@ -5,6 +5,7 @@ import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import Modal from '../../components/Modal.jsx';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import EmployeeEvaluations from './EmployeeEvaluations';
 
 const EMPTY_FORM = {
   matricule: '', nom: '', prenom: '', poste: '', departement: '',
@@ -155,7 +156,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
   if (!loaded) return wrap(<p>{t('prd.loading')}</p>);
 
   return wrap(
-    (
+    (<>
         <form onSubmit={onSubmit} className="form-grid" style={{ maxWidth: 'none' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <label className="field">{t('emp.th.matricule')}
@@ -303,6 +304,7 @@ export default function FormPage({ employeeId, onDone } = {}) {
             {!isNew && <button type="button" onClick={onDelete} className="btn btn-danger">{t('common.delete')}</button>}
           </div>
         </form>
-    )
+        {!isNew && <EmployeeEvaluations employeeId={id} />}
+    </>)
   );
 }

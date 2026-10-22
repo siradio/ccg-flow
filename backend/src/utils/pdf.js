@@ -270,6 +270,52 @@ async function generateCommandeCommercialePdf({ commande, lignes, beneficiaireLa
   });
 }
 
+// Fiche d'évaluation annuelle (après finalisation). En-tête CCG + grille de compétences par
+// catégorie (notes employé/manager) + sections texte.
+async function generateEvaluationPdf({ evaluation, lignes, employeNom, managerNom, campagne }) {
+  const groups = [];
+  const byCat = {};
+  for (const l of (lignes || [])) {
+    const g = l.categorie_libelle || 'Autres';
+    if (!byCat[g]) { byCat[g] = []; groups.push(g); }
+    byCat[g].push(l);
+  }
+  const cols = [
+    { key: 'libelle', label: 'Compétence', width: 235 },
+    { key: 'ne', label: 'Employé', width: 55, align: 'right' },
+    { key: 'nm', label: 'Manager', width: 55, align: 'right' },
+    { key: 'com', label: 'Commentaire', width: 150 },
+  ];
+  return renderPdf(doc => {
+    const section = (titre, valeur) => {
+      doc.moveDown(0.5).fontSize(11).font('Helvetica-Bold').fillColor(BRAND_NAVY).text(titre);
+      doc.fontSize(10).font('Helvetica').fillColor('black').text(valeur && String(valeur).trim() ? String(valeur) : '—', { width: PAGE_WIDTH });
+    };
+    renderLetterhead(doc, "Fiche d'évaluation annuelle", null);
+    doc.fontSize(11).font('Helvetica').fillColor('black');
+    doc.text(`Numéro : ${evaluation.numero || '—'}`);
+    doc.text(`Employé : ${employeNom || '—'}${evaluation.poste ? ' — ' + evaluation.poste : ''}`);
+    doc.text(`Manager : ${managerNom || '—'}`);
+    doc.text(`Campagne : ${campagne || '—'}     Année : ${evaluation.annee || '—'}     Barème : 1 à ${evaluation.echelle_max}`);
+    if (evaluation.note_globale_employe != null || evaluation.note_globale_manager != null) {
+      doc.text(`Note globale — employé : ${evaluation.note_globale_employe ?? '—'} / ${evaluation.echelle_max}    manager : ${evaluation.note_globale_manager ?? '—'} / ${evaluation.echelle_max}`);
+    }
+    doc.moveDown(0.5);
+    for (const g of groups) {
+      doc.moveDown(0.4).fontSize(11).font('Helvetica-Bold').fillColor(BRAND_BLUE).text(g);
+      doc.fillColor('black');
+      simpleTable(doc, cols, byCat[g].map(l => ({
+        libelle: l.libelle, ne: l.note_employe ?? '—', nm: l.note_manager ?? '—', com: l.commentaire_manager || '',
+      })));
+    }
+    section('Points forts (manager)', evaluation.points_forts);
+    section("Axes d'amélioration (employé)", evaluation.axes_amelioration);
+    section('Plan de carrière (employé)', evaluation.plan_carriere);
+    section('Conclusion (manager)', evaluation.conclusion_manager);
+    section('Avis RH', evaluation.avis_rh);
+  });
+}
+
 // Petit tableau générique (en-tête bleu + lignes zébrées) pour les documents de synthèse.
 function simpleTable(doc, columns, rows) {
   const startX = 50;
@@ -339,7 +385,7 @@ async function generateCommercialFichePdf({ commercial, metrics, mensuel, journa
 }
 
 module.exports = {
-  generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf, generateCommandeCommercialePdf,
+  generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf, generateCommandeCommercialePdf, generateEvaluationPdf,
   // Helpers réutilisables (ex. module Reporting) :
   renderPdf, renderLetterhead, simpleTable, money,
   BRAND_BLUE, BRAND_NAVY, MUTED_GRAY, PAGE_WIDTH,
