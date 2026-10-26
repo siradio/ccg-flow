@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import RhSubnav, { canValidateRh } from './RhSubnav';
 
 // Modèles d'évaluation réutilisables (créés par RH ou manager). Liste + accès au builder.
 export default function Modeles() {
   const { user } = useAuth();
   const nav = useNavigate();
+  const confirm = useConfirm();
   const canManage = canValidateRh(user);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   function load() {
     setLoading(true);
@@ -19,9 +22,11 @@ export default function Modeles() {
   useEffect(() => { load(); }, []);
 
   async function remove(id, nom) {
-    if (!window.confirm(`Supprimer le modèle « ${nom} » ?`)) return;
+    const ok = await confirm(`Supprimer le modèle « ${nom} » ?`, { danger: true, confirmLabel: 'Supprimer' });
+    if (!ok) return;
+    setError('');
     try { await client.delete(`/rh/evaluation/templates/${id}`); load(); }
-    catch (e) { window.alert(e?.response?.data?.error || 'Erreur.'); }
+    catch (e) { setError(e?.response?.data?.error || 'Erreur.'); }
   }
 
   return (
@@ -32,6 +37,7 @@ export default function Modeles() {
           <h2 style={{ margin: 0 }}>Modèles d'évaluation</h2>
           {canManage && <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => nav('/rh/evaluation/modeles/new')}>+ Nouveau modèle</button>}
         </div>
+        {error && <div className="alert alert-warning" style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{error}</span><button onClick={() => setError('')} className="btn-icon" aria-label="Fermer">×</button></div>}
         <div className="table-wrap">
           <table className="table" style={{ width: '100%' }}>
             <thead><tr><th>Nom</th><th>Poste cible</th><th>Compétences</th><th>Barème</th><th>Créé par</th><th></th></tr></thead>

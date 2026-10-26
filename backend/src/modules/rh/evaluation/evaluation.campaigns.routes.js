@@ -55,6 +55,30 @@ router.put('/:id', requireRh, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Employés éligibles à la génération d'une campagne : actifs, ayant un manager. Expose des
+// indicateurs (manager avec compte, fiche déjà créée dans la campagne) pour une sélection ciblée
+// côté UI — l'évaluation ne concerne pas forcément tout le monde (un modèle = certains métiers).
+router.get('/:id/eligibles', requireRh, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const camp = await one('SELECT id FROM rh_eval_campaigns WHERE id = $1', [id]);
+    if (!camp) return res.status(404).json({ error: 'Campagne introuvable.' });
+    const rows = await all(`
+      SELECT e.id, e.matricule, e.prenom, e.nom, e.poste, e.business_unit_id,
+             bu.nom AS business_unit_nom,
+             TRIM(CONCAT(me.prenom,' ',me.nom)) AS manager_nom,
+             (mu.id IS NOT NULL) AS manager_a_compte,
+             EXISTS (SELECT 1 FROM rh_evaluations ev WHERE ev.campaign_id = $1 AND ev.employee_id = e.id) AS deja_fiche
+        FROM employees e
+        LEFT JOIN business_units bu ON bu.id = e.business_unit_id
+        LEFT JOIN employees me ON me.id = e.manager_employee_id
+        LEFT JOIN users mu ON mu.employee_id = e.manager_employee_id AND mu.actif = true
+       WHERE e.statut = 'actif' AND e.manager_employee_id IS NOT NULL
+       ORDER BY e.poste NULLS LAST, e.nom, e.prenom`, [id]);
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
 // Génération en masse des fiches d'une campagne : une fiche BROUILLON par employé actif ayant un
 // manager (compte lié), à partir du modèle de la campagne (ou fourni). Les fiches déjà créées pour
 // cet employé dans la campagne sont ignorées. Chaque manager est notifié une fois.

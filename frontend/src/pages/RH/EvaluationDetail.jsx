@@ -17,6 +17,8 @@ export default function EvaluationDetail() {
   const [fields, setFields] = useState({ axes_amelioration: '', plan_carriere: '', points_forts: '', conclusion_manager: '', avis_rh: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [comment, setComment] = useState('');
+  const [retourTarget, setRetourTarget] = useState('');
 
   function hydrate(data) {
     setE(data);
@@ -36,6 +38,9 @@ export default function EvaluationDetail() {
   const editMgr = e.statut === 'evaluation_manager' && e.can_act;
   const editRh = e.statut === 'avis_rh' && e.can_act;
   const noteOpts = Array.from({ length: e.echelle_max }, (_, i) => i + 1);
+  const STEP_FR = { brouillon: 'Créateur (brouillon)', auto_evaluation: 'Auto-évaluation', evaluation_manager: 'Évaluation manager' };
+  const returnTargets = ORDER.slice(0, ORDER.indexOf(e.statut)).filter(s => ['brouillon', 'auto_evaluation', 'evaluation_manager'].includes(s));
+  const peutAnnuler = (e.is_manager || e.is_rh) && e.statut !== 'cloturee' && e.statut !== 'annulee';
 
   function setLigne(lid, field, val) { setLignes(ls => ls.map(l => l.id === lid ? { ...l, [field]: val } : l)); }
 
@@ -53,15 +58,17 @@ export default function EvaluationDetail() {
     catch (err) { setError(err?.response?.data?.error || 'Erreur.'); } finally { setBusy(false); }
   }
   async function doReturn() {
-    const prev = ORDER.slice(0, ORDER.indexOf(e.statut)).filter(s => s !== 'brouillon' || e.is_manager || e.is_rh);
-    const target = window.prompt(`Retourner à quelle étape ? (${prev.join(', ')})`, prev[prev.length - 1] || 'brouillon');
-    if (!target || !prev.includes(target)) return;
-    const c = window.prompt('Motif du retour (obligatoire) :'); if (!c || !c.trim()) return;
-    try { await client.post(`/rh/evaluation/fiches/${id}/return`, { target, commentaire: c.trim() }); load(); } catch (err) { setError(err?.response?.data?.error || 'Erreur.'); }
+    if (!retourTarget) { setError('Choisissez une étape de retour.'); return; }
+    if (!comment.trim()) { setError('Un motif est obligatoire pour un retour (champ commentaire).'); return; }
+    setBusy(true); setError('');
+    try { await client.post(`/rh/evaluation/fiches/${id}/return`, { target: retourTarget, commentaire: comment.trim() }); setComment(''); setRetourTarget(''); load(); }
+    catch (err) { setError(err?.response?.data?.error || 'Erreur.'); } finally { setBusy(false); }
   }
   async function cancel() {
-    const m = window.prompt("Motif d'annulation (obligatoire) :"); if (!m || !m.trim()) return;
-    try { await client.post(`/rh/evaluation/fiches/${id}/cancel`, { motif: m.trim() }); load(); } catch (err) { setError(err?.response?.data?.error || 'Erreur.'); }
+    if (!comment.trim()) { setError("Un motif d'annulation est obligatoire (saisissez-le dans le champ commentaire)."); return; }
+    setBusy(true); setError('');
+    try { await client.post(`/rh/evaluation/fiches/${id}/cancel`, { motif: comment.trim() }); setComment(''); load(); }
+    catch (err) { setError(err?.response?.data?.error || 'Erreur.'); } finally { setBusy(false); }
   }
   async function openPdf() {
     try { const r = await client.get(`/rh/evaluation/fiches/${id}/pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(r.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
@@ -149,12 +156,30 @@ export default function EvaluationDetail() {
         {e.motif_annulation && <p style={{ color: 'var(--color-danger)' }}>Annulée : {e.motif_annulation}</p>}
         {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
 
-        {/* Actions */}
+        {/* Commentaire (motif de retour / annulation) */}
+        {peutAnnuler && (
+          <div style={{ marginTop: 16, display: 'grid', gap: 10, maxWidth: 640 }}>
+            <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Commentaire (motif obligatoire pour un retour ou une annulation)
+              <textarea value={comment} onChange={ev => setComment(ev.target.value)} rows={2} style={{ display: 'block', width: '100%' }} />
+            </label>
+            {returnTargets.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13 }}>Retour à :</span>
+                <select value={retourTarget} onChange={ev => setRetourTarget(ev.target.value)}>
+                  <option value="">— choisir —</option>
+                  {returnTargets.map(s => <option key={s} value={s}>{STEP_FR[s]}</option>)}
+                </select>
+                <button className="btn btn-secondary btn-sm" onClick={doReturn} disabled={busy}>Retourner</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions principales */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
           {(editEmp || editMgr || editRh) && <button className="btn" onClick={save} disabled={busy}>Enregistrer</button>}
           {e.can_act && e.statut in SUBMIT_LABEL && <button className="btn btn-primary" onClick={submit} disabled={busy}>{SUBMIT_LABEL[e.statut]}</button>}
-          {e.can_act && e.statut !== 'brouillon' && e.statut !== 'cloturee' && e.statut !== 'annulee' && <button className="btn btn-secondary" onClick={doReturn} disabled={busy}>Retourner</button>}
-          {(e.is_manager || e.is_rh) && e.statut !== 'cloturee' && e.statut !== 'annulee' && <button className="btn btn-danger-ghost" onClick={cancel} disabled={busy}>Annuler la fiche</button>}
+          {peutAnnuler && <button className="btn btn-danger-ghost" onClick={cancel} disabled={busy}>Annuler la fiche</button>}
           {e.statut === 'cloturee' && <button className="btn btn-primary" onClick={openPdf}>Télécharger le PDF</button>}
         </div>
 
