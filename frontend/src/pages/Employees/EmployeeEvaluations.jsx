@@ -10,6 +10,7 @@ export default function EmployeeEvaluations({ employeeId }) {
   const nav = useNavigate();
   const [rows, setRows] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [err, setErr] = useState('');
 
   useEffect(() => {
     if (!employeeId) return;
@@ -19,14 +20,16 @@ export default function EmployeeEvaluations({ employeeId }) {
   }, [employeeId]);
 
   async function openPdf(id) {
+    setErr('');
     try { const r = await client.get(`/rh/evaluation/fiches/${id}/pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(r.data); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000); }
-    catch { window.alert('PDF indisponible.'); }
+    catch { setErr('PDF indisponible (disponible après finalisation).'); }
   }
 
   if (!loaded) return null;
   return (
     <div style={{ marginTop: 20 }}>
       <h3 style={{ marginBottom: 8 }}>Évaluations</h3>
+      {err && <p style={{ color: 'var(--color-danger)', fontSize: 13 }}>{err}</p>}
       {rows.length === 0
         ? <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>Aucune évaluation pour cet employé.</p>
         : (
