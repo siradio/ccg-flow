@@ -53,7 +53,7 @@ export default function Campagnes() {
     setGen({ campaign: c, loading: true, eligibles: [], templateId: c.template_defaut_id ? String(c.template_defaut_id) : '', selected: {}, posteFilter: '', buFilter: '', busy: false });
     client.get(`/rh/evaluation/campaigns/${c.id}/eligibles`).then(r => {
       const sel = {};
-      for (const e of r.data) if (!e.deja_fiche && e.manager_a_compte) sel[e.id] = true; // présélection par défaut
+      for (const e of r.data) if (!e.deja_fiche) sel[e.id] = true; // présélection par défaut (hors fiches déjà créées)
       setGen(g => g && g.campaign.id === c.id ? { ...g, loading: false, eligibles: r.data, selected: sel } : g);
     }).catch(() => setGen(g => g ? { ...g, loading: false } : g));
   }
@@ -70,7 +70,7 @@ export default function Campagnes() {
   function setAll(v) {
     setGen(g => {
       const sel = { ...g.selected };
-      for (const e of filteredEligibles) if (!e.deja_fiche && e.manager_a_compte) sel[e.id] = v;
+      for (const e of filteredEligibles) if (!e.deja_fiche) sel[e.id] = v;
       return { ...g, selected: sel };
     });
   }
@@ -80,7 +80,7 @@ export default function Campagnes() {
     if (!cible) { setNotice({ type: 'warning', text: 'Ce modèle n\'a pas de « poste cible » renseigné.' }); return; }
     setGen(g => {
       const sel = {};
-      for (const e of g.eligibles) if (!e.deja_fiche && e.manager_a_compte && (e.poste || '').toLowerCase().includes(cible)) sel[e.id] = true;
+      for (const e of g.eligibles) if (!e.deja_fiche && (e.poste || '').toLowerCase().includes(cible)) sel[e.id] = true;
       return { ...g, selected: sel };
     });
   }
@@ -192,14 +192,14 @@ export default function Campagnes() {
                   <tbody>
                     {filteredEligibles.length === 0 ? <tr><td colSpan={5}>Aucun employé éligible.</td></tr>
                       : filteredEligibles.map(e => {
-                        const bloque = e.deja_fiche || !e.manager_a_compte;
+                        const bloque = e.deja_fiche;
                         return (
                           <tr key={e.id} style={bloque ? { color: 'var(--color-text-muted)' } : undefined}>
                             <td><input type="checkbox" disabled={bloque} checked={!!gen.selected[e.id]} onChange={ev => setSel(e.id, ev.target.checked)} /></td>
-                            <td>{e.matricule ? e.matricule + ' — ' : ''}{e.prenom} {e.nom}{e.deja_fiche && <span style={{ fontSize: 11 }}> (fiche déjà créée)</span>}{!e.manager_a_compte && <span style={{ fontSize: 11, color: 'var(--color-warning-fg)' }}> (manager sans compte)</span>}</td>
+                            <td>{e.matricule ? e.matricule + ' — ' : ''}{e.prenom} {e.nom}{e.deja_fiche && <span style={{ fontSize: 11 }}> (fiche déjà créée)</span>}</td>
                             <td>{e.poste || '—'}</td>
                             <td>{e.business_unit_nom || '—'}</td>
-                            <td>{e.manager_nom || '—'}</td>
+                            <td>{e.manager_nom || <span style={{ fontSize: 11, color: 'var(--color-warning-fg)' }}>sans manager → RH</span>}</td>
                           </tr>
                         );
                       })}
