@@ -34,6 +34,12 @@ export default function Campagnes() {
       setShow(false); setForm({ libelle: '', annee: new Date().getFullYear(), date_debut: '', date_fin: '', echelle_max: 5, template_defaut_id: '' }); load();
     } catch (e) { setError(e?.response?.data?.error || 'Erreur.'); }
   }
+  async function remove(c) {
+    const ok = await confirm(`Supprimer la campagne « ${c.libelle} » ? Cette action est définitive.`, { danger: true, confirmLabel: 'Supprimer' });
+    if (!ok) return;
+    try { await client.delete(`/rh/evaluation/campaigns/${c.id}`); setNotice({ type: 'success', text: 'Campagne supprimée.' }); load(); }
+    catch (e) { setNotice({ type: 'warning', text: e?.response?.data?.error || 'Erreur.' }); }
+  }
   async function toggleStatut(c) {
     const ok = await confirm(`${c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir'} la campagne « ${c.libelle} » ?`, { confirmLabel: c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir' });
     if (!ok) return;
@@ -145,7 +151,8 @@ export default function Campagnes() {
                     <td><span className="badge" style={{ background: c.statut === 'ouverte' ? '#128a54' : '#6b7280', color: '#fff' }}>{c.statut === 'ouverte' ? 'Ouverte' : 'Close'}</span></td>
                     {isRh && <td style={{ whiteSpace: 'nowrap' }}>
                       {c.statut === 'ouverte' && <button className="btn btn-primary btn-sm" onClick={() => openGen(c)}>Générer les fiches</button>}{' '}
-                      <button className="btn btn-secondary btn-sm" onClick={() => toggleStatut(c)}>{c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir'}</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => toggleStatut(c)}>{c.statut === 'ouverte' ? 'Clôturer' : 'Rouvrir'}</button>{' '}
+                      {c.statut === 'ouverte' && c.nb_fiches === 0 && <button className="btn btn-danger-ghost btn-sm" onClick={() => remove(c)}>Supprimer</button>}
                     </td>}
                   </tr>
                 ))}

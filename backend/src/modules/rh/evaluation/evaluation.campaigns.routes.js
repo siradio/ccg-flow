@@ -55,6 +55,22 @@ router.put('/:id', requireRh, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Suppression d'une campagne — réservée aux RH, uniquement si OUVERTE et SANS fiche rattachée
+// (évite d'orpheliner des évaluations). Une campagne avec des fiches doit être clôturée, pas supprimée.
+router.delete('/:id', requireRh, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const camp = await one('SELECT id, statut, libelle FROM rh_eval_campaigns WHERE id = $1', [id]);
+    if (!camp) return res.status(404).json({ error: 'Campagne introuvable.' });
+    if (camp.statut !== 'ouverte') return res.status(409).json({ error: 'Seule une campagne ouverte peut être supprimée.' });
+    const n = await one('SELECT COUNT(*)::int AS n FROM rh_evaluations WHERE campaign_id = $1', [id]);
+    if (n.n > 0) return res.status(409).json({ error: `Impossible : ${n.n} fiche(s) rattachée(s) à cette campagne. Supprimez-les d'abord, ou clôturez la campagne.` });
+    await run('DELETE FROM rh_eval_campaigns WHERE id = $1', [id]);
+    await logAction({ tableName: 'rh_eval_campaigns', recordId: id, action: 'suppression', userId: req.user.id, details: { libelle: camp.libelle } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // Employés éligibles à la génération d'une campagne : actifs, ayant un manager. Expose des
 // indicateurs (manager avec compte, fiche déjà créée dans la campagne) pour une sélection ciblée
 // côté UI — l'évaluation ne concerne pas forcément tout le monde (un modèle = certains métiers).
