@@ -79,6 +79,28 @@ export default function LogistiqueDocuments() {
     ? { ...f, optionLabels: Object.fromEntries(f.options.map(o => [o, t(`${f.optionNs}.${o}`)])) }
     : f));
 
+  // Filtre calculé « Échéance » sur l'onglet Documents : permet d'afficher/exporter uniquement les
+  // documents expirés (ou à échoir / valides). jours restants = date_fin - aujourd'hui.
+  const _today = new Date(); _today.setHours(0, 0, 0, 0);
+  const daysLeft = (d) => (d ? Math.round((Date.parse(String(d).slice(0, 10) + 'T00:00:00') - _today) / 86400000) : null);
+  const echeanceFilter = {
+    key: '_echeance',
+    label: t('log.doc.deadline'),
+    options: [
+      { value: 'expires', label: t('log.doc.deadlineFilterExpired') },
+      { value: 'proches', label: t('log.doc.deadlineFilterSoon') },
+      { value: 'valides', label: t('log.doc.deadlineFilterValid') },
+    ],
+    predicate: (v, item) => {
+      const jr = daysLeft(item.date_fin);
+      if (jr == null) return false; // sans échéance → exclu dès qu'un filtre d'échéance est posé
+      if (v === 'expires') return jr < 0;
+      if (v === 'proches') return jr >= 0 && jr <= 30;
+      if (v === 'valides') return jr > 30;
+      return true;
+    },
+  };
+
   // Vue des échéances filtrée côté client (Tous / Expirés / À échoir ≤ 30 j). L'export reprend
   // exactement cette vue filtrée (et non toute la liste).
   const echViz = echeances.filter(d => {
@@ -114,6 +136,7 @@ export default function LogistiqueDocuments() {
           endpoint="/vehicle-documents"
           fields={docFields}
           filters={['vehicle_id', 'type']}
+          extraFilters={[echeanceFilter]}
           lists={{ vehicles }}
           canAdd={hasSubModuleLevel(user, 'logistique.parc', 'ajout')}
           canEdit={hasSubModuleLevel(user, 'logistique.parc', 'edition')}
