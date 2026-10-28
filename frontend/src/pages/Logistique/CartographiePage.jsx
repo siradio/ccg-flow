@@ -35,9 +35,11 @@ export default function CartographiePage() {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
+  const missionLayerRef = useRef(null); // calque des missions (départ/arrivée/trajet)
   const placeRef = useRef(false); // mode "placement" actif (lecture dans le handler de clic)
 
   const [positions, setPositions] = useState([]);
+  const [missions, setMissions] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [placing, setPlacing] = useState(false);
   const [pending, setPending] = useState(null); // { lat, lng } cliqué sur la carte
@@ -46,6 +48,7 @@ export default function CartographiePage() {
 
   function load() {
     client.get('/positions/latest').then(r => setPositions(r.data)).catch(() => {});
+    client.get('/missions/carte').then(r => setMissions(r.data)).catch(() => {});
   }
 
   // Init de la carte (une seule fois).
@@ -56,6 +59,7 @@ export default function CartographiePage() {
       maxZoom: 19,
       attribution: '© OpenStreetMap',
     }).addTo(map);
+    missionLayerRef.current = L.layerGroup().addTo(map); // sous les véhicules
     layerRef.current = L.layerGroup().addTo(map);
     map.on('click', e => {
       if (!placeRef.current) return;
@@ -88,8 +92,42 @@ export default function CartographiePage() {
       m.addTo(layer);
       pts.push([p.lat, p.lng]);
     });
-    if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
   }, [positions, lang]);
+
+  // (Re)dessine les missions actives : marqueur départ (D), marqueur arrivée (A) et trait pointillé
+  // entre les deux. Les missions dont les lieux n'ont pas pu être géolocalisés sont simplement omises.
+  useEffect(() => {
+    const map = mapRef.current; const layer = missionLayerRef.current;
+    if (!map || !layer) return;
+    layer.clearLayers();
+    const pin = (letter, bg) => L.divIcon({
+      className: 'mission-pin',
+      html: `<div style="background:${bg};color:#fff;width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:12px;font-weight:700;line-height:1;">${letter}</span></div>`,
+      iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -20],
+    });
+    missions.forEach(ms => {
+      const dep = ms.depart_lat != null && ms.depart_lng != null ? [Number(ms.depart_lat), Number(ms.depart_lng)] : null;
+      const arr = ms.arrivee_lat != null && ms.arrivee_lng != null ? [Number(ms.arrivee_lat), Number(ms.arrivee_lng)] : null;
+      const info = `<strong>${ms.objet || ''}</strong><br/>` +
+        `<small>${ms.vehicle_immat || ''}${ms.marque ? ' — ' + ms.marque : ''}${ms.driver_nom ? ' · ' + ms.driver_nom : ''}</small><br/>` +
+        `<small>${ms.depart || '?'} → ${ms.arrivee || '?'} · ${ms.statut || ''}</small>`;
+      if (dep && arr) L.polyline([dep, arr], { color: '#6366f1', weight: 3, dashArray: '6 6', opacity: 0.8 }).addTo(layer);
+      if (dep) L.marker(dep, { icon: pin('D', '#16a34a') }).bindPopup(info).addTo(layer);
+      if (arr) L.marker(arr, { icon: pin('A', '#dc2626') }).bindPopup(info).addTo(layer);
+    });
+  }, [missions]);
+
+  // Cadrage global : ajuste la vue pour englober positions véhicules et points de mission.
+  useEffect(() => {
+    const map = mapRef.current; if (!map) return;
+    const pts = [];
+    positions.forEach(p => pts.push([p.lat, p.lng]));
+    missions.forEach(ms => {
+      if (ms.depart_lat != null && ms.depart_lng != null) pts.push([Number(ms.depart_lat), Number(ms.depart_lng)]);
+      if (ms.arrivee_lat != null && ms.arrivee_lng != null) pts.push([Number(ms.arrivee_lat), Number(ms.arrivee_lng)]);
+    });
+    if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+  }, [positions, missions]);
 
   // Marqueur temporaire du point en cours de saisie.
   const pendingMarkerRef = useRef(null);
@@ -169,7 +207,19 @@ export default function CartographiePage() {
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} /> {t('log.vehStatut.' + s)}
           </span>
         ))}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', background: '#16a34a', border: '1.5px solid #fff', display: 'inline-block' }} /> {t('log.carto.missionDepart')}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50% 50% 50% 0', transform: 'rotate(-45deg)', background: '#dc2626', border: '1.5px solid #fff', display: 'inline-block' }} /> {t('log.carto.missionArrivee')}
+        </span>
       </div>
+
+      {missions.some(m => (m.depart && m.depart_lat == null) || (m.arrivee && m.arrivee_lat == null)) && (
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '8px 2px 0' }}>
+          {t('log.carto.missionsUnlocated')}
+        </p>
+      )}
 
       {positions.length === 0 && (
         <p className="empty-row" style={{ marginTop: 12 }}>{t('log.carto.noPos')}</p>
