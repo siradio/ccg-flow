@@ -21,8 +21,8 @@ router.get('/grid', requireSubModule('production.releve'), async (req, res, next
     const visible = visibleBusinessUnitIds(req.user);
     if (visible !== null && !visible.includes(buId)) return res.json([]);
     res.json(await all(
-      `SELECT p.id AS product_id, p.code, p.designation, p.unite,
-              pe.quantite AS produit, pe.commentaire,
+      `SELECT p.id AS product_id, p.code, p.designation, p.unite, p.poids_unitaire_g,
+              pe.quantite AS produit, pe.quantite_tonnes, pe.commentaire,
               NULLIF(TRIM(CONCAT(u.prenom, ' ', u.nom)), '') AS saisi_par,
               pe.updated_at AS saisi_le
        FROM products p
@@ -66,11 +66,14 @@ router.put('/grid', requireCreate, async (req, res, next) => {
     for (const l of (b.lines || [])) {
       const q = num(l.quantite);
       if (q == null || Number.isNaN(q) || q < 0) continue;
+      // Snapshot du poids unitaire (g) depuis le produit, figé à la saisie → la quantité en tonnes
+      // (colonne générée) reste stable même si le conditionnement du produit est corrigé plus tard.
       await run(
-        `INSERT INTO production_entries (date_production, product_id, quantite, commentaire, created_by, updated_by)
-         VALUES ($1,$2,$3,$4,$5,$5)
+        `INSERT INTO production_entries (date_production, product_id, quantite, commentaire, poids_unitaire_g, created_by, updated_by)
+         VALUES ($1,$2,$3,$4,(SELECT poids_unitaire_g FROM products WHERE id = $2),$5,$5)
          ON CONFLICT (date_production, product_id)
-         DO UPDATE SET quantite = EXCLUDED.quantite, commentaire = EXCLUDED.commentaire, updated_by = $5, updated_at = now()`,
+         DO UPDATE SET quantite = EXCLUDED.quantite, commentaire = EXCLUDED.commentaire,
+                       poids_unitaire_g = EXCLUDED.poids_unitaire_g, updated_by = $5, updated_at = now()`,
         [date, Number(l.product_id), q, l.commentaire || null, req.user.id]);
       saved++;
     }
@@ -90,7 +93,8 @@ router.get('/dashboard', requireSubModule('production.suivi'), async (req, res, 
     if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
     res.json(await all(
       `SELECT p.id AS product_id, p.code, p.designation, p.unite, p.business_unit_id, bu.nom AS bu_nom,
-              SUM(pe.quantite) AS total_produit, COUNT(*)::int AS jours_saisis,
+              SUM(pe.quantite) AS total_produit, SUM(pe.quantite_tonnes) AS total_tonnes,
+              COUNT(*)::int AS jours_saisis,
               MAX(pe.date_production) AS dernier_jour,
               la.saisi_par
        FROM production_entries pe
@@ -122,7 +126,8 @@ router.get('/detail', requireSubModule('production.suivi'), async (req, res, nex
     const visible = visibleBusinessUnitIds(req.user);
     if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
     res.json(await all(
-      `SELECT pe.date_production AS date, p.code, p.designation, p.unite, bu.nom AS bu_nom, pe.quantite AS qty
+      `SELECT pe.date_production AS date, p.code, p.designation, p.unite, bu.nom AS bu_nom,
+              pe.quantite AS qty, pe.quantite_tonnes AS qty_t
        FROM production_entries pe
        JOIN products p ON p.id = pe.product_id
        LEFT JOIN business_units bu ON bu.id = p.business_unit_id
@@ -136,7 +141,7 @@ router.get('/series', requireSubModule('production.suivi'), async (req, res, nex
   try {
     if (!req.query.product_id) return res.status(400).json({ error: 'product_id requis.' });
     res.json(await all(
-      `SELECT date_production, quantite FROM production_entries WHERE product_id = $1 ORDER BY date_production ASC LIMIT 180`,
+      `SELECT date_production, quantite, quantite_tonnes FROM production_entries WHERE product_id = $1 ORDER BY date_production ASC LIMIT 180`,
       [Number(req.query.product_id)]));
   } catch (e) { next(e); }
 });
@@ -156,7 +161,8 @@ router.get('/evolution', requireSubModule('production.suivi'), async (req, res, 
     const visible = visibleBusinessUnitIds(req.user);
     if (visible !== null) { if (!visible.length) return res.json([]); params.push(visible); where.push(`p.business_unit_id = ANY($${params.length})`); }
     res.json(await all(
-      `SELECT date_trunc('${unit}', pe.date_production) AS bucket, SUM(pe.quantite)::float AS valeur
+      `SELECT date_trunc('${unit}', pe.date_production) AS bucket, SUM(pe.quantite)::float AS valeur,
+              SUM(pe.quantite_tonnes)::float AS valeur_t
        FROM production_entries pe JOIN products p ON p.id = pe.product_id
        WHERE ${where.join(' AND ')}
        GROUP BY bucket ORDER BY bucket`, params));

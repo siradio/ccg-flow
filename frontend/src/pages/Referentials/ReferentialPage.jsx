@@ -283,7 +283,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
                 return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
                   hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
               }
-              const input = <FieldInput field={f} value={form[f.key]}
+              const input = <FieldInput field={f} value={form[f.key]} form={form}
                 onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
                 entities={entities} sites={sites} lists={lists} />;
               // La case à cocher porte déjà son propre libellé à côté d'elle.
@@ -398,6 +398,10 @@ function renderValue(field, item, entities, sites, lists = {}, endpoint = '', t 
   if (field.type === 'multiFk') return (value || []).map(id => (lists[field.listKey] || []).find(o => o.id === id)?.nom).filter(Boolean).join(', ') || '—';
   if (field.type === 'multiCheck') return (value || []).map(v => optLabel(field, v)).join(', ') || '—';
   if (field.type === 'select') return value ? optLabel(field, value) : value;
+  if (field.type === 'computed') {
+    const v = value != null && value !== '' ? value : (field.compute ? field.compute(item) : null);
+    return (v == null || v === '' || Number.isNaN(Number(v))) ? '—' : `${Number(v).toLocaleString('fr-FR')}${field.suffix || ''}`;
+  }
   if (field.type === 'checkbox') return value ? t('ref.yes') : t('ref.no');
   // Affichage localisé JJ/MM/AAAA depuis la portion date (sans reparser en Date → pas de décalage TZ).
   if (field.type === 'date') return value ? String(value).slice(0, 10).split('-').reverse().join('/') : '—';
@@ -482,10 +486,17 @@ function PhotoField({ endpoint, editingId, hasPhoto, onChanged }) {
   );
 }
 
-export function FieldInput({ field, value, onChange, entities, sites, lists = {} }) {
+export function FieldInput({ field, value, onChange, entities, sites, lists = {}, form = {} }) {
   const { t } = useI18n();
   const [optFilterOn, setOptFilterOn] = useState(false); // case à cocher optionnelle (voir optionFilterToggle)
   const label = fieldLabel(field, t);
+  // Champ calculé (lecture seule) : valeur dérivée des autres champs via field.compute(form).
+  if (field.type === 'computed') {
+    const v = field.compute ? field.compute(form) : value;
+    const show = (v == null || v === '' || Number.isNaN(Number(v))) ? '—' : `${Number(v).toLocaleString('fr-FR')}${field.suffix || ''}`;
+    return <input type="text" value={show} readOnly tabIndex={-1}
+      style={{ background: 'var(--color-bg-muted, #f3f4f6)', color: 'var(--color-text-muted)', fontWeight: 600 }} />;
+  }
   if (field.type === 'entitySelect') {
     return (
       <select required={field.required} value={value || ''} onChange={e => onChange(Number(e.target.value))}>

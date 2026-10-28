@@ -111,6 +111,14 @@ const CONFIGS = {
       { key: 'business_unit_id', labelKey: 'refx.f.business_unit_id', type: 'fkSelect', listKey: 'businessUnits' },
       { key: 'unite', labelKey: 'refx.f.unite' },
       { key: 'unite_vente', labelKey: 'refx.f.unite_vente' },
+      // Conditionnement & poids (module Production — harmonisation en tonnes). Poids unitaire (g) =
+      // Format × Unités par colis × (kg→1000, sinon 1). Visible pour les produits finis.
+      { key: 'pds_format', labelKey: 'refx.f.pds_format', type: 'number', showIf: { field: 'type_article', equals: 'produit_fini' } },
+      { key: 'pds_unites_par_colis', labelKey: 'refx.f.pds_unites_par_colis', type: 'number', showIf: { field: 'type_article', equals: 'produit_fini' } },
+      { key: 'pds_unite', labelKey: 'refx.f.pds_unite', type: 'select', options: ['g', 'ml', 'kg'], showIf: { field: 'type_article', equals: 'produit_fini' } },
+      { key: 'poids_unitaire_g', labelKey: 'refx.f.poids_unitaire_g', type: 'computed', suffix: ' g',
+        compute: (f) => { const fmt = Number(f.pds_format); const u = Number(f.pds_unites_par_colis); if (!fmt || !u) return null; return fmt * u * (f.pds_unite === 'kg' ? 1000 : 1); },
+        showIf: { field: 'type_article', equals: 'produit_fini' } },
       // Champs spécifiques matières premières (production / consommation).
       { key: 'unite_conso', labelKey: 'refx.f.unite_conso', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
       { key: 'coef_conversion', labelKey: 'refx.f.coef_conversion', type: 'number', showIf: { field: 'type_article', equals: 'matiere_premiere' } },

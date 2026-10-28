@@ -47,30 +47,35 @@ export function dailyDetailSheets(rows, { valueLabel = 'Quantité' } = {}) {
   const days = [...new Set(rows.map(r => day(r.date)))].sort();
   const dLabel = d => d.split('-').reverse().slice(0, 2).join('/'); // JJ/MM
   const key = r => `${r.bu_nom || ''}|${r.code || ''}|${r.designation || ''}`;
+  // Colonne tonnes ajoutée seulement si le détail la porte (module Production) — n'affecte pas le Stock.
+  const hasT = rows.some(r => r.qty_t != null);
   const prods = new Map();
   for (const r of rows) {
     const k = key(r);
-    if (!prods.has(k)) prods.set(k, { code: r.code, designation: r.designation, bu_nom: r.bu_nom, byDay: {}, __total: 0 });
+    if (!prods.has(k)) prods.set(k, { code: r.code, designation: r.designation, bu_nom: r.bu_nom, byDay: {}, __total: 0, __total_t: 0 });
     const p = prods.get(k);
     const d = day(r.date);
     p.byDay[d] = (p.byDay[d] || 0) + Number(r.qty || 0);
     p.__total += Number(r.qty || 0);
+    p.__total_t += Number(r.qty_t || 0);
   }
   const matrixCols = [
     { key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
     ...days.map(d => ({ key: d, label: dLabel(d), type: 'number' })),
     { key: '__total', label: 'Total', type: 'number' },
+    ...(hasT ? [{ key: '__total_t', label: 'Total (t)', type: 'number' }] : []),
   ];
   const matrixRows = [...prods.values()].map(p => ({
-    code: p.code, designation: p.designation, bu_nom: p.bu_nom, __total: p.__total,
+    code: p.code, designation: p.designation, bu_nom: p.bu_nom, __total: p.__total, __total_t: p.__total_t,
     ...Object.fromEntries(days.map(d => [d, p.byDay[d] ?? ''])),
   }));
   const flatCols = [
     { key: 'date', label: 'Date', type: 'date' }, { key: 'code', label: 'Code' },
     { key: 'designation', label: 'Produit' }, { key: 'bu_nom', label: 'Business Unit' },
     { key: 'qty', label: valueLabel, type: 'number' },
+    ...(hasT ? [{ key: 'qty_t', label: 'Quantité (t)', type: 'number' }] : []),
   ];
-  const flatRows = rows.map(r => ({ date: day(r.date), code: r.code, designation: r.designation, bu_nom: r.bu_nom, qty: r.qty }));
+  const flatRows = rows.map(r => ({ date: day(r.date), code: r.code, designation: r.designation, bu_nom: r.bu_nom, qty: r.qty, qty_t: r.qty_t }));
   return { days, matrix: { name: 'Matrice', columns: matrixCols, rows: matrixRows }, flat: { name: 'Détail', columns: flatCols, rows: flatRows } };
 }
 

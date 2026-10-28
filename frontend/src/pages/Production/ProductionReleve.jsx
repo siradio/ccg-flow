@@ -11,9 +11,12 @@ import { useI18n } from '../../i18n/I18nContext';
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => today().slice(0, 8) + '01';
 const fmt = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 }));
+// Tonnes : 3 décimales (petites quantités). poids unitaire en grammes → t = qté × g ÷ 1 000 000.
+const fmtT = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+const tonnes = (qte, pug) => (Number(qte) || 0) * (Number(pug) || 0) / 1e6;
 const d10 = v => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');
 
-const SAISIE_COLS = [{ key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'produit', label: 'Produit ce jour', type: 'number' }];
+const SAISIE_COLS = [{ key: 'code', label: 'Code' }, { key: 'designation', label: 'Produit' }, { key: 'produit', label: 'Quantité produite', type: 'number' }, { key: 'qte_t', label: 'Qte (t)', type: 'number' }];
 
 function Segmented({ tab, setTab }) {
   const { t } = useI18n();
@@ -107,15 +110,15 @@ export default function ProductionReleve() {
   }
 
   const nbSaisis = Object.values(edits).filter(v => v.quantite !== '' && v.quantite != null).length;
-  const totalJour = Object.values(edits).reduce((s, v) => s + (Number(v.quantite) || 0), 0);
-  const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '' }));
-  const totalPeriode = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
+  const totalJourT = grid.reduce((s, r) => s + tonnes(edits[r.product_id]?.quantite, r.poids_unitaire_g), 0);
+  const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '', qte_t: tonnes(edits[r.product_id]?.quantite, r.poids_unitaire_g) }));
+  const totalPeriodeT = suivi.reduce((s, r) => s + Number(r.total_tonnes || 0), 0);
   const fmtBucket = b => {
     const s = String(b).slice(0, 10);
     if (evoGran === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
     return s.split('-').slice(1).reverse().join('/');
   };
-  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur }));
+  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur_t }));
 
   return (
     <div>
@@ -145,7 +148,7 @@ export default function ProductionReleve() {
             </label>
             <label className="field">{t('stockreleve.date')}<input type="date" value={date} onChange={e => { setMsg(null); setDate(e.target.value); }} /></label>
             <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'right' }}>
-              {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}<br /><strong>{t('prodrel.totalDay', { v: fmt(totalJour) })}</strong>
+              {t('stockreleve.entered', { n: nbSaisis, total: grid.length })}<br /><strong>{t('prodrel.totalDayT', { v: fmtT(totalJourT) })}</strong>
             </div>
           </div>
           {/* État du dernier relevé de production de la BU (toutes dates), bien visible (ou message si aucun) */}
@@ -164,7 +167,7 @@ export default function ProductionReleve() {
             <div className="card" style={{ padding: 0 }}>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>{t('stockreleve.th.product')}</th><th className="num">{t('prodrel.thQty')}</th><th>{t('stockreleve.th.comment')}</th></tr></thead>
+                  <thead><tr><th>{t('stockreleve.th.product')}</th><th className="num">{t('prodrel.thQty')}</th><th className="num">{t('prodrel.thQtyT')}</th><th>{t('stockreleve.th.comment')}</th></tr></thead>
                   <tbody>
                     {grid.map(r => (
                       <tr key={r.product_id}>
@@ -172,6 +175,9 @@ export default function ProductionReleve() {
                         <td className="num">
                           <input type="number" min="0" step="0.001" disabled={!canSaisir} value={edits[r.product_id]?.quantite ?? ''} style={{ width: 110, textAlign: 'right' }}
                             onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], quantite: e.target.value } }))} />
+                        </td>
+                        <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }} title={r.poids_unitaire_g ? '' : t('prodrel.noWeight')}>
+                          {r.poids_unitaire_g ? fmtT(tonnes(edits[r.product_id]?.quantite, r.poids_unitaire_g)) : <span style={{ color: 'var(--color-warning, #b45309)', fontWeight: 400 }}>⚠︎</span>}
                         </td>
                         <td><input disabled={!canSaisir} value={edits[r.product_id]?.commentaire ?? ''} placeholder={t('stockreleve.optional')} style={{ width: 180 }}
                           onChange={e => setEdits(x => ({ ...x, [r.product_id]: { ...x[r.product_id], commentaire: e.target.value } }))} /></td>
@@ -203,19 +209,19 @@ export default function ProductionReleve() {
                 <option value="">{t('stockcommon.all')}</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </label>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('prodrel.totalPeriod', { v: fmt(totalPeriode) })}</div>
+            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('prodrel.totalPeriodT', { v: fmtT(totalPeriodeT) })}</div>
           </div>
           {suivi.length === 0 && <p className="empty-row">{t('prodrel.noneInPeriod')}</p>}
           {suivi.length > 0 && (
             <>
               <section className="card" style={{ marginBottom: 16 }}>
-                <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{t('prodrel.byProduct')}</h2>
+                <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{t('prodrel.byProduct')} ({t('prodrel.inTonnes')})</h2>
                 <div style={{ width: '100%', height: 280 }}>
                   <ResponsiveContainer>
-                    <BarChart data={suivi.slice(0, 12).map(r => ({ nom: r.code || r.designation, total: Number(r.total_produit) }))} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
+                    <BarChart data={suivi.slice(0, 12).map(r => ({ nom: r.code || r.designation, total: Number(r.total_tonnes) }))} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis dataKey="nom" fontSize={11} /><YAxis fontSize={11} tickFormatter={fmt} width={60} />
-                      <Tooltip formatter={v => fmt(v)} />
+                      <XAxis dataKey="nom" fontSize={11} /><YAxis fontSize={11} tickFormatter={fmtT} width={60} />
+                      <Tooltip formatter={v => fmtT(v)} />
                       <Bar dataKey="total" fill="#0f766e" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -243,8 +249,8 @@ export default function ProductionReleve() {
                       <LineChart data={evoData} margin={{ top: 6, right: 12, bottom: 6, left: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                         <XAxis dataKey="x" fontSize={11} />
-                        <YAxis fontSize={11} width={60} tickFormatter={fmt} />
-                        <Tooltip formatter={v => fmt(v)} />
+                        <YAxis fontSize={11} width={60} tickFormatter={fmtT} />
+                        <Tooltip formatter={v => fmtT(v)} />
                         <Line type="monotone" dataKey="valeur" stroke="var(--color-primary, #2454e0)" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -259,6 +265,7 @@ export default function ProductionReleve() {
                       <SortTh label={t('stockreleve.th.product')} colKey="produit" get={r => `${r.code || ''} ${r.designation || ''}`} sort={suiviSort} by={suiviBy} />
                       <SortTh label={t('stockreleve.th.bu')} colKey="bu" get={r => r.bu_nom} sort={suiviSort} by={suiviBy} />
                       <SortTh label={t('prodrel.th.totalProduced')} colKey="total" get={r => Number(r.total_produit) || 0} sort={suiviSort} by={suiviBy} className="num" />
+                      <SortTh label={t('prodrel.th.totalTonnes')} colKey="totalT" get={r => Number(r.total_tonnes) || 0} sort={suiviSort} by={suiviBy} className="num" />
                       <SortTh label={t('prodrel.th.daysEntered')} colKey="jours" get={r => Number(r.jours_saisis) || 0} sort={suiviSort} by={suiviBy} className="num" />
                       <SortTh label={t('prodrel.th.lastDay')} colKey="dernier" get={r => r.dernier_jour} sort={suiviSort} by={suiviBy} />
                       <SortTh label={t('stockreleve.th.by')} colKey="par" get={r => r.saisi_par} sort={suiviSort} by={suiviBy} />
@@ -268,7 +275,8 @@ export default function ProductionReleve() {
                         <tr key={r.product_id}>
                           <td><strong>{r.code || ''}</strong>{r.code ? ' — ' : ''}{r.designation}</td>
                           <td>{r.bu_nom}</td>
-                          <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmt(r.total_produit)} {r.unite || ''}</td>
+                          <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(r.total_produit)} {r.unite || ''}</td>
+                          <td className="num" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{fmtT(r.total_tonnes)}</td>
                           <td className="num">{r.jours_saisis}</td>
                           <td>{d10(r.dernier_jour)}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{r.saisi_par || '—'}</td>

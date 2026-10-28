@@ -13,6 +13,8 @@ const OPTIONAL_COLS = [
   'code', 'business_unit_id', 'unite', 'actif', 'seuil_alerte_stock',
   'type_article', 'code_barres', 'sous_categorie', 'marque',
   'unite_vente', 'unite_conso', 'coef_conversion',
+  // Conditionnement/poids (module Production — harmonisation tonnes). poids_unitaire_g est GÉNÉRÉE → non éditable.
+  'pds_format', 'pds_unites_par_colis', 'pds_unite',
   'cout_standard', 'prix_vente_ht', 'seuil_max', 'stock_securite',
   'delai_reappro_jours', 'gere_par_lot', 'gere_peremption', 'duree_conservation_jours',
   'methode_valorisation', 'fournisseur_principal_id',
