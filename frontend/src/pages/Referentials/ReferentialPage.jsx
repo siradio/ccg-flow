@@ -168,8 +168,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       <div className="page-header">
         <h1 className="page-title">{title}</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-secondary btn-sm" disabled={items.length === 0}
-            onClick={() => exportReferential(title, items, fields, { entities, sites, lists }, t)}>{t('ref.io.exportBtn')}</button>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={sortedItems.length === 0}
+            onClick={() => exportReferential(title, sortedItems, fields, { entities, sites, lists }, t)}>{t('ref.io.exportBtn')}{hasActiveFilter ? ` (${sortedItems.length})` : ''}</button>
           {canAdd && (
             <button type="button" className="btn btn-secondary btn-sm"
               onClick={() => downloadTemplate(title, fields, { entities, sites, lists }, t)}>{t('ref.io.templateBtn')}</button>

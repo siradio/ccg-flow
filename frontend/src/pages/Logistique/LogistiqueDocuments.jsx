@@ -3,6 +3,7 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel, isSuperAdmin } from '../../auth/AuthContext';
 import LogistiqueSubnav from './LogistiqueSubnav';
 import ReferentialPage from '../Referentials/ReferentialPage';
+import { exportXlsx } from '../../utils/exportData';
 import { useI18n } from '../../i18n/I18nContext';
 
 const DOC_TYPES = ['Assurance', 'Carte grise', 'Visite technique', 'Vignette', 'Autre'];
@@ -34,6 +35,7 @@ export default function LogistiqueDocuments() {
   const [tab, setTab] = useState('docs');
   const [vehicles, setVehicles] = useState([]);
   const [echeances, setEcheances] = useState([]);
+  const [echFilter, setEchFilter] = useState('tous'); // tous | expires | proches
   const [alertCfg, setAlertCfg] = useState({ actif: false, jours: '30', emails: '' });
   const [alertMsg, setAlertMsg] = useState('');
 
@@ -77,6 +79,27 @@ export default function LogistiqueDocuments() {
     ? { ...f, optionLabels: Object.fromEntries(f.options.map(o => [o, t(`${f.optionNs}.${o}`)])) }
     : f));
 
+  // Vue des échéances filtrée côté client (Tous / Expirés / À échoir ≤ 30 j). L'export reprend
+  // exactement cette vue filtrée (et non toute la liste).
+  const echViz = echeances.filter(d => {
+    const jr = Number(d.jours_restants);
+    if (echFilter === 'expires') return jr < 0;
+    if (echFilter === 'proches') return jr >= 0 && jr <= 30;
+    return true;
+  });
+  function exportEcheances() {
+    const statut = d => { const jr = Number(d.jours_restants); return jr < 0 ? `Expiré depuis ${-jr} j` : `Dans ${jr} j`; };
+    const cols = [
+      { key: 'vehicle_immat', label: 'Véhicule' },
+      { key: 'type', label: 'Type' },
+      { key: 'numero', label: 'N°' },
+      { key: 'date_fin', label: 'Échéance', type: 'date' },
+      { key: 'jours_restants', label: 'Jours restants', type: 'number' },
+      { key: '_statut', label: 'Statut' },
+    ];
+    exportXlsx('echeances_documents', cols, echViz.map(d => ({ ...d, _statut: statut(d) })));
+  }
+
   return (
     <div>
       <LogistiqueSubnav />
@@ -98,7 +121,18 @@ export default function LogistiqueDocuments() {
       ) : (
         <div>
           <h1 className="page-title" style={{ margin: '0 0 4px' }}>{t('log.doc.deadlines')}</h1>
-          <p className="page-subtitle" style={{ margin: '0 0 14px' }}>{t('log.doc.deadlinesSub')}</p>
+          <p className="page-subtitle" style={{ margin: '0 0 12px' }}>{t('log.doc.deadlinesSub')}</p>
+
+          <div className="form-inline" style={{ marginBottom: 14, alignItems: 'center', gap: 8 }}>
+            <select value={echFilter} onChange={e => setEchFilter(e.target.value)}>
+              <option value="tous">{t('log.doc.deadlineFilterAll')}</option>
+              <option value="expires">{t('log.doc.deadlineFilterExpired')}</option>
+              <option value="proches">{t('log.doc.deadlineFilterSoon')}</option>
+            </select>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={echViz.length === 0} onClick={exportEcheances}>
+              {t('ref.io.exportBtn')} ({echViz.length})
+            </button>
+          </div>
 
           {admin && (
             <div className="card" style={{ marginBottom: 16 }}>
@@ -123,9 +157,9 @@ export default function LogistiqueDocuments() {
               <p style={{ fontSize: 12, color: 'var(--color-text-faint)', margin: '8px 0 0' }}>{t('log.doc.autoCheckNote')}</p>
             </div>
           )}
-          {echeances.length === 0 && <p className="empty-row">{t('log.doc.noDeadlines')}</p>}
+          {echViz.length === 0 && <p className="empty-row">{t('log.doc.noDeadlines')}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {echeances.map(d => {
+            {echViz.map(d => {
               const jr = Number(d.jours_restants);
               const st = echeanceStatus(jr, t);
               return (

@@ -55,6 +55,22 @@ router.put('/:id', requireRh, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Suppression d'une campagne — réservée aux RH, uniquement si OUVERTE et SANS fiche rattachée
+// (évite d'orpheliner des évaluations). Une campagne avec des fiches doit être clôturée, pas supprimée.
+router.delete('/:id', requireRh, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const camp = await one('SELECT id, statut, libelle FROM rh_eval_campaigns WHERE id = $1', [id]);
+    if (!camp) return res.status(404).json({ error: 'Campagne introuvable.' });
+    if (camp.statut !== 'ouverte') return res.status(409).json({ error: 'Seule une campagne ouverte peut être supprimée.' });
+    const n = await one('SELECT COUNT(*)::int AS n FROM rh_evaluations WHERE campaign_id = $1', [id]);
+    if (n.n > 0) return res.status(409).json({ error: `Impossible : ${n.n} fiche(s) rattachée(s) à cette campagne. Supprimez-les d'abord, ou clôturez la campagne.` });
+    await run('DELETE FROM rh_eval_campaigns WHERE id = $1', [id]);
+    await logAction({ tableName: 'rh_eval_campaigns', recordId: id, action: 'suppression', userId: req.user.id, details: { libelle: camp.libelle } });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // Employés éligibles à la génération d'une campagne : actifs, ayant un manager. Expose des
 // indicateurs (manager avec compte, fiche déjà créée dans la campagne) pour une sélection ciblée
 // côté UI — l'évaluation ne concerne pas forcément tout le monde (un modèle = certains métiers).
@@ -73,7 +89,7 @@ router.get('/:id/eligibles', requireRh, async (req, res, next) => {
         LEFT JOIN business_units bu ON bu.id = e.business_unit_id
         LEFT JOIN employees me ON me.id = e.manager_employee_id
         LEFT JOIN users mu ON mu.employee_id = e.manager_employee_id AND mu.actif = true
-       WHERE e.statut = 'actif' AND e.manager_employee_id IS NOT NULL
+       WHERE e.statut = 'actif'
        ORDER BY e.poste NULLS LAST, e.nom, e.prenom`, [id]);
     res.json(rows);
   } catch (e) { next(e); }
@@ -114,14 +130,15 @@ router.post('/:id/generate', requireRh, async (req, res, next) => {
         const exists = await one('SELECT 1 FROM rh_evaluations WHERE campaign_id = $1 AND employee_id = $2', [id, emp.id]);
         if (exists) { report.skipped += 1; continue; }
         const mgr = await one(`SELECT u.id FROM employees e JOIN users u ON u.employee_id = e.manager_employee_id AND u.actif = true WHERE e.id = $1 LIMIT 1`, [emp.id]);
-        if (!mgr) { report.skipped += 1; report.errors.push({ employee_id: emp.id, motif: 'Manager non configuré ou sans compte' }); continue; }
+        // Pas de manager configuré (ex. directeurs) → l'évaluateur est le RH qui lance la génération.
+        const managerUserId = mgr ? mgr.id : req.user.id;
         const euid = await one('SELECT id FROM users WHERE employee_id = $1 AND actif = true LIMIT 1', [emp.id]);
         await withTransaction(async (tx) => {
           const numero = await nextRef(tx, { scope: 'rh_evaluation', prefix: 'EVL', pad: 4 });
           const row = await tx.one(
             `INSERT INTO rh_evaluations (numero, campaign_id, employee_id, manager_user_id, template_id, entity_id, business_unit_id, annee, echelle_max, statut, auto_par_manager, created_by)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'brouillon',$10,$11) RETURNING id`,
-            [numero, id, emp.id, mgr.id, templateId, emp.entity_id, emp.business_unit_id, camp.annee, echelle, euid == null, req.user.id]);
+            [numero, id, emp.id, managerUserId, templateId, emp.entity_id, emp.business_unit_id, camp.annee, echelle, euid == null, req.user.id]);
           for (const it of items) {
             await tx.run(`INSERT INTO rh_evaluation_lignes (evaluation_id, competence_id, categorie_libelle, libelle, ordre) VALUES ($1,$2,$3,$4,$5)`,
               [row.id, it.competence_id, it.categorie_libelle, it.libelle, it.ordre]);
@@ -129,7 +146,7 @@ router.post('/:id/generate', requireRh, async (req, res, next) => {
           await tx.run(`INSERT INTO rh_evaluation_history (evaluation_id, action, user_id) VALUES ($1,'creation',$2)`, [row.id, req.user.id]);
         });
         report.created += 1;
-        managerCounts.set(mgr.id, (managerCounts.get(mgr.id) || 0) + 1);
+        managerCounts.set(managerUserId, (managerCounts.get(managerUserId) || 0) + 1);
       } catch (err) { report.skipped += 1; report.errors.push({ employee_id: emp.id, motif: err.message }); }
     }
     // Notifie chaque manager une fois.
