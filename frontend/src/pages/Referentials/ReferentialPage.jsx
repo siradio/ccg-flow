@@ -23,7 +23,7 @@ const optLabel = (f, o) => (f.optionLabels && f.optionLabels[o] != null ? f.opti
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
-export default function ReferentialPage({ title, endpoint, fields, filters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false, rowLink = null, rowLinkLabel = 'Ouvrir' }) {
+export default function ReferentialPage({ title, endpoint, fields, filters = [], extraFilters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false, rowLink = null, rowLinkLabel = 'Ouvrir' }) {
   const confirm = useConfirm();
   const { t } = useI18n();
   const [items, setItems] = useState([]);
@@ -133,7 +133,9 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
   const hasActiveFilter = search.trim() !== '' || Object.values(filterValues).some(v => v !== '' && v != null);
   const visibleItems = items.filter(item =>
     matchesSearch(item, fields, search) &&
-    filterDefs.every(f => matchesFilter(f, item, filterValues[f.key]))
+    filterDefs.every(f => matchesFilter(f, item, filterValues[f.key])) &&
+    // Filtres calculés (non liés à une colonne, ex. statut d'échéance) : un prédicat par item.
+    extraFilters.every(ef => { const v = filterValues[ef.key]; return v === '' || v == null || ef.predicate(v, item); })
   );
 
   function resetFilters() {
@@ -205,6 +207,18 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
             >
               <option value="">{fieldLabel(f, t)} : {t('ref.all')}</option>
               {filterOptions(f, items, entities, sites, lists, t).map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          ))}
+          {extraFilters.map(ef => (
+            <select
+              key={ef.key}
+              value={filterValues[ef.key] ?? ''}
+              onChange={e => setFilterValues(fv => ({ ...fv, [ef.key]: e.target.value }))}
+            >
+              <option value="">{ef.label} : {t('ref.all')}</option>
+              {ef.options.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
