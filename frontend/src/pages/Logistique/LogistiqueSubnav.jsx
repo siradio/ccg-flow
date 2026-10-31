@@ -5,26 +5,23 @@ import { useI18n } from '../../i18n/I18nContext';
 // Sous-navigation partagée du module Logistique — utilisée par les écrans génériques (LogistiqueIndex)
 // et par la page Checklists (custom). Chaque onglet est gaté par son sous-module.
 // [chemin, clé i18n du libellé, sous-module]
-// Regroupé par sous-module pour une lecture cohérente : d'abord le Parc véhicule (véhicules,
-// conducteurs, types, documents), puis missions, checklists, la maintenance (pannes, garages),
-// accidents et le suivi.
+// Regroupé par usage pour une lecture cohérente : Parc (véhicules et référentiels), Exploitation
+// (missions, suivi terrain) puis Entretien & coûts (carburant, maintenance, accidents).
 const NAV = [
-  // Parc véhicule (logistique.parc) — ordre logique de saisie : type d'abord, puis véhicules.
-  ['/logistique/types', 'log.nav.types', 'logistique.parc'],
+  // — Parc — (véhicule d'abord comme entrée principale, puis les référentiels associés)
   ['/logistique/vehicules', 'log.nav.vehicules', 'logistique.parc'],
+  ['/logistique/types', 'log.nav.types', 'logistique.parc'],
   ['/logistique/conducteurs', 'log.nav.conducteurs', 'logistique.parc'],
   ['/logistique/documents', 'log.nav.documents', 'logistique.parc'],
-  // Missions
+  // — Exploitation —
   ['/logistique/missions', 'log.nav.missions', 'logistique.missions'],
-  // Checklists
+  ['/logistique/cartographie', 'log.nav.cartographie', 'logistique.suivi'],
   ['/logistique/checklists', 'log.nav.checklists', 'logistique.checklists'],
-  // Maintenance (logistique.maintenance)
+  // — Entretien & coûts —
+  ['/logistique/carburant', 'log.nav.carburant', 'logistique.carburant'],
   ['/logistique/pannes', 'log.nav.pannes', 'logistique.maintenance'],
   ['/logistique/garages', 'log.nav.garages', 'logistique.maintenance'],
-  ['/logistique/carburant', 'log.nav.carburant', 'logistique.carburant'],
-  // Accidents & suivi
   ['/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'],
-  ['/logistique/cartographie', 'log.nav.cartographie', 'logistique.suivi'],
 ];
 
 export default function LogistiqueSubnav() {

@@ -22,7 +22,7 @@ export default function RhSubnav() {
       <NavLink to="/rh/mes-demandes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.mine')}</NavLink>
       {canValidateRh(user) && <NavLink to="/rh/a-valider" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.pending')}</NavLink>}
       {canSeeAllRh(user) && <NavLink to="/rh/toutes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.all')}</NavLink>}
-      {canValidateRh(user) && <NavLink to="/rh/journaliers/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.journaliers')}</NavLink>}
+      {/* Le suivi des journaliers est un onglet du Tableau de bord (plus d'entrée de menu dédiée). */}
       {/* Évaluation */}
       <NavLink to="/rh/evaluation/fiches" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.evaluations')}</NavLink>
       {canManageRhTypes(user) && <NavLink to="/rh/evaluation/campagnes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.campagnes')}</NavLink>}

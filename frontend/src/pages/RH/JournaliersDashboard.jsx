@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
-import RhSubnav from './RhSubnav';
 import { exportXlsx } from '../../utils/exportData';
 
 // Dashboard de suivi des demandes de journaliers : volumes par jour / tâche / BU / semaine + liste.
@@ -49,13 +48,11 @@ export default function JournaliersDashboard() {
 
   return (
     <div>
-      <RhSubnav />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1 className="page-title" style={{ margin: '4px 0' }}>Journaliers — suivi</h1>
-        <button className="btn btn-primary" onClick={() => nav('/rh/demandes/journaliers/new')}>+ Nouvelle demande</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button className="btn btn-primary" onClick={() => nav('/rh/demandes/journaliers/new')}>+ Nouvelle demande de journaliers</button>
       </div>
 
-      <div className="card" style={{ margin: '10px 0 14px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <div className="card" style={{ margin: '0 0 14px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field">Du<input type="date" value={period.from} onChange={e => setPeriod(p => ({ ...p, from: e.target.value }))} /></label>
         <label className="field">Au<input type="date" value={period.to} onChange={e => setPeriod(p => ({ ...p, to: e.target.value }))} /></label>
         <label className="field" style={{ minWidth: 170 }}>Business Unit
