@@ -68,6 +68,7 @@ app.use('/api/garages', require('./modules/logistique/garages.routes'));
 app.use('/api/pannes', require('./modules/logistique/pannes.routes'));
 app.use('/api/reparations', require('./modules/logistique/reparations.routes'));
 app.use('/api/accidents', require('./modules/logistique/accidents.routes'));
+app.use('/api/fuel', require('./modules/logistique/carburant.routes'));
 app.use('/api/positions', require('./modules/logistique/positions.routes'));
 app.use('/api/production', require('./modules/production/production.routes'));
 // Module Commerce — Phase D : référentiels & affectations (versements en Phase F).
