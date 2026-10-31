@@ -16,15 +16,19 @@ export default function RhSubnav() {
   const { t } = useI18n();
   return (
     <nav className="subnav">
+      {/* Pilotage */}
       {canValidateRh(user) && <NavLink to="/rh/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.dashboard')}</NavLink>}
+      {/* Demandes */}
       <NavLink to="/rh/mes-demandes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.mine')}</NavLink>
-      {canValidateRh(user) && <NavLink to="/rh/journaliers/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.journaliers')}</NavLink>}
-      <NavLink to="/rh/evaluation/fiches" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.evaluations')}</NavLink>
       {canValidateRh(user) && <NavLink to="/rh/a-valider" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.pending')}</NavLink>}
       {canSeeAllRh(user) && <NavLink to="/rh/toutes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.all')}</NavLink>}
+      {canValidateRh(user) && <NavLink to="/rh/journaliers/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.journaliers')}</NavLink>}
+      {/* Évaluation */}
+      <NavLink to="/rh/evaluation/fiches" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.evaluations')}</NavLink>
       {canManageRhTypes(user) && <NavLink to="/rh/evaluation/campagnes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.campagnes')}</NavLink>}
       {canValidateRh(user) && <NavLink to="/rh/evaluation/modeles" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.modeles')}</NavLink>}
       {canManageRhTypes(user) && <NavLink to="/rh/competences" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.competences')}</NavLink>}
+      {/* Configuration */}
       {canManageRhTypes(user) && <NavLink to="/rh/parametres" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.params')}</NavLink>}
     </nav>
   );
