@@ -45,6 +45,7 @@ const MODULES = [
       { key: 'logistique.missions', label: 'Missions' },
       { key: 'logistique.checklists', label: 'Checklists chauffeurs' },
       { key: 'logistique.maintenance', label: 'Pannes, garages & réparations' },
+      { key: 'logistique.carburant', label: 'Carburant (pleins, conso, fraude)' },
       { key: 'logistique.accidents', label: 'Accidents' },
       { key: 'logistique.suivi', label: 'Cartographie / suivi GPS' },
     ],

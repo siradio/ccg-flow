@@ -17,6 +17,7 @@ import PannesPage from './pages/Logistique/PannesPage';
 import LogistiqueGarages from './pages/Logistique/LogistiqueGarages';
 import AccidentsPage from './pages/Logistique/AccidentsPage';
 import CartographiePage from './pages/Logistique/CartographiePage';
+import CarburantPage from './pages/Logistique/CarburantPage';
 import LiensPage from './pages/Liens/LiensPage';
 import UsersListPage from './pages/Admin/Users/ListPage';
 import UsersDetailPage from './pages/Admin/Users/DetailPage';
@@ -204,6 +205,7 @@ export default function App() {
         <Route path="logistique/garages" element={<LogistiqueGarages />} />
         <Route path="logistique/accidents" element={<AccidentsPage />} />
         <Route path="logistique/cartographie" element={<CartographiePage />} />
+        <Route path="logistique/carburant" element={<CarburantPage />} />
         <Route path="logistique/:type" element={<LogistiqueIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><UsersListPage /></RequireAdmin>} />
         <Route path="admin/users/:id" element={<RequireAdmin level="user"><UsersDetailPage /></RequireAdmin>} />

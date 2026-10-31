@@ -21,6 +21,7 @@ const NAV = [
   // Maintenance (logistique.maintenance)
   ['/logistique/pannes', 'log.nav.pannes', 'logistique.maintenance'],
   ['/logistique/garages', 'log.nav.garages', 'logistique.maintenance'],
+  ['/logistique/carburant', 'log.nav.carburant', 'logistique.carburant'],
   // Accidents & suivi
   ['/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'],
   ['/logistique/cartographie', 'log.nav.cartographie', 'logistique.suivi'],

@@ -36,6 +36,9 @@ const CONFIGS = {
       { key: 'statut', label: 'Statut', type: 'select', options: STATUTS, default: 'Disponible' },
       { key: 'compteur_km', label: 'Compteur (km)', type: 'number' },
       { key: 'capacite_reservoir', label: 'Capacité réservoir (L)', type: 'number' },
+      // Carburant — base de la détection de fraude (conso de référence = L/100 km attendue).
+      { key: 'type_carburant', label: 'Type de carburant', type: 'select', options: ['Gasoil', 'Essence'] },
+      { key: 'conso_reference_l_100', label: 'Conso. réf. (L/100 km)', type: 'number' },
       // Capacité de charge — sert au contrôle de remplissage des bons de commande commerciaux.
       { key: 'capacite_casiers', label: 'Capacité (casiers)', type: 'number' },
       { key: 'capacite_cartons', label: 'Capacité (cartons)', type: 'number' },
