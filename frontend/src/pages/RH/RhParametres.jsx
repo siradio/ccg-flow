@@ -25,6 +25,13 @@ export default function RhParametres() {
     { key: 'actif', label: t('rh.param.actif'), type: 'checkbox', default: true },
   ];
 
+  // Types de tâches journalières (demande de journaliers) — configurables par les RH.
+  const taskFields = [
+    { key: 'nom', label: 'Nom de la tâche', required: true },
+    { key: 'ordre', label: 'Ordre', type: 'number' },
+    { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+  ];
+
   return (
     <div>
       <RhSubnav />
@@ -32,6 +39,12 @@ export default function RhParametres() {
         key="rh-types" title={t('rh.param.title')} endpoint="/rh/admin/types"
         fields={fields} filters={['domaine', 'actif']} lists={{}} canAdd canEdit
       />
+      <div style={{ marginTop: 28 }}>
+        <ReferentialPage
+          key="rh-task-types" title="Types de tâches journalières" endpoint="/rh/journaliers/task-types"
+          fields={taskFields} filters={['actif']} lists={{}} canAdd canEdit
+        />
+      </div>
     </div>
   );
 }

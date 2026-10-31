@@ -140,6 +140,31 @@ router.post('/requests/cdi', async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+// ── Demande de journaliers ──
+// Types de tâches journalières (référentiel configurable par les RH). ?all=1 pour inclure les inactifs (config).
+router.get('/journaliers/task-types', async (req, res, next) => {
+  try { res.json(await service.listTaskTypes(false)); } catch (e) { next(e); }
+});
+router.post('/journaliers/task-types', async (req, res, next) => {
+  try { res.status(201).json(await service.createTaskType(req.user, req.body || {})); } catch (e) { next(e); }
+});
+router.put('/journaliers/task-types/:id', async (req, res, next) => {
+  try { res.json(await service.updateTaskType(req.user, Number(req.params.id), req.body || {})); } catch (e) { next(e); }
+});
+router.delete('/journaliers/task-types/:id', async (req, res, next) => {
+  try { res.json(await service.deleteTaskType(req.user, Number(req.params.id))); } catch (e) { next(e); }
+});
+// Dashboard de suivi (avant /:id pour éviter toute collision).
+router.get('/journaliers/dashboard', async (req, res, next) => {
+  try { res.json(await service.journaliersDashboard(req.user, req.query || {})); } catch (e) { next(e); }
+});
+router.post('/journaliers', async (req, res, next) => {
+  try { res.status(201).json(await service.createJournaliers(req.user, req.body || {})); } catch (e) { next(e); }
+});
+router.put('/journaliers/:id', async (req, res, next) => {
+  try { res.json(await service.updateJournaliers(req.user, Number(req.params.id), req.body || {})); } catch (e) { next(e); }
+});
+
 // Liste légère d'employés pour les sélecteurs RH (ex. employé concerné par un passage CDD→CDI).
 // Accessible à tout utilisateur authentifié du module RH (pas besoin du droit d'admin employés).
 router.get('/employees', async (req, res, next) => {

@@ -5,6 +5,7 @@ import RhSubnav, { canValidateRh } from './RhSubnav';
 import { useAuth } from '../../auth/AuthContext';
 import { RH_TYPE_LABELS } from './rhStatus.jsx';
 import { useI18n } from '../../i18n/I18nContext';
+import JournaliersPanel from './JournaliersDashboard';
 
 function StatCard({ label, value, to, accent }) {
   const inner = (
@@ -50,10 +51,12 @@ function RhDashboardInner() {
   const { t, lang } = useI18n();
   const [d, setD] = useState(null);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState('rh'); // 'rh' = synthèse RH, 'journaliers' = suivi des journaliers
 
   useEffect(() => {
+    if (tab !== 'rh') return;
     client.get('/rh/dashboard').then(r => setD(r.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError')));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dfmt = (x) => x ? new Date(x).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR') : '—';
   const typeLabel = (r) => r.type_libelle || t(RH_TYPE_LABELS[r.type] || 'rh.type.absence');
@@ -87,10 +90,18 @@ function RhDashboardInner() {
   return (
     <div>
       <RhSubnav />
-      <h1 className="page-title" style={{ marginBottom: 16 }}>{t('rh.dash.title')}</h1>
-      {error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
-      {!d && !error && <p>{t('rh.loading')}</p>}
-      {d && (
+      <h1 className="page-title" style={{ marginBottom: 12 }}>{t('rh.dash.title')}</h1>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[['rh', t('rh.dash.tabRh')], ['journaliers', t('rh.nav.journaliers')]].map(([k, l]) => (
+          <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </div>
+
+      {tab === 'journaliers' && <JournaliersPanel />}
+
+      {tab === 'rh' && error && <div className="alert alert-danger" style={{ maxWidth: 720 }}>{error}</div>}
+      {tab === 'rh' && !d && !error && <p>{t('rh.loading')}</p>}
+      {tab === 'rh' && d && (
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
             <StatCard label={t('rh.dash.headcount')} value={d.effectif.total} />

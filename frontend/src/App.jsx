@@ -44,6 +44,7 @@ import Campagnes from './pages/RH/Campagnes';
 import Evaluations from './pages/RH/Evaluations';
 import EvaluationDetail from './pages/RH/EvaluationDetail';
 import DemandeDetail from './pages/RH/DemandeDetail';
+import JournaliersForm from './pages/RH/JournaliersForm';
 import StockReferentiels from './pages/Stock/StockReferentiels';
 import StockTableauBord from './pages/Stock/StockTableauBord';
 import MouvementForm from './pages/Stock/MouvementForm';
@@ -161,6 +162,9 @@ export default function App() {
         <Route path="rh/demandes/conge/new" element={<RequireRh><CongeForm /></RequireRh>} />
         <Route path="rh/demandes/recrutement/new" element={<RequireRh><RecrutementForm /></RequireRh>} />
         <Route path="rh/demandes/cdi/new" element={<RequireRh><CdiForm /></RequireRh>} />
+        <Route path="rh/demandes/journaliers/new" element={<RequireRh><JournaliersForm /></RequireRh>} />
+        {/* Ancien lien direct → le suivi journaliers est désormais un onglet du tableau de bord RH. */}
+        <Route path="rh/journaliers/dashboard" element={<Navigate to="/rh/dashboard" replace />} />
         <Route path="rh/demandes/:id" element={<RequireRh><DemandeDetail /></RequireRh>} />
         {/* Fusionné dans le Tableau de bord (onglets Vue globale/Achats/RH/Stock) — redirige les liens/habitudes existants. */}
         <Route path="kpi" element={<Navigate to="/" replace />} />

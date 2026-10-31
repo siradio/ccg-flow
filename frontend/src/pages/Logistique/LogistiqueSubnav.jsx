@@ -1,41 +1,32 @@
-import { NavLink } from 'react-router-dom';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
+import GroupedSubnav from '../../components/GroupedSubnav';
 
-// Sous-navigation partagée du module Logistique — utilisée par les écrans génériques (LogistiqueIndex)
-// et par la page Checklists (custom). Chaque onglet est gaté par son sous-module.
-// [chemin, clé i18n du libellé, sous-module]
-// Regroupé par sous-module pour une lecture cohérente : d'abord le Parc véhicule (véhicules,
-// conducteurs, types, documents), puis missions, checklists, la maintenance (pannes, garages),
-// accidents et le suivi.
-const NAV = [
-  // Parc véhicule (logistique.parc) — ordre logique de saisie : type d'abord, puis véhicules.
-  ['/logistique/types', 'log.nav.types', 'logistique.parc'],
-  ['/logistique/vehicules', 'log.nav.vehicules', 'logistique.parc'],
-  ['/logistique/conducteurs', 'log.nav.conducteurs', 'logistique.parc'],
-  ['/logistique/documents', 'log.nav.documents', 'logistique.parc'],
-  // Missions
-  ['/logistique/missions', 'log.nav.missions', 'logistique.missions'],
-  // Checklists
-  ['/logistique/checklists', 'log.nav.checklists', 'logistique.checklists'],
-  // Maintenance (logistique.maintenance)
-  ['/logistique/pannes', 'log.nav.pannes', 'logistique.maintenance'],
-  ['/logistique/garages', 'log.nav.garages', 'logistique.maintenance'],
-  ['/logistique/carburant', 'log.nav.carburant', 'logistique.carburant'],
-  // Accidents & suivi
-  ['/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'],
-  ['/logistique/cartographie', 'log.nav.cartographie', 'logistique.suivi'],
-];
-
+// Sous-navigation à 2 niveaux du module Logistique : menus (Parc / Exploitation / Entretien & coûts)
+// → sous-menus. Chaque sous-menu est gaté par son sous-module.
 export default function LogistiqueSubnav() {
   const { user } = useAuth();
   const { t } = useI18n();
-  const allowed = NAV.filter(([, , sub]) => hasSubModuleLevel(user, sub));
-  return (
-    <nav className="subnav">
-      {allowed.map(([to, labelKey]) => (
-        <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'active' : undefined}>{t(labelKey)}</NavLink>
-      ))}
-    </nav>
-  );
+  const can = (sub) => hasSubModuleLevel(user, sub);
+  const it = (to, labelKey, sub) => ({ to, label: t(labelKey), visible: can(sub) });
+  const groups = [
+    { key: 'parc', label: t('log.grp.parc'), items: [
+      it('/logistique/vehicules', 'log.nav.vehicules', 'logistique.parc'),
+      it('/logistique/types', 'log.nav.types', 'logistique.parc'),
+      it('/logistique/conducteurs', 'log.nav.conducteurs', 'logistique.parc'),
+      it('/logistique/documents', 'log.nav.documents', 'logistique.parc'),
+    ] },
+    { key: 'exploitation', label: t('log.grp.exploitation'), items: [
+      it('/logistique/missions', 'log.nav.missions', 'logistique.missions'),
+      it('/logistique/cartographie', 'log.nav.cartographie', 'logistique.suivi'),
+      it('/logistique/checklists', 'log.nav.checklists', 'logistique.checklists'),
+    ] },
+    { key: 'entretien', label: t('log.grp.entretien'), items: [
+      it('/logistique/carburant', 'log.nav.carburant', 'logistique.carburant'),
+      it('/logistique/pannes', 'log.nav.pannes', 'logistique.maintenance'),
+      it('/logistique/garages', 'log.nav.garages', 'logistique.maintenance'),
+      it('/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'),
+    ] },
+  ];
+  return <GroupedSubnav groups={groups} />;
 }

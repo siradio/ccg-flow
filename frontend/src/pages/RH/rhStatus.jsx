@@ -15,4 +15,4 @@ export function RhStatusBadge({ statut }) {
   return <span className="badge" style={{ background: c.bg, color: c.fg }}>{t('rh.status.' + statut)}</span>;
 }
 
-export const RH_TYPE_LABELS = { absence: 'rh.type.absence', conge: 'rh.type.conge', recrutement: 'rh.type.recrutement', cdi: 'rh.type.cdi' };
+export const RH_TYPE_LABELS = { absence: 'rh.type.absence', conge: 'rh.type.conge', recrutement: 'rh.type.recrutement', cdi: 'rh.type.cdi', journaliers: 'rh.type.journaliers' };
