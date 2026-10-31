@@ -905,6 +905,11 @@ export const translations = {
     // ─── Module RH (demandes d'absence / congés) ───
     'nav.hr': 'Ressources Humaines',
     'rh.nav.mine': 'Mes demandes',
+    'rh.grp.pilotage': 'Pilotage',
+    'rh.grp.demandes': 'Demandes',
+    'rh.grp.evaluation': 'Évaluation',
+    'rh.grp.config': 'Configuration',
+    'rh.nav.employees': 'Employés',
     'rh.nav.journaliers': 'Journaliers',
     'rh.nav.pending': 'À valider',
     'rh.nav.all': 'Toutes les demandes',
@@ -1109,6 +1114,9 @@ export const translations = {
     // Module Logistique
     'log.notGranted': "Cet écran du module Logistique ne vous a pas été accordé.",
     'log.nav.vehicules': 'Véhicules',
+    'log.grp.parc': 'Parc',
+    'log.grp.exploitation': 'Exploitation',
+    'log.grp.entretien': 'Entretien & coûts',
     'log.nav.conducteurs': 'Conducteurs',
     'log.nav.missions': 'Missions',
     'log.nav.checklists': 'Checklists',
@@ -3227,6 +3235,11 @@ export const translations = {
     // ─── HR module (absence / leave requests) ───
     'nav.hr': 'Human Resources',
     'rh.nav.mine': 'My requests',
+    'rh.grp.pilotage': 'Overview',
+    'rh.grp.demandes': 'Requests',
+    'rh.grp.evaluation': 'Appraisal',
+    'rh.grp.config': 'Settings',
+    'rh.nav.employees': 'Employees',
     'rh.nav.journaliers': 'Day labourers',
     'rh.nav.pending': 'To approve',
     'rh.nav.all': 'All requests',
@@ -3431,6 +3444,9 @@ export const translations = {
     // Logistics module
     'log.notGranted': 'This Logistics screen has not been granted to you.',
     'log.nav.vehicules': 'Vehicles',
+    'log.grp.parc': 'Fleet',
+    'log.grp.exploitation': 'Operations',
+    'log.grp.entretien': 'Maintenance & costs',
     'log.nav.conducteurs': 'Drivers',
     'log.nav.missions': 'Missions',
     'log.nav.checklists': 'Checklists',

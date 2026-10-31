@@ -1072,6 +1072,28 @@ a.kpi-tile:hover {
   font-weight: 600;
 }
 
+/* Boutons « menus » (1er niveau) d'une sous-nav groupée (GroupedSubnav) : même allure que les
+   liens de sous-nav, mais en gras pour marquer le niveau supérieur. */
+.subnav-group {
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  transition: background-color .12s ease, color .12s ease;
+}
+.subnav-group:hover {
+  color: var(--color-text);
+  background: var(--color-border);
+}
+.subnav-group[data-active="true"] {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
 /* Second niveau de sous-navigation (ex. Stock -> Stock du Jour -> Saisie/Historique/...) :
    même composant, légèrement plus petit et rapproché du premier niveau pour marquer la hiérarchie. */
 .subnav-nested {
