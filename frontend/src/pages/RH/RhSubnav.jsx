@@ -18,6 +18,7 @@ export default function RhSubnav() {
     <nav className="subnav">
       {canValidateRh(user) && <NavLink to="/rh/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.dashboard')}</NavLink>}
       <NavLink to="/rh/mes-demandes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.mine')}</NavLink>
+      {canValidateRh(user) && <NavLink to="/rh/journaliers/dashboard" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.journaliers')}</NavLink>}
       <NavLink to="/rh/evaluation/fiches" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.evaluations')}</NavLink>
       {canValidateRh(user) && <NavLink to="/rh/a-valider" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.pending')}</NavLink>}
       {canSeeAllRh(user) && <NavLink to="/rh/toutes" className={({ isActive }) => isActive ? 'active' : undefined}>{t('rh.nav.all')}</NavLink>}

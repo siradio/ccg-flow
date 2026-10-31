@@ -1,4 +1,4 @@
-const { one, all } = require('../../db');
+const { one, all, run } = require('../../db');
 const repo = require('./rh.repository');
 const blob = require('../../storage/blob');
 const audit = require('../audit/audit.service');
@@ -16,12 +16,13 @@ const DEFAULT_CHAIN = ['responsable', 'rh'];
 // apparaît deux fois → la progression se fait par INDEX d'étape (step_index), pas par le rôle seul.
 const CONGE_CHAIN = ['rh', 'responsable', 'rh'];
 // Passage CDD→CDI (engagement permanent) : Responsable → RH → DAF → DGA.
-const CHAINS = { absence: DEFAULT_CHAIN, conge: CONGE_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'] };
+// Journaliers : demande d'un directeur de BU (rôle responsable) → DAF → DGA → RH (exécution).
+const CHAINS = { absence: DEFAULT_CHAIN, conge: CONGE_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'], journaliers: ['daf', 'dg', 'rh'] };
 const RECRUTEMENT_REMPLACEMENT = ['responsable', 'rh', 'dg'];
 const RECRUTEMENT_AUTRE = ['responsable', 'rh', 'daf', 'dg'];
 // Union de tous les rôles pouvant valider (pour la liste « À valider », tous circuits confondus).
 const ALL_VALIDATION_ROLES = ['responsable', 'rh', 'daf', 'dg'];
-const PREFIX = { absence: 'ABS', conge: 'CNG', recrutement: 'REC', cdi: 'CDI' };
+const PREFIX = { absence: 'ABS', conge: 'CNG', recrutement: 'REC', cdi: 'CDI', journaliers: 'JRN' };
 
 // Le circuit d'un recrutement dépend de son sous-type (code du rh_type : remplacement vs création…).
 function chainForRequest(req) {
@@ -249,7 +250,15 @@ async function getDetail(id) {
       )).map(x => ({ nom: x.nom, direct: false }));
     }
   }
-  return { ...req, history, attachments, solde, chain, current_validators: currentValidators };
+  // Demande de journaliers : on joint la grille (jour × tâche × nombre) pour l'affichage/détail.
+  let journaliers_lines = null;
+  if (req.type === 'journaliers') {
+    journaliers_lines = await all(
+      `SELECT jl.jour, jl.task_type_id, jl.nombre, tt.nom AS task_nom
+         FROM rh_journaliers_lines jl JOIN rh_task_types tt ON tt.id = jl.task_type_id
+        WHERE jl.rh_request_id = $1 ORDER BY tt.ordre, tt.nom, jl.jour`, [id]);
+  }
+  return { ...req, history, attachments, solde, chain, current_validators: currentValidators, journaliers_lines };
 }
 
 function assertOwner(user, req) {
@@ -333,6 +342,13 @@ async function reject(user, id, commentaire) {
   if (req.statut !== 'en_validation' || !req.role_courant) throw httpError(400, 'Aucune validation en attente.');
   await assertCanAct(user, req);
   if (!commentaire || !commentaire.trim()) throw httpError(400, 'Un commentaire est obligatoire pour refuser.');
+  // Journaliers : le refus RENVOIE la demande au demandeur (retour brouillon, corrigeable et re-soumettable).
+  if (req.type === 'journaliers') {
+    await repo.update(id, { statut: 'brouillon', role_courant: null, validateur_user_id: null });
+    await repo.logHistory(id, 'refus', user.id, commentaire);
+    await notifyRequester(req, 'Demande de journaliers à corriger', `Votre demande ${req.numero} a été renvoyée pour correction : ${commentaire}`);
+    return getDetail(id);
+  }
   await repo.update(id, { statut: 'refusee', role_courant: null, decided_by: user.id, decided_at: new Date() });
   await repo.logHistory(id, 'refus', user.id, commentaire);
   await notifyRequester(req, 'Demande RH refusée', `Votre demande ${req.numero} a été refusée : ${commentaire}`);
@@ -460,8 +476,133 @@ async function getTeamMemberCongeSolde(user, employeeId) {
   return getCongeSolde(target.id);
 }
 
+// ─────────────────────────── Demande de journaliers ───────────────────────────
+const isRhRole = (u) => isSuperAdmin(u) || (u.roles || []).some(r => r.role_code === 'rh');
+const isJournaliersViewer = (u) => isSuperAdmin(u) || (u.roles || []).some(r => ['rh', 'daf', 'dg'].includes(r.role_code));
+
+// Types de tâches journalières (configurables par les RH).
+async function listTaskTypes(activeOnly = false) {
+  return all(`SELECT * FROM rh_task_types ${activeOnly ? 'WHERE actif = true' : ''} ORDER BY ordre, nom`);
+}
+async function createTaskType(user, body) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  if (!body.nom || !body.nom.trim()) throw httpError(400, 'Le nom est obligatoire.');
+  return one('INSERT INTO rh_task_types (nom, ordre, actif) VALUES ($1,$2,$3) RETURNING *',
+    [body.nom.trim(), Number(body.ordre) || 0, body.actif === false ? false : true]);
+}
+async function updateTaskType(user, id, body) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  const ex = await one('SELECT * FROM rh_task_types WHERE id = $1', [id]);
+  if (!ex) throw httpError(404, 'Type introuvable.');
+  return one('UPDATE rh_task_types SET nom=$1, ordre=$2, actif=$3 WHERE id=$4 RETURNING *',
+    [(body.nom && body.nom.trim()) || ex.nom, body.ordre != null ? Number(body.ordre) : ex.ordre,
+     body.actif != null ? !!body.actif : ex.actif, id]);
+}
+async function deleteTaskType(user, id) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  // Si le type est déjà utilisé, on le désactive (préserve l'historique) plutôt que de le supprimer.
+  const used = await one('SELECT 1 FROM rh_journaliers_lines WHERE task_type_id = $1 LIMIT 1', [id]);
+  if (used) { await run('UPDATE rh_task_types SET actif = false WHERE id = $1', [id]); return { ok: true, disabled: true }; }
+  await run('DELETE FROM rh_task_types WHERE id = $1', [id]);
+  return { ok: true };
+}
+
+function mondayOf(dateStr) {
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+  const dow = d.getUTCDay(); // 0=dim..6=sam
+  const diff = (dow === 0 ? -6 : 1 - dow);
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d;
+}
+
+async function saveJournaliersLines(reqId, lines) {
+  await run('DELETE FROM rh_journaliers_lines WHERE rh_request_id = $1', [reqId]);
+  for (const l of (lines || [])) {
+    const jour = Number(l.jour), tt = Number(l.task_type_id), nb = Number(l.nombre);
+    if (!jour || jour < 1 || jour > 7 || !tt || !nb || nb <= 0) continue;
+    await run(`INSERT INTO rh_journaliers_lines (rh_request_id, jour, task_type_id, nombre) VALUES ($1,$2,$3,$4)
+               ON CONFLICT (rh_request_id, jour, task_type_id) DO UPDATE SET nombre = EXCLUDED.nombre`, [reqId, jour, tt, nb]);
+  }
+}
+
+async function createJournaliers(user, body) {
+  const emp = await resolveRequesterEmployee(user);
+  if (!body.semaine_debut) throw httpError(400, 'La semaine (lundi) est requise.');
+  const lundi = mondayOf(body.semaine_debut);
+  const dimanche = new Date(lundi); dimanche.setUTCDate(lundi.getUTCDate() + 6);
+  const buId = Number(body.business_unit_id) || emp.business_unit_id;
+  if (!buId) throw httpError(400, 'La Business Unit est requise.');
+  let req = await repo.create({
+    type: 'journaliers', employeeId: null, createdBy: user.id, entityId: emp.entity_id,
+    businessUnitId: buId, dateDebut: lundi.toISOString().slice(0, 10), dateFin: dimanche.toISOString().slice(0, 10),
+  });
+  req = await repo.setNumero(req.id, numbering.formatRhNumber('JRN', emp.entity_code || 'CCG', req.id));
+  await saveJournaliersLines(req.id, body.lines);
+  await repo.logHistory(req.id, 'creation', user.id, null);
+  return getDetail(req.id);
+}
+
+async function updateJournaliers(user, id, body) {
+  const req = await repo.getById(id);
+  if (!req) throw httpError(404, 'Demande introuvable.');
+  assertOwner(user, req);
+  if (req.statut !== 'brouillon') throw httpError(400, 'Seule une demande en brouillon est modifiable.');
+  const patch = {};
+  if (body.business_unit_id) patch.business_unit_id = Number(body.business_unit_id);
+  if (body.semaine_debut) {
+    const lundi = mondayOf(body.semaine_debut); const dim = new Date(lundi); dim.setUTCDate(lundi.getUTCDate() + 6);
+    patch.date_debut = lundi.toISOString().slice(0, 10); patch.date_fin = dim.toISOString().slice(0, 10);
+  }
+  if (Object.keys(patch).length) await repo.update(id, patch);
+  if (body.lines) await saveJournaliersLines(id, body.lines);
+  return getDetail(id);
+}
+
+// Dashboard de suivi des demandes de journaliers (agrégats sur une période, par la semaine demandée).
+const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+async function journaliersDashboard(user, q) {
+  const from = /^\d{4}-\d{2}-\d{2}/.test(String(q.date_from || '')) ? String(q.date_from).slice(0, 10) : new Date(Date.now() - 56 * 864e5).toISOString().slice(0, 10);
+  const to = /^\d{4}-\d{2}-\d{2}/.test(String(q.date_to || '')) ? String(q.date_to).slice(0, 10) : new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+  const params = [from, to]; const where = ["r.type = 'journaliers'", "r.statut <> 'annulee'", 'r.date_debut BETWEEN $1 AND $2'];
+  if (q.business_unit_id) { params.push(Number(q.business_unit_id)); where.push(`r.business_unit_id = $${params.length}`); }
+  // Les non-RH/valideurs ne voient que leurs propres demandes.
+  if (!isJournaliersViewer(user)) { params.push(user.id); where.push(`r.created_by = $${params.length}`); }
+  const W = where.join(' AND ');
+
+  const [totRow, parStatut, parJour, parTache, parBu, parSemaine, demandes] = await Promise.all([
+    one(`SELECT COALESCE(SUM(jl.nombre),0)::int AS total, COUNT(DISTINCT r.id)::int AS nb_demandes
+           FROM rh_requests r LEFT JOIN rh_journaliers_lines jl ON jl.rh_request_id = r.id WHERE ${W}`, params),
+    all(`SELECT r.statut, COUNT(*)::int AS n FROM rh_requests r WHERE ${W} GROUP BY r.statut`, params),
+    all(`SELECT jl.jour, COALESCE(SUM(jl.nombre),0)::int AS total
+           FROM rh_requests r JOIN rh_journaliers_lines jl ON jl.rh_request_id = r.id WHERE ${W} GROUP BY jl.jour ORDER BY jl.jour`, params),
+    all(`SELECT tt.nom AS tache, COALESCE(SUM(jl.nombre),0)::int AS total
+           FROM rh_requests r JOIN rh_journaliers_lines jl ON jl.rh_request_id = r.id JOIN rh_task_types tt ON tt.id = jl.task_type_id
+          WHERE ${W} GROUP BY tt.nom ORDER BY total DESC`, params),
+    all(`SELECT bu.nom AS bu, COALESCE(SUM(jl.nombre),0)::int AS total
+           FROM rh_requests r JOIN rh_journaliers_lines jl ON jl.rh_request_id = r.id LEFT JOIN business_units bu ON bu.id = r.business_unit_id
+          WHERE ${W} GROUP BY bu.nom ORDER BY total DESC`, params),
+    all(`SELECT r.date_debut AS semaine, COALESCE(SUM(jl.nombre),0)::int AS total
+           FROM rh_requests r LEFT JOIN rh_journaliers_lines jl ON jl.rh_request_id = r.id WHERE ${W} GROUP BY r.date_debut ORDER BY r.date_debut`, params),
+    all(`SELECT r.id, r.numero, r.statut, r.role_courant, r.date_debut, r.date_fin, bu.nom AS bu_nom,
+                TRIM(CONCAT(u.prenom,' ',u.nom)) AS demandeur,
+                (SELECT COALESCE(SUM(nombre),0)::int FROM rh_journaliers_lines WHERE rh_request_id = r.id) AS total
+           FROM rh_requests r LEFT JOIN business_units bu ON bu.id = r.business_unit_id LEFT JOIN users u ON u.id = r.created_by
+          WHERE ${W} ORDER BY r.date_debut DESC, r.id DESC`, params),
+  ]);
+  return {
+    from, to, total: totRow.total, nb_demandes: totRow.nb_demandes,
+    par_statut: parStatut,
+    par_jour: parJour.map(r => ({ jour: r.jour, label: JOURS[r.jour - 1] || r.jour, total: r.total })),
+    par_tache: parTache, par_bu: parBu,
+    par_semaine: parSemaine.map(r => ({ semaine: String(r.semaine).slice(0, 10), total: r.total })),
+    demandes,
+  };
+}
+
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
   listMine, listPending, listAll, canSeeAll, canDelete, workingDays, listMyTeam, getTeamMemberCongeSolde,
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
+  listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
+  createJournaliers, updateJournaliers, journaliersDashboard,
 };

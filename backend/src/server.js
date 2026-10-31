@@ -149,6 +149,8 @@ async function start() {
     require('./modules/employees/permis-alerts').startPermisAlerts();
     // Scheduler des rapports planifiés (production/stock/achats par e-mail).
     require('./modules/reporting/scheduler').startReportScheduler();
+    // Rappel hebdomadaire (vendredi) aux directeurs de BU : demande de journaliers pour S+1.
+    require('./modules/rh/journaliers-reminder').startJournaliersReminder();
   });
 }
 

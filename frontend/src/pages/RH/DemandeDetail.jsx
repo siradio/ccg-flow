@@ -101,6 +101,12 @@ export default function DemandeDetail() {
               {r.payload?.nouvelle_remuneration && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.cdi.nouvelleRemuneration')}</span><span>{r.payload.nouvelle_remuneration}</span></>}
               {r.payload?.justification && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.recrutement.justification')}</span><span style={{ whiteSpace: 'pre-line' }}>{r.payload.justification}</span></>}
             </>
+          ) : r.type === 'journaliers' ? (
+            <>
+              <span style={{ color: 'var(--color-text-muted)' }}>Business Unit</span><span style={{ fontWeight: 600 }}>{r.business_unit_nom || '—'}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>Demandeur</span><span>{r.created_by_prenom} {r.created_by_nom} · {r.entity_code}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>Semaine</span><span style={{ fontWeight: 600 }}>{dfmt(r.date_debut)} → {dfmt(r.date_fin)}</span>
+            </>
           ) : (
             <>
               <span style={{ color: 'var(--color-text-muted)' }}>{t('rh.th.employee')}</span><span style={{ fontWeight: 600 }}>{empName} {r.employee_matricule ? `(${r.employee_matricule})` : ''}</span>
@@ -114,6 +120,8 @@ export default function DemandeDetail() {
           {r.commentaire && <><span style={{ color: 'var(--color-text-muted)' }}>{t('rh.absence.comment')}</span><span>{r.commentaire}</span></>}
         </div>
       </section>
+
+      {r.type === 'journaliers' && r.journaliers_lines && <JournaliersGrid lines={r.journaliers_lines} />}
 
       {r.type === 'conge' && r.solde && (
         <section className="card" style={{ maxWidth: 720, marginTop: 14, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -151,6 +159,7 @@ export default function DemandeDetail() {
             <textarea placeholder={t('rh.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {isOwner && r.statut === 'brouillon' && r.type === 'journaliers' && <Link className="btn btn-secondary" to={`/rh/demandes/journaliers/new?id=${r.id}`}>Éditer la grille</Link>}
             {isOwner && r.statut === 'brouillon' && <button className="btn btn-primary" disabled={busy} onClick={() => act('submit')}>{t('rh.submit')}</button>}
             {canValidate && <button className="btn btn-primary" disabled={busy} onClick={() => act('validate', { comment })}>{t('rh.validate')}</button>}
             {canValidate && <button className="btn btn-danger" disabled={busy} onClick={() => act('reject', { comment })}>{t('rh.reject')}</button>}
@@ -173,6 +182,35 @@ export default function DemandeDetail() {
         </ul>
       </section>
     </div>
+  );
+}
+
+// Grille de la demande de journaliers : tâches en lignes, Lun→Dim en colonnes, nombre en cellules.
+const JOURS_G = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+function JournaliersGrid({ lines }) {
+  const tasks = []; const byTask = {};
+  for (const l of lines) {
+    if (!byTask[l.task_type_id]) { byTask[l.task_type_id] = { nom: l.task_nom, jours: {} }; tasks.push(l.task_type_id); }
+    byTask[l.task_type_id].jours[l.jour] = l.nombre;
+  }
+  const totJour = JOURS_G.map((_, i) => lines.filter(l => l.jour === i + 1).reduce((s, l) => s + Number(l.nombre || 0), 0));
+  const total = totJour.reduce((a, b) => a + b, 0);
+  return (
+    <section className="card" style={{ maxWidth: 720, marginTop: 14, padding: 0 }}>
+      <h2 style={{ margin: 0, fontSize: 15, padding: '12px 14px' }}>Journaliers demandés ({total})</h2>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Tâche</th>{JOURS_G.map(j => <th key={j} className="num">{j}</th>)}<th className="num">Total</th></tr></thead>
+          <tbody>
+            {tasks.map(tid => {
+              const t = byTask[tid]; const tot = JOURS_G.reduce((s, _, i) => s + Number(t.jours[i + 1] || 0), 0);
+              return <tr key={tid}><td><strong>{t.nom}</strong></td>{JOURS_G.map((_, i) => <td key={i} className="num">{t.jours[i + 1] || ''}</td>)}<td className="num" style={{ fontWeight: 700 }}>{tot}</td></tr>;
+            })}
+            <tr style={{ background: 'var(--color-bg-muted, #f3f4f6)' }}><td><strong>Total / jour</strong></td>{totJour.map((n, i) => <td key={i} className="num" style={{ fontWeight: 700 }}>{n || ''}</td>)}<td className="num" style={{ fontWeight: 800 }}>{total}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
