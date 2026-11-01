@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
@@ -278,25 +278,42 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       {formOpen && (
         <Modal title={editingId ? t('ref.modify') : t('common.add')} onClose={closeForm} wide>
           <form onSubmit={onSubmit} className="form-inline" style={{ maxWidth: 'none' }}>
-            {fields.filter(f => fieldVisible(f, form)).map(f => {
-              if (f.type === 'photo') {
-                return <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
-                  hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
-              }
-              const input = <FieldInput field={f} value={form[f.key]} form={form}
-                onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
-                entities={entities} sites={sites} lists={lists} />;
-              // La case à cocher porte déjà son propre libellé à côté d'elle.
-              if (f.type === 'checkbox') return <span key={f.key} style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>{input}</span>;
-              // Un libellé au-dessus de chaque champ : sans ça, les placeholders (tronqués sur les
-              // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
-              return (
-                <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
-                  {fieldLabel(f, t)}{f.required ? ' *' : ''}
-                  {input}
-                </label>
-              );
-            })}
+            {(() => {
+              const vis = fields.filter(f => fieldVisible(f, form));
+              return vis.map((f, idx) => {
+                // En-tête de section : affiché dès qu'un champ ouvre un nouveau `group` (opt-in —
+                // les référentiels sans `group` sur leurs champs n'affichent aucun en-tête). Le div
+                // plein largeur force un retour à la ligne dans le conteneur flex, créant la section.
+                const showHeader = f.group && (idx === 0 || vis[idx - 1].group !== f.group);
+                const header = showHeader ? (
+                  <div key={`grp-${f.group}`} style={{ width: '100%', margin: idx === 0 ? '0 0 2px' : '12px 0 2px',
+                    fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--color-text-muted)',
+                    borderTop: idx === 0 ? 'none' : '1px solid var(--color-border)', paddingTop: idx === 0 ? 0 : 10 }}>
+                    {t(f.group)}
+                  </div>
+                ) : null;
+                let node;
+                if (f.type === 'photo') {
+                  node = <PhotoField key={f.key} endpoint={endpoint} editingId={editingId}
+                    hasPhoto={!!items.find(i => i.id === editingId)?.has_photo} onChanged={load} />;
+                } else {
+                  const input = <FieldInput field={f} value={form[f.key]} form={form}
+                    onChange={v => setForm(prev => applyFieldChange(prev, f, v, lists))}
+                    entities={entities} sites={sites} lists={lists} />;
+                  // La case à cocher porte déjà son propre libellé à côté d'elle.
+                  if (f.type === 'checkbox') node = <span key={f.key} style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>{input}</span>;
+                  // Un libellé au-dessus de chaque champ : sans ça, les placeholders (tronqués sur les
+                  // menus, absents sur un select facultatif « — ») ne disent pas ce que le champ attend.
+                  else node = (
+                    <label key={f.key} style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, fontSize: 11, color: 'var(--color-text-muted)' }}>
+                      {fieldLabel(f, t)}{f.required ? ' *' : ''}
+                      {input}
+                    </label>
+                  );
+                }
+                return header ? <Fragment key={f.key}>{header}{node}</Fragment> : node;
+              });
+            })()}
             {error && <div className="alert alert-danger" style={{ width: '100%' }}>{error}</div>}
             <div style={{ width: '100%', display: 'flex', gap: 8, marginTop: 4 }}>
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('common.saving') : (editingId ? t('common.save') : t('common.add'))}</button>
