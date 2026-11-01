@@ -16,8 +16,8 @@ const DEFAULT_CHAIN = ['responsable', 'rh'];
 // apparaît deux fois → la progression se fait par INDEX d'étape (step_index), pas par le rôle seul.
 const CONGE_CHAIN = ['rh', 'responsable', 'rh'];
 // Passage CDD→CDI (engagement permanent) : Responsable → RH → DAF → DGA.
-// Journaliers : demande d'un directeur de BU (rôle responsable) → DAF → DGA → RH (exécution).
-const CHAINS = { absence: DEFAULT_CHAIN, conge: CONGE_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'], journaliers: ['daf', 'dg', 'rh'] };
+// Journaliers : demande d'un directeur de BU (rôle responsable) → DAF (finances) → RH (exécution). DGA hors circuit.
+const CHAINS = { absence: DEFAULT_CHAIN, conge: CONGE_CHAIN, cdi: ['responsable', 'rh', 'daf', 'dg'], journaliers: ['daf', 'rh'] };
 const RECRUTEMENT_REMPLACEMENT = ['responsable', 'rh', 'dg'];
 const RECRUTEMENT_AUTRE = ['responsable', 'rh', 'daf', 'dg'];
 // Union de tous les rôles pouvant valider (pour la liste « À valider », tous circuits confondus).
