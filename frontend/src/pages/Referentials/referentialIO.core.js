@@ -11,7 +11,7 @@ export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, 
 // lecture seule (ex. code fournisseur auto-généré par le backend).
 export const exportableFields = (fields) => fields.filter(f => f.type !== 'photo');
 // multiFk (liste d'ids FK) est exclu de l'import (résolution multiple non gérée) ; il reste exportable.
-export const importableFields = (fields) => fields.filter(f => f.type !== 'photo' && f.type !== 'multiFk' && !f.readOnly);
+export const importableFields = (fields) => fields.filter(f => f.type !== 'photo' && f.type !== 'multiFk' && f.type !== 'computed' && !f.readOnly);
 
 export const columnsFor = (fields, t) => fields.map(f => ({
   key: f.key, label: fieldLabel(f, t), type: f.type === 'number' ? 'number' : undefined,
