@@ -34,7 +34,10 @@ export function downloadTemplate(title, fields, ctx, t) {
   exportXlsxSheets(`${t('ref.io.templatePrefix')} ${title}.xlsx`, sheets);
 }
 
-export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, onDone }) {
+// `upsertKey` (ex. 'code') + `canEdit` activent le mode « mise à jour » : une ligne dont la valeur
+// de clé correspond à une fiche existante est MISE À JOUR (PUT) plutôt que créée en doublon (POST).
+// Sans upsertKey, ou si l'utilisateur n'a pas le droit d'édition, l'import crée uniquement (inchangé).
+export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, onDone, upsertKey = null, canEdit = false }) {
   const { t } = useI18n();
   const [rows, setRows] = useState(null);
   const [mapInfo, setMapInfo] = useState(null);
@@ -42,6 +45,10 @@ export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, 
   const [running, setRunning] = useState(false);
   const [report, setReport] = useState(null);
   const fLabel = (f) => fieldLabel(f, t);
+  const upsertOn = !!upsertKey && canEdit;
+  const upsertField = upsertKey ? fields.find(f => f.key === upsertKey) : null;
+  const upsertLabel = upsertField ? fLabel(upsertField) : upsertKey;
+  const normKey = (v) => (v == null ? '' : String(v).trim().toLowerCase());
 
   async function onFile(file) {
     if (!file) return;
@@ -64,11 +71,27 @@ export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, 
   async function run() {
     if (!rows || !mapInfo || running) return;
     setRunning(true);
-    const rep = { total: rows.length, success: 0, errors: [] };
+    const rep = { total: rows.length, success: 0, created: 0, updated: 0, errors: [] };
+    // Mode mise à jour : on charge l'existant une fois pour retrouver l'id par clé (ex. code).
+    let byKey = null;
+    if (upsertOn) {
+      try {
+        const existing = (await client.get(endpoint)).data || [];
+        byKey = new Map();
+        for (const it of existing) { const k = normKey(it[upsertKey]); if (k) byKey.set(k, it.id); }
+      } catch { byKey = null; }
+    }
     for (let i = 0; i < rows.length; i++) {
       try {
         const payload = rowToPayload(rows[i], fields, mapInfo.headerByField, ctx, t);
-        await client.post(endpoint, payload);
+        const k = byKey ? normKey(payload[upsertKey]) : '';
+        if (k && byKey.has(k)) {
+          await client.put(`${endpoint}/${byKey.get(k)}`, payload);
+          rep.updated += 1;
+        } else {
+          await client.post(endpoint, payload);
+          rep.created += 1;
+        }
         rep.success += 1;
       } catch (e) {
         const motif = e.response?.data?.error || e.message || t('ref.error');
@@ -84,6 +107,11 @@ export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, 
       {!report && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-muted)' }}>{t('ref.io.importIntro')}</p>
+          {upsertOn && (
+            <div className="alert" style={{ fontSize: 13, background: 'var(--color-info-bg, #eff6ff)', color: 'var(--color-text)' }}>
+              {t('ref.io.upsertInfo', { key: upsertLabel })}
+            </div>
+          )}
           <input type="file" accept=".xlsx,.xls,.csv" onChange={e => onFile(e.target.files?.[0])} />
           {fileErr && <div className="alert alert-danger">{fileErr}</div>}
           {mapInfo && (
@@ -113,6 +141,8 @@ export function ReferentialImportModal({ endpoint, fields, ctx, title, onClose, 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <span className="badge">{t('ref.io.repTotal', { n: report.total })}</span>
             <span className="badge" style={{ background: 'var(--color-success-bg, #dcfce7)' }}>{t('ref.io.repSuccess', { n: report.success })}</span>
+            {upsertOn && <span className="badge">{t('ref.io.repCreated', { n: report.created })}</span>}
+            {upsertOn && <span className="badge">{t('ref.io.repUpdated', { n: report.updated })}</span>}
             <span className="badge" style={{ background: report.errors.length ? 'var(--color-danger-bg, #fee2e2)' : undefined }}>{t('ref.io.repFail', { n: report.errors.length })}</span>
           </div>
           {report.errors.length > 0 && (

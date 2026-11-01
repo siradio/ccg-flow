@@ -23,7 +23,7 @@ const optLabel = (f, o) => (f.optionLabels && f.optionLabels[o] != null ? f.opti
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
 // canAdd/canEdit reflètent les niveaux ajout/edition du sous-module (§2.3 SPEC.md) — même
 // distinction que sur Prix (Prices/HistoryPage.jsx), désormais généralisée à tous les référentiels.
-export default function ReferentialPage({ title, endpoint, fields, filters = [], extraFilters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false, rowLink = null, rowLinkLabel = 'Ouvrir' }) {
+export default function ReferentialPage({ title, endpoint, fields, filters = [], extraFilters = [], entities = [], sites = [], lists = {}, canAdd = false, canEdit = false, duplicable = false, rowLink = null, rowLinkLabel = 'Ouvrir', importUpsertKey = null }) {
   const confirm = useConfirm();
   const { t } = useI18n();
   const [items, setItems] = useState([]);
@@ -187,7 +187,8 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
       {importOpen && (
         <ReferentialImportModal endpoint={endpoint} fields={fields} ctx={{ entities, sites, lists }}
-          title={title} onClose={() => setImportOpen(false)} onDone={load} />
+          title={title} onClose={() => setImportOpen(false)} onDone={load}
+          upsertKey={importUpsertKey} canEdit={canEdit} />
       )}
 
       {items.length > 0 && (

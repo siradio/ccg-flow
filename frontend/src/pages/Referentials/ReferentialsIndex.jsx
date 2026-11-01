@@ -96,6 +96,9 @@ const CONFIGS = {
   },
   products: {
     titleKey: 'refx.title.products', endpoint: '/products', subModuleKey: 'referentiels.products',
+    // Import Excel : met à jour les produits existants dont le `code` correspond (plutôt que créer
+    // des doublons) — permet de compléter en masse le conditionnement depuis un export rempli.
+    importUpsertKey: 'code',
     // Un seul référentiel gère produits finis, matières premières et consommables : la distinction
     // se fait par « Type d'article ». Les champs propres aux matières premières n'apparaissent que
     // lorsque ce type est « matière première » (showIf).
@@ -203,6 +206,7 @@ export default function ReferentialsIndex() {
         entities={entities} sites={sites} lists={{ categories, businessUnits, suppliers }}
         canAdd={hasSubModuleLevel(user, config.subModuleKey, 'ajout')}
         canEdit={hasSubModuleLevel(user, config.subModuleKey, 'edition')}
+        importUpsertKey={config.importUpsertKey || null}
       />
     </div>
   );
