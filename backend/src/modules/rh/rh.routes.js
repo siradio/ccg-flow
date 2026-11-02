@@ -158,6 +158,15 @@ router.delete('/journaliers/task-types/:id', async (req, res, next) => {
 router.get('/journaliers/dashboard', async (req, res, next) => {
   try { res.json(await service.journaliersDashboard(req.user, req.query || {})); } catch (e) { next(e); }
 });
+// Configuration de l'échéance/rappel (jour, heure de rappel, heure limite). GET lisible par tous les
+// utilisateurs authentifiés (le formulaire en a besoin) ; PUT réservé aux RH (contrôlé dans le service).
+// À déclarer AVANT PUT /journaliers/:id pour que 'config' ne soit pas interprété comme un id.
+router.get('/journaliers/config', async (req, res, next) => {
+  try { res.json(await service.getJournaliersConfig()); } catch (e) { next(e); }
+});
+router.put('/journaliers/config', async (req, res, next) => {
+  try { res.json(await service.setJournaliersConfig(req.user, req.body || {})); } catch (e) { next(e); }
+});
 router.post('/journaliers', async (req, res, next) => {
   try { res.status(201).json(await service.createJournaliers(req.user, req.body || {})); } catch (e) { next(e); }
 });

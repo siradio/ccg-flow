@@ -4,6 +4,7 @@ const blob = require('../../storage/blob');
 const audit = require('../audit/audit.service');
 const notifications = require('../notifications/notifications.service');
 const numbering = require('../../utils/numbering');
+const settings = require('../settings/settings.service');
 const { hasRoleOnEntity, isSuperAdmin } = require('../../middleware/permissions');
 const { httpError } = require('../../utils/httpError');
 
@@ -43,14 +44,43 @@ function nextRole(chain, current) {
   return (i >= 0 && i < chain.length - 1) ? chain[i + 1] : null;
 }
 
-// Échéance hebdomadaire des demandes de journaliers : la soumission au circuit est fermée après le
-// VENDREDI 13h (les directeurs saisissent pour la semaine suivante avant cette heure). Fenêtre
-// fermée = vendredi dès 13h, samedi et dimanche ; réouverture le lundi. Le serveur tourne en
-// UTC ≈ heure de Conakry (GMT), donc getDay()/getHours() reflètent l'heure locale.
-function isJournaliersSubmissionClosed(d = new Date()) {
-  const day = d.getDay();   // 0 = dimanche … 5 = vendredi, 6 = samedi
-  const hour = d.getHours();
-  return (day === 5 && hour >= 13) || day === 6 || day === 0;
+// Configuration de l'échéance/rappel des demandes de journaliers, éditable par les RH (RH → Config).
+// Stockée dans app_settings ; valeurs par défaut = vendredi, rappel 8h, échéance 13h. Le serveur
+// tourne en UTC ≈ heure de Conakry (GMT), donc jour/heure reflètent l'heure locale.
+const JRN_DEFAULTS = { jour: 5, rappel_heure: 8, deadline_heure: 13 };
+async function getJournaliersConfig() {
+  return {
+    jour: await settings.getIntValue('journaliers_jour', JRN_DEFAULTS.jour),
+    rappel_heure: await settings.getIntValue('journaliers_rappel_heure', JRN_DEFAULTS.rappel_heure),
+    deadline_heure: await settings.getIntValue('journaliers_deadline_heure', JRN_DEFAULTS.deadline_heure),
+  };
+}
+async function setJournaliersConfig(user, body = {}) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  const day = Number(body.jour); const rh = Number(body.rappel_heure); const dh = Number(body.deadline_heure);
+  const okDay = Number.isInteger(day) && day >= 0 && day <= 6;
+  const okRh = Number.isInteger(rh) && rh >= 0 && rh <= 23;
+  const okDh = Number.isInteger(dh) && dh >= 0 && dh <= 23;
+  if (!okDay || !okRh || !okDh) throw httpError(400, 'Jour (0=dimanche … 6=samedi) et heures (0–23) requis.');
+  await settings.setValue('journaliers_jour', day);
+  await settings.setValue('journaliers_rappel_heure', rh);
+  await settings.setValue('journaliers_deadline_heure', dh);
+  return getJournaliersConfig();
+}
+// Instant d'échéance de la semaine contenant `now` (semaine lundi→dimanche), au jour/heure configurés.
+function weekDeadlineInstant(now, jour, heure) {
+  const dow = now.getDay();                       // 0 = dimanche … 6 = samedi
+  const toMonday = (dow === 0 ? -6 : 1 - dow);    // recule au lundi de la semaine courante
+  const monday = new Date(now); monday.setDate(now.getDate() + toMonday); monday.setHours(0, 0, 0, 0);
+  const offset = (jour === 0 ? 6 : jour - 1);     // nb de jours depuis lundi
+  const deadline = new Date(monday); deadline.setDate(monday.getDate() + offset); deadline.setHours(heure, 0, 0, 0);
+  return deadline;
+}
+// Fermé dès que l'instant d'échéance de la semaine est dépassé → réouverture automatique le lundi
+// suivant (nouvelle semaine, échéance à venir).
+async function isJournaliersSubmissionClosed(now = new Date()) {
+  const cfg = await getJournaliersConfig();
+  return now >= weekDeadlineInstant(now, cfg.jour, cfg.deadline_heure);
 }
 
 // Nombre de jours ouvrables entre deux dates incluses. Semaine de travail lundi→samedi :
@@ -310,8 +340,8 @@ async function submit(user, id) {
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
   // Journaliers : échéance hebdomadaire — plus de soumission après le vendredi 13h (réouverture lundi).
   // Le brouillon reste enregistré et modifiable ; seule la soumission au circuit est bloquée.
-  if (req.type === 'journaliers' && isJournaliersSubmissionClosed()) {
-    throw httpError(400, "La soumission des demandes de journaliers est fermée après le vendredi 13h. Elle rouvre le lundi pour la semaine suivante — votre brouillon est enregistré.");
+  if (req.type === 'journaliers' && await isJournaliersSubmissionClosed()) {
+    throw httpError(400, "La soumission des demandes de journaliers est fermée (échéance hebdomadaire dépassée). Elle rouvre le lundi pour la semaine suivante — votre brouillon est enregistré.");
   }
   await applyStep(id, chainForRequest(req), 0, req);
   await repo.logHistory(id, 'soumission', user.id, null);
@@ -620,4 +650,5 @@ module.exports = {
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
   listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
   createJournaliers, updateJournaliers, journaliersDashboard,
+  getJournaliersConfig, setJournaliersConfig, isJournaliersSubmissionClosed,
 };
