@@ -67,7 +67,7 @@ export default function JournaliersDashboard() {
         <>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
             <Kpi label="Journaliers demandés" value={nf(data.total)} sub={`${data.nb_demandes} demande(s)`} />
-            <Kpi label="En validation" value={parStatut.en_validation || 0} sub="DAF / DGA / RH" />
+            <Kpi label="En validation" value={parStatut.en_validation || 0} sub="DAF / RH" />
             <Kpi label="Validées" value={parStatut.validee || 0} />
             <Kpi label="À corriger / refusées" value={(parStatut.brouillon || 0)} sub={`${parStatut.refusee || 0} refus`} />
           </div>

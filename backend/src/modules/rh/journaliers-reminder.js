@@ -20,7 +20,7 @@ async function runReminder(force = false) {
   for (const d of directors) {
     try {
       await notify(d.id, 'Demande de journaliers — semaine prochaine',
-        'Merci de saisir votre demande de journaliers pour la semaine prochaine (lundi → dimanche). La demande suit le circuit DAF → DGA → RH.',
+        'Merci de saisir votre demande de journaliers pour la semaine prochaine (lundi → dimanche). La demande suit le circuit DAF → RH.',
         '/rh/demandes/journaliers/new');
     } catch (_e) { /* non bloquant */ }
   }
