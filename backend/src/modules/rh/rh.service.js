@@ -644,8 +644,65 @@ async function journaliersDashboard(user, q) {
   };
 }
 
+// ─── Jours fériés (décompte des congés/absences) — gérés par la RH (RH → Configuration) ──────────
+// La table rh_jours_feries alimente déjà workingDays() ; ici on expose la GESTION (CRUD + pré-remplissage
+// des fériés à DATE FIXE d'une année ; les fériés variables — Tabaski, Aïd, Maouloud… — restent saisis
+// à la main chaque année).
+const FERIES_FIXES = [
+  ['01-01', "Jour de l'An"],
+  ['05-01', 'Fête du travail'],
+  ['05-25', "Journée de l'Afrique"],
+  ['08-15', 'Assomption'],
+  ['10-02', 'Fête nationale'],
+  ['12-25', 'Noël'],
+];
+const SELECT_FERIE = "SELECT id, to_char(date, 'YYYY-MM-DD') AS date, libelle FROM rh_jours_feries";
+function parseFerie(b) {
+  const date = String(b.date || '').slice(0, 10);
+  const libelle = String(b.libelle || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400, 'Date invalide (format AAAA-MM-JJ attendu).');
+  if (!libelle) throw httpError(400, 'Le libellé est obligatoire.');
+  return { date, libelle };
+}
+async function listFeries(user) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  return all(`${SELECT_FERIE} ORDER BY date`);
+}
+async function createFerie(user, body) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  const f = parseFerie(body);
+  try { return await one(`INSERT INTO rh_jours_feries (date, libelle) VALUES ($1,$2) RETURNING id, to_char(date,'YYYY-MM-DD') AS date, libelle`, [f.date, f.libelle]); }
+  catch (e) { if (e.code === '23505') throw httpError(409, 'Cette date est déjà enregistrée comme jour férié.'); throw e; }
+}
+async function updateFerie(user, id, body) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  const f = parseFerie(body);
+  try {
+    const row = await one(`UPDATE rh_jours_feries SET date=$1, libelle=$2 WHERE id=$3 RETURNING id, to_char(date,'YYYY-MM-DD') AS date, libelle`, [f.date, f.libelle, id]);
+    if (!row) throw httpError(404, 'Jour férié introuvable.');
+    return row;
+  } catch (e) { if (e.code === '23505') throw httpError(409, 'Cette date est déjà enregistrée comme jour férié.'); throw e; }
+}
+async function deleteFerie(user, id) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  await run('DELETE FROM rh_jours_feries WHERE id=$1', [id]);
+  return { ok: true };
+}
+async function prefillFeries(user, annee) {
+  if (!isRhRole(user)) throw httpError(403, 'Réservé aux RH.');
+  const y = Number(annee);
+  if (!Number.isInteger(y) || y < 2020 || y > 2100) throw httpError(400, 'Année invalide.');
+  let inserted = 0;
+  for (const [md, lib] of FERIES_FIXES) {
+    const r = await run('INSERT INTO rh_jours_feries (date, libelle) VALUES ($1,$2) ON CONFLICT (date) DO NOTHING', [`${y}-${md}`, lib]);
+    inserted += r.rowCount || 0;
+  }
+  return { annee: y, inserted };
+}
+
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
+  listFeries, createFerie, updateFerie, deleteFerie, prefillFeries,
   listMine, listPending, listAll, canSeeAll, canDelete, workingDays, listMyTeam, getTeamMemberCongeSolde,
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
   listTaskTypes, createTaskType, updateTaskType, deleteTaskType,

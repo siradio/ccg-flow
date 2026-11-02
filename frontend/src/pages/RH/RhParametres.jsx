@@ -65,6 +65,51 @@ function JournaliersConfigCard() {
 // de jours accordés. Ces types alimentent les listes déroulantes des formulaires Absence/Congé
 // (via GET /rh/types) : plus rien n'est codé en dur. Réutilise la page CRUD générique des
 // référentiels sur l'endpoint /rh/admin/types (réservé RH/super_admin côté backend).
+// Jours fériés — décompte des congés/absences. Gestion CRUD (page référentiel générique) + bouton
+// de pré-remplissage des fériés à date fixe d'une année ; les fériés variables sont saisis à la main.
+function FeriesManager() {
+  const cy = new Date().getFullYear();
+  const [annee, setAnnee] = useState(cy);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const feriesFields = [
+    { key: 'date', label: 'Date', type: 'date', required: true },
+    { key: 'libelle', label: 'Libellé', required: true },
+  ];
+  const years = []; for (let y = cy - 1; y <= cy + 2; y++) years.push(y);
+  async function prefill() {
+    setBusy(true); setMsg('');
+    try { const r = await client.post('/rh/admin/feries/prefill', { annee }); setMsg(`${r.data.inserted} férié(s) fixe(s) ajouté(s) pour ${r.data.annee}.`); setReloadKey(k => k + 1); }
+    catch (e) { setMsg(e.response?.data?.error || 'Erreur.'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div style={{ marginTop: 28 }}>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: 16 }}>Jours fériés — décompte des congés</h2>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+          Ces dates sont déduites du décompte des congés et absences (en plus des dimanches). Pré-remplissez
+          les fériés à date fixe d'une année, puis ajoutez ou corrigez les dates variables (Tabaski, Aïd, Maouloud, Pâques…).
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label className="field" style={{ width: 120 }}>Année
+            <select value={annee} onChange={e => setAnnee(Number(e.target.value))}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+          <button className="btn btn-secondary" disabled={busy} onClick={prefill}>{busy ? '…' : `Pré-remplir les fériés fixes ${annee}`}</button>
+          {msg && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{msg}</span>}
+        </div>
+      </div>
+      <ReferentialPage
+        key={`feries-${reloadKey}`} title="Jours fériés" endpoint="/rh/admin/feries"
+        fields={feriesFields} filters={[]} lists={{}} canAdd canEdit
+      />
+    </div>
+  );
+}
+
 export default function RhParametres() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -103,6 +148,7 @@ export default function RhParametres() {
           fields={taskFields} filters={['actif']} lists={{}} canAdd canEdit
         />
       </div>
+      <FeriesManager />
     </div>
   );
 }

@@ -101,6 +101,24 @@ router.delete('/admin/types/:id', async (req, res, next) => {
   }
 });
 
+// ── Jours fériés (décompte des congés/absences) — gérés par la RH ─────────────────
+// Alimente workingDays(). CRUD + pré-remplissage des fériés fixes d'une année ; réservé RH (service).
+router.get('/admin/feries', async (req, res, next) => {
+  try { res.json(await service.listFeries(req.user)); } catch (e) { next(e); }
+});
+router.post('/admin/feries', async (req, res, next) => {
+  try { res.status(201).json(await service.createFerie(req.user, req.body || {})); } catch (e) { next(e); }
+});
+router.post('/admin/feries/prefill', async (req, res, next) => {
+  try { res.json(await service.prefillFeries(req.user, (req.body || {}).annee)); } catch (e) { next(e); }
+});
+router.put('/admin/feries/:id', async (req, res, next) => {
+  try { res.json(await service.updateFerie(req.user, Number(req.params.id), req.body || {})); } catch (e) { next(e); }
+});
+router.delete('/admin/feries/:id', async (req, res, next) => {
+  try { res.json(await service.deleteFerie(req.user, Number(req.params.id))); } catch (e) { next(e); }
+});
+
 // Jours ouvrables entre deux dates (calcul en direct côté formulaire).
 router.get('/working-days', async (req, res, next) => {
   try { res.json({ jours: await service.workingDays(req.query.from, req.query.to) }); }
