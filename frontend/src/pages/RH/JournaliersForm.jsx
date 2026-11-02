@@ -4,7 +4,7 @@ import client from '../../api/client';
 import RhSubnav from './RhSubnav';
 
 // Demande de journaliers — grille hebdomadaire : lignes = types de tâches (config RH), colonnes =
-// Lun→Dim, cellules = nombre de journaliers. Circuit DAF → DGA → RH. Interface en français.
+// Lun→Dim, cellules = nombre de journaliers. Circuit DAF → RH. Interface en français.
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const d10 = v => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');
 
@@ -20,6 +20,13 @@ function mondayOf(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 function addDays(dateStr, n) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+
+// Échéance hebdomadaire : la soumission au circuit ferme après le vendredi 13h (réouverture lundi).
+// Simple aide à la saisie — le serveur reste l'autorité (il revérifie et refuse la soumission).
+function submissionClosed(d = new Date()) {
+  const day = d.getDay(); const hour = d.getHours();
+  return (day === 5 && hour >= 13) || day === 6 || day === 0;
+}
 
 export default function JournaliersForm() {
   const nav = useNavigate();
@@ -75,11 +82,18 @@ export default function JournaliersForm() {
     } catch (e) { setError(e.response?.data?.error || 'Erreur serveur.'); setSaving(false); }
   }
 
+  const closed = submissionClosed();
   return (
     <div>
       <RhSubnav />
       <h1 className="page-title" style={{ margin: '4px 0' }}>Demande de journaliers</h1>
-      <p className="page-subtitle" style={{ margin: '0 0 14px' }}>Nombre de journaliers par jour et par tâche, pour la semaine. Circuit : DAF → DGA → RH.</p>
+      <p className="page-subtitle" style={{ margin: '0 0 14px' }}>Nombre de journaliers par jour et par tâche, pour la semaine. Circuit : DAF → RH. Soumission jusqu'au <strong>vendredi 13h</strong>.</p>
+
+      {closed && (
+        <div className="alert" style={{ marginBottom: 12, background: 'var(--status-amber-bg)', color: 'var(--status-amber-fg)', fontSize: 13 }}>
+          La soumission est fermée (après vendredi 13h). Vous pouvez enregistrer un brouillon ; la soumission rouvrira lundi.
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 12, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field" style={{ minWidth: 200 }}>Business Unit
@@ -124,7 +138,7 @@ export default function JournaliersForm() {
 
       {error && <div className="alert alert-danger" style={{ marginTop: 12 }}>{error}</div>}
       <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary" disabled={saving} onClick={() => save(true)}>{saving ? 'Envoi…' : 'Soumettre au circuit (DAF → DGA → RH)'}</button>
+        <button className="btn btn-primary" disabled={saving || closed} title={closed ? 'Soumission fermée après vendredi 13h' : undefined} onClick={() => save(true)}>{saving ? 'Envoi…' : 'Soumettre au circuit (DAF → RH)'}</button>
         <button className="btn btn-secondary" disabled={saving} onClick={() => save(false)}>Enregistrer en brouillon</button>
         <button className="btn btn-secondary" onClick={() => nav('/rh/mes-demandes')}>Annuler</button>
       </div>

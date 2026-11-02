@@ -43,6 +43,16 @@ function nextRole(chain, current) {
   return (i >= 0 && i < chain.length - 1) ? chain[i + 1] : null;
 }
 
+// Échéance hebdomadaire des demandes de journaliers : la soumission au circuit est fermée après le
+// VENDREDI 13h (les directeurs saisissent pour la semaine suivante avant cette heure). Fenêtre
+// fermée = vendredi dès 13h, samedi et dimanche ; réouverture le lundi. Le serveur tourne en
+// UTC ≈ heure de Conakry (GMT), donc getDay()/getHours() reflètent l'heure locale.
+function isJournaliersSubmissionClosed(d = new Date()) {
+  const day = d.getDay();   // 0 = dimanche … 5 = vendredi, 6 = samedi
+  const hour = d.getHours();
+  return (day === 5 && hour >= 13) || day === 6 || day === 0;
+}
+
 // Nombre de jours ouvrables entre deux dates incluses. Semaine de travail lundi→samedi :
 // seuls les dimanches et les jours fériés paramétrés sont exclus.
 async function workingDays(from, to) {
@@ -298,6 +308,11 @@ async function submit(user, id) {
   if (!req) throw httpError(404, 'Demande introuvable.');
   assertOwner(user, req);
   if (req.statut !== 'brouillon') throw httpError(400, `Soumission impossible depuis le statut "${req.statut}".`);
+  // Journaliers : échéance hebdomadaire — plus de soumission après le vendredi 13h (réouverture lundi).
+  // Le brouillon reste enregistré et modifiable ; seule la soumission au circuit est bloquée.
+  if (req.type === 'journaliers' && isJournaliersSubmissionClosed()) {
+    throw httpError(400, "La soumission des demandes de journaliers est fermée après le vendredi 13h. Elle rouvre le lundi pour la semaine suivante — votre brouillon est enregistré.");
+  }
   await applyStep(id, chainForRequest(req), 0, req);
   await repo.logHistory(id, 'soumission', user.id, null);
   return getDetail(id);
