@@ -36,7 +36,7 @@ import CongeForm from './pages/RH/CongeForm';
 import RecrutementForm from './pages/RH/RecrutementForm';
 import CdiForm from './pages/RH/CdiForm';
 import RhDashboard from './pages/RH/RhDashboard';
-import RhParametres from './pages/RH/RhParametres';
+import RhParametres, { RhConfigTypes, RhConfigJournaliers, RhConfigFeries } from './pages/RH/RhParametres';
 import Competences from './pages/RH/Competences';
 import Modeles from './pages/RH/Modeles';
 import ModeleForm from './pages/RH/ModeleForm';
@@ -151,6 +151,9 @@ export default function App() {
         <Route path="rh/a-valider" element={<RequireRh><AValider /></RequireRh>} />
         <Route path="rh/toutes" element={<RequireRh><ToutesDemandes /></RequireRh>} />
         <Route path="rh/parametres" element={<RequireRh><RhParametres /></RequireRh>} />
+        <Route path="rh/config/types" element={<RequireRh><RhConfigTypes /></RequireRh>} />
+        <Route path="rh/config/journaliers" element={<RequireRh><RhConfigJournaliers /></RequireRh>} />
+        <Route path="rh/config/feries" element={<RequireRh><RhConfigFeries /></RequireRh>} />
         <Route path="rh/competences" element={<RequireRh><Competences /></RequireRh>} />
         <Route path="rh/evaluation/campagnes" element={<RequireRh><Campagnes /></RequireRh>} />
         <Route path="rh/evaluation/fiches" element={<RequireRh><Evaluations /></RequireRh>} />

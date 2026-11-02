@@ -31,7 +31,9 @@ export default function RhSubnav() {
       { to: '/rh/competences', label: t('rh.nav.competences'), visible: canManageRhTypes(user) },
     ] },
     { key: 'config', label: t('rh.grp.config'), items: [
-      { to: '/rh/parametres', label: t('rh.nav.params'), visible: canManageRhTypes(user) },
+      { to: '/rh/config/types', label: t('rh.nav.cfgTypes'), visible: canManageRhTypes(user) },
+      { to: '/rh/config/journaliers', label: t('rh.nav.cfgJournaliers'), visible: canManageRhTypes(user) },
+      { to: '/rh/config/feries', label: t('rh.nav.cfgFeries'), visible: canManageRhTypes(user) },
       { to: '/employees', label: t('rh.nav.employees'), visible: canManageRhTypes(user) },
     ] },
   ];

@@ -110,11 +110,16 @@ function FeriesManager() {
   );
 }
 
-export default function RhParametres() {
+// Garde commune aux pages de configuration RH : réservé aux gestionnaires de types RH.
+function useRhConfigGuard() {
   const { user } = useAuth();
-  const { t } = useI18n();
-  if (!canManageRhTypes(user)) return <Navigate to="/rh/mes-demandes" replace />;
+  return canManageRhTypes(user);
+}
 
+// Sous-menu Configuration 1/4 — Types de demande (congé / absence / recrutement + barèmes).
+export function RhConfigTypes() {
+  const { t } = useI18n();
+  if (!useRhConfigGuard()) return <Navigate to="/rh/mes-demandes" replace />;
   const fields = [
     { key: 'domaine', label: t('rh.param.domaine'), type: 'select', required: true, options: ['conge', 'absence', 'recrutement'],
       optionLabels: { conge: t('rh.param.dom.conge'), absence: t('rh.param.dom.absence'), recrutement: t('rh.param.dom.recrutement') } },
@@ -126,14 +131,6 @@ export default function RhParametres() {
     { key: 'ordre', label: t('rh.param.ordre'), type: 'number' },
     { key: 'actif', label: t('rh.param.actif'), type: 'checkbox', default: true },
   ];
-
-  // Types de tâches journalières (demande de journaliers) — configurables par les RH.
-  const taskFields = [
-    { key: 'nom', label: 'Nom de la tâche', required: true },
-    { key: 'ordre', label: 'Ordre', type: 'number' },
-    { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
-  ];
-
   return (
     <div>
       <RhSubnav />
@@ -141,14 +138,43 @@ export default function RhParametres() {
         key="rh-types" title={t('rh.param.title')} endpoint="/rh/admin/types"
         fields={fields} filters={['domaine', 'actif']} lists={{}} canAdd canEdit
       />
-      <div style={{ marginTop: 28 }}>
-        <JournaliersConfigCard />
-        <ReferentialPage
-          key="rh-task-types" title="Types de tâches journalières" endpoint="/rh/journaliers/task-types"
-          fields={taskFields} filters={['actif']} lists={{}} canAdd canEdit
-        />
-      </div>
+    </div>
+  );
+}
+
+// Sous-menu Configuration 2/4 — Journaliers : échéance & rappel + types de tâches.
+export function RhConfigJournaliers() {
+  if (!useRhConfigGuard()) return <Navigate to="/rh/mes-demandes" replace />;
+  const taskFields = [
+    { key: 'nom', label: 'Nom de la tâche', required: true },
+    { key: 'ordre', label: 'Ordre', type: 'number' },
+    { key: 'actif', label: 'Actif', type: 'checkbox', default: true },
+  ];
+  return (
+    <div>
+      <RhSubnav />
+      <h1 className="page-title" style={{ margin: '4px 0 14px' }}>Journaliers — configuration</h1>
+      <JournaliersConfigCard />
+      <ReferentialPage
+        key="rh-task-types" title="Types de tâches journalières" endpoint="/rh/journaliers/task-types"
+        fields={taskFields} filters={['actif']} lists={{}} canAdd canEdit
+      />
+    </div>
+  );
+}
+
+// Sous-menu Configuration 3/4 — Jours fériés (décompte des congés).
+export function RhConfigFeries() {
+  if (!useRhConfigGuard()) return <Navigate to="/rh/mes-demandes" replace />;
+  return (
+    <div>
+      <RhSubnav />
       <FeriesManager />
     </div>
   );
+}
+
+// Compat : l'ancienne page unique redirige vers le premier sous-menu.
+export default function RhParametres() {
+  return <Navigate to="/rh/config/types" replace />;
 }
