@@ -1,8 +1,65 @@
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import client from '../../api/client';
 import ReferentialPage from '../Referentials/ReferentialPage';
 import RhSubnav, { canManageRhTypes } from './RhSubnav';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
+
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const hh = (h) => `${String(h).padStart(2, '0')}:00`;
+
+// Échéance & rappel de la demande de journaliers (jour, heure de rappel, heure limite de soumission).
+// Stocké côté serveur (app_settings), lu par le formulaire de saisie et le planificateur de rappel.
+function JournaliersConfigCard() {
+  const [cfg, setCfg] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => { client.get('/rh/journaliers/config').then(r => setCfg(r.data)).catch(() => setCfg({ jour: 5, rappel_heure: 8, deadline_heure: 13 })); }, []);
+  if (!cfg) return null;
+
+  const set = (k, v) => { setCfg(c => ({ ...c, [k]: Number(v) })); setMsg(''); };
+  async function save() {
+    setSaving(true); setMsg('');
+    try { const r = await client.put('/rh/journaliers/config', cfg); setCfg(r.data); setMsg('Enregistré.'); }
+    catch (e) { setMsg(e.response?.data?.error || 'Erreur.'); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h2 style={{ margin: '0 0 4px', fontSize: 16 }}>Échéance & rappel — Demande de journaliers</h2>
+      <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+        Jour de référence, heure du rappel automatique et heure limite de soumission au circuit.
+        Après l'heure limite, la soumission est fermée jusqu'au lundi suivant (le brouillon reste possible).
+      </p>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label className="field" style={{ minWidth: 150 }}>Jour de référence
+          <select value={cfg.jour} onChange={e => set('jour', e.target.value)}>
+            {JOURS.map((j, i) => <option key={i} value={i}>{j.charAt(0).toUpperCase() + j.slice(1)}</option>)}
+          </select>
+        </label>
+        <label className="field" style={{ width: 150 }}>Heure du rappel
+          <select value={cfg.rappel_heure} onChange={e => set('rappel_heure', e.target.value)}>
+            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hh(h)}</option>)}
+          </select>
+        </label>
+        <label className="field" style={{ width: 170 }}>Heure limite de soumission
+          <select value={cfg.deadline_heure} onChange={e => set('deadline_heure', e.target.value)}>
+            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hh(h)}</option>)}
+          </select>
+        </label>
+        <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+        {msg && <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{msg}</span>}
+      </div>
+      <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--color-text-muted)' }}>
+        Actuel : rappel le <strong>{JOURS[cfg.jour]} à {hh(cfg.rappel_heure)}</strong>, soumission jusqu'au <strong>{JOURS[cfg.jour]} {hh(cfg.deadline_heure)}</strong>.
+        Heures basées sur l'horloge serveur (UTC ≈ Conakry).
+      </p>
+    </div>
+  );
+}
 
 // Paramètres RH — gestion des types de demande (congé / absence / recrutement) et de leur forfait
 // de jours accordés. Ces types alimentent les listes déroulantes des formulaires Absence/Congé
@@ -40,6 +97,7 @@ export default function RhParametres() {
         fields={fields} filters={['domaine', 'actif']} lists={{}} canAdd canEdit
       />
       <div style={{ marginTop: 28 }}>
+        <JournaliersConfigCard />
         <ReferentialPage
           key="rh-task-types" title="Types de tâches journalières" endpoint="/rh/journaliers/task-types"
           fields={taskFields} filters={['actif']} lists={{}} canAdd canEdit

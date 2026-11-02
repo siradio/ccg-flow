@@ -21,11 +21,18 @@ function mondayOf(dateStr) {
 }
 function addDays(dateStr, n) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
 
-// Échéance hebdomadaire : la soumission au circuit ferme après le vendredi 13h (réouverture lundi).
-// Simple aide à la saisie — le serveur reste l'autorité (il revérifie et refuse la soumission).
-function submissionClosed(d = new Date()) {
-  const day = d.getDay(); const hour = d.getHours();
-  return (day === 5 && hour >= 13) || day === 6 || day === 0;
+const JOURS_LONG = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+// Échéance hebdomadaire (jour + heure limite configurés en RH → Config) : la soumission ferme une
+// fois l'échéance de la semaine dépassée, réouverture le lundi. Simple aide à la saisie — le serveur
+// reste l'autorité (il revérifie et refuse la soumission).
+function submissionClosed(cfg, d = new Date()) {
+  if (!cfg) return false;
+  const dow = d.getDay();
+  const toMonday = (dow === 0 ? -6 : 1 - dow);
+  const monday = new Date(d); monday.setDate(d.getDate() + toMonday); monday.setHours(0, 0, 0, 0);
+  const offset = (cfg.jour === 0 ? 6 : cfg.jour - 1);
+  const deadline = new Date(monday); deadline.setDate(monday.getDate() + offset); deadline.setHours(cfg.deadline_heure, 0, 0, 0);
+  return d >= deadline;
 }
 
 export default function JournaliersForm() {
@@ -40,6 +47,9 @@ export default function JournaliersForm() {
   const [cells, setCells] = useState({}); // `${taskId}_${jour}` -> nombre
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [cfg, setCfg] = useState(null); // échéance/rappel configurés (RH → Config)
+
+  useEffect(() => { client.get('/rh/journaliers/config').then(r => setCfg(r.data)).catch(() => {}); }, []);
 
   useEffect(() => {
     client.get('/business-units/mine').then(r => { setBus(r.data); if (!editId && r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {});
@@ -82,16 +92,17 @@ export default function JournaliersForm() {
     } catch (e) { setError(e.response?.data?.error || 'Erreur serveur.'); setSaving(false); }
   }
 
-  const closed = submissionClosed();
+  const closed = submissionClosed(cfg);
+  const limite = cfg ? `${JOURS_LONG[cfg.jour]} ${String(cfg.deadline_heure).padStart(2, '0')}h` : '';
   return (
     <div>
       <RhSubnav />
       <h1 className="page-title" style={{ margin: '4px 0' }}>Demande de journaliers</h1>
-      <p className="page-subtitle" style={{ margin: '0 0 14px' }}>Nombre de journaliers par jour et par tâche, pour la semaine. Circuit : DAF → RH. Soumission jusqu'au <strong>vendredi 13h</strong>.</p>
+      <p className="page-subtitle" style={{ margin: '0 0 14px' }}>Nombre de journaliers par jour et par tâche, pour la semaine. Circuit : DAF → RH.{limite && <> Soumission jusqu'au <strong>{limite}</strong>.</>}</p>
 
       {closed && (
         <div className="alert" style={{ marginBottom: 12, background: 'var(--status-amber-bg)', color: 'var(--status-amber-fg)', fontSize: 13 }}>
-          La soumission est fermée (après vendredi 13h). Vous pouvez enregistrer un brouillon ; la soumission rouvrira lundi.
+          La soumission est fermée (échéance hebdomadaire dépassée). Vous pouvez enregistrer un brouillon ; la soumission rouvrira lundi.
         </div>
       )}
 

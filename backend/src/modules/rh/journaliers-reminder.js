@@ -1,6 +1,7 @@
 const { all } = require('../../db');
 const settings = require('../settings/settings.service');
 const { notify } = require('../notifications/notifications.service');
+const { getJournaliersConfig } = require('./rh.service');
 
 // Rappel hebdomadaire « demande de journaliers » : chaque VENDREDI, on rappelle aux directeurs de BU
 // (rôle `responsable`) de saisir leur demande de journaliers pour la semaine suivante. Même modèle
@@ -8,8 +9,9 @@ const { notify } = require('../notifications/notifications.service');
 async function runReminder(force = false) {
   const now = new Date();
   if (!force) {
-    if (now.getDay() !== 5) return;      // 5 = vendredi
-    if (now.getHours() < 8) return;      // rappel le MATIN : à partir de 8h (serveur en UTC ≈ Conakry)
+    const cfg = await getJournaliersConfig();    // jour + heure de rappel configurables (RH → Config)
+    if (now.getDay() !== cfg.jour) return;
+    if (now.getHours() < cfg.rappel_heure) return; // rappel à partir de l'heure configurée (serveur UTC ≈ Conakry)
     const today = now.toISOString().slice(0, 10);
     const last = await settings.getValue('journaliers_reminder_last_sent', '');
     if (last === today) return; // déjà envoyé aujourd'hui (robuste au redémarrage)
