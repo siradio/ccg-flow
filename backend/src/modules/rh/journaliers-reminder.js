@@ -7,8 +7,9 @@ const { notify } = require('../notifications/notifications.service');
 // que les autres alertes planifiées (vérif quotidienne, garde anti-doublon via app_settings).
 async function runReminder(force = false) {
   const now = new Date();
-  if (!force && now.getDay() !== 5) return; // 5 = vendredi
   if (!force) {
+    if (now.getDay() !== 5) return;      // 5 = vendredi
+    if (now.getHours() < 8) return;      // rappel le MATIN : à partir de 8h (serveur en UTC ≈ Conakry)
     const today = now.toISOString().slice(0, 10);
     const last = await settings.getValue('journaliers_reminder_last_sent', '');
     if (last === today) return; // déjà envoyé aujourd'hui (robuste au redémarrage)
@@ -30,9 +31,11 @@ async function runReminder(force = false) {
 let started = false;
 function startJournaliersReminder() {
   if (started) return; started = true;
+  // Vérification toutes les 30 min : le rappel part dès le vendredi 8h (garde anti-doublon
+  // quotidienne), au lieu d'un unique passage quotidien calé sur l'heure de démarrage du serveur.
   setTimeout(() => {
     runReminder().catch(() => {});
-    setInterval(() => runReminder().catch(() => {}), 24 * 60 * 60 * 1000);
+    setInterval(() => runReminder().catch(() => {}), 30 * 60 * 1000);
   }, 90 * 1000);
 }
 
