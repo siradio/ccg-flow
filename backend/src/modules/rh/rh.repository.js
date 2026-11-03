@@ -118,7 +118,7 @@ async function remove(id) {
 // 'YYYY-MM-DD' côté SQL : pg renvoie sinon un objet Date, et String(dateObj).slice(0,10) donnerait
 // « Thu Nov 05 » → aucune correspondance avec les dates ISO comparées, donc fériés jamais exclus.
 async function holidaysBetween(from, to) {
-  return all("SELECT to_char(date, 'YYYY-MM-DD') AS date FROM rh_jours_feries WHERE date BETWEEN $1 AND $2", [from, to]);
+  return all("SELECT to_char(date, 'YYYY-MM-DD') AS date, libelle FROM rh_jours_feries WHERE date BETWEEN $1 AND $2 ORDER BY date", [from, to]);
 }
 
 // Total des jours de congés imputables au solde pour un employé, depuis une date de référence :

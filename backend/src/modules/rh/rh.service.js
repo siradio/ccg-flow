@@ -83,21 +83,33 @@ async function isJournaliersSubmissionClosed(now = new Date()) {
   return now >= weekDeadlineInstant(now, cfg.jour, cfg.deadline_heure);
 }
 
-// Nombre de jours ouvrables entre deux dates incluses. Semaine de travail lundi→samedi :
-// seuls les dimanches et les jours fériés paramétrés sont exclus.
-async function workingDays(from, to) {
-  if (!from || !to) return null;
+// Détail du décompte entre deux dates incluses. Semaine de travail lundi→samedi :
+// seuls les dimanches et les jours fériés paramétrés sont exclus. Renvoie le nombre de jours
+// ouvrables ET la liste des fériés réellement décomptés (tombant un jour ouvrable, donc hors
+// dimanche) — affichés à titre informatif côté formulaire.
+async function workingDaysDetail(from, to) {
+  if (!from || !to) return { jours: null, feries: [] };
   const start = new Date(from + 'T00:00:00Z');
   const end = new Date(to + 'T00:00:00Z');
-  if (isNaN(start) || isNaN(end) || end < start) return null;
-  const feries = new Set((await repo.holidaysBetween(from, to)).map(r => String(r.date).slice(0, 10)));
+  if (isNaN(start) || isNaN(end) || end < start) return { jours: null, feries: [] };
+  const rows = await repo.holidaysBetween(from, to);
+  const feriesMap = new Map(rows.map(r => [String(r.date).slice(0, 10), r.libelle]));
   let count = 0;
+  const feriesExclus = [];
   for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const day = d.getUTCDay(); // 0 dimanche, 6 samedi
     const iso = d.toISOString().slice(0, 10);
-    if (day !== 0 && !feries.has(iso)) count++; // samedi compté, dimanche exclu
+    const ferie = feriesMap.has(iso);
+    if (day !== 0 && !ferie) count++; // samedi compté, dimanche exclu
+    // Un férié tombant un dimanche est déjà non travaillé : on ne l'affiche pas comme « non compté ».
+    if (day !== 0 && ferie) feriesExclus.push({ date: iso, libelle: feriesMap.get(iso) });
   }
-  return count;
+  return { jours: count, feries: feriesExclus };
+}
+
+// Nombre de jours ouvrables entre deux dates incluses (voir workingDaysDetail).
+async function workingDays(from, to) {
+  return (await workingDaysDetail(from, to)).jours;
 }
 
 async function resolveRequesterEmployee(user) {
@@ -703,7 +715,7 @@ async function prefillFeries(user, annee) {
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
   listFeries, createFerie, updateFerie, deleteFerie, prefillFeries,
-  listMine, listPending, listAll, canSeeAll, canDelete, workingDays, listMyTeam, getTeamMemberCongeSolde,
+  listMine, listPending, listAll, canSeeAll, canDelete, workingDays, workingDaysDetail, listMyTeam, getTeamMemberCongeSolde,
   getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
   listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
   createJournaliers, updateJournaliers, journaliersDashboard,
