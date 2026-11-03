@@ -146,7 +146,7 @@ async function exportRows({ from, to, entityIds }) {
   return all(
     `SELECT pr.numero, e.code AS entite, bu.nom AS business_unit, pr.objet, pr.justification,
             TRIM(CONCAT(u.prenom, ' ', u.nom)) AS demandeur, pr.status AS statut, pr.devise,
-            pr.montant_final, pr.created_at, pr.updated_at,
+            pr.montant_final, pr.created_at, pr.updated_at, pr.receptionnee,
             po.numero AS bon_commande, po.montant AS montant_bon_commande, po.generated_at AS date_bon_commande,
             s.nom AS fournisseur
      FROM purchase_requests pr

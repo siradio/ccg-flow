@@ -720,6 +720,7 @@ export const translations = {
     // ── Achats : liste des demandes ──
     'pr.newBtn': '+ Nouvelle demande',
     'pr.export.btn': 'Exporter (Excel)',
+    'pr.reportBtn': 'Rapport des achats',
     'pr.export.from': 'Du',
     'pr.export.to': 'Au',
     'pr.export.download': 'Télécharger',
@@ -3064,6 +3065,7 @@ export const translations = {
     // ── Purchasing: request list ──
     'pr.newBtn': '+ New request',
     'pr.export.btn': 'Export (Excel)',
+    'pr.reportBtn': 'Purchase report',
     'pr.export.from': 'From',
     'pr.export.to': 'To',
     'pr.export.download': 'Download',

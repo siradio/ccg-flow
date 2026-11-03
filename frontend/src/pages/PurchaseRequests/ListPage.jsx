@@ -149,6 +149,9 @@ export default function ListPage() {
         <h1 className="page-title">{t('nav.purchases')}</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canExport && (
+            <Link to="/purchase-requests/rapport" className="btn btn-secondary">{t('pr.reportBtn')}</Link>
+          )}
+          {canExport && (
             <button type="button" className="btn btn-secondary" onClick={() => setExportOpen(o => !o)}>{t('pr.export.btn')}</button>
           )}
           {canAddSupplier && (
