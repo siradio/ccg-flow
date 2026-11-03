@@ -114,9 +114,11 @@ async function remove(id) {
   await run('DELETE FROM rh_requests WHERE id = $1', [id]);
 }
 
-// Jours fériés dans une plage (pour le calcul des jours ouvrables).
+// Jours fériés dans une plage (pour le calcul des jours ouvrables). On renvoie la date formatée en
+// 'YYYY-MM-DD' côté SQL : pg renvoie sinon un objet Date, et String(dateObj).slice(0,10) donnerait
+// « Thu Nov 05 » → aucune correspondance avec les dates ISO comparées, donc fériés jamais exclus.
 async function holidaysBetween(from, to) {
-  return all('SELECT date FROM rh_jours_feries WHERE date BETWEEN $1 AND $2', [from, to]);
+  return all("SELECT to_char(date, 'YYYY-MM-DD') AS date FROM rh_jours_feries WHERE date BETWEEN $1 AND $2", [from, to]);
 }
 
 // Total des jours de congés imputables au solde pour un employé, depuis une date de référence :
