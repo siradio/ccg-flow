@@ -6,6 +6,7 @@ import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
 import Loading from '../../components/Loading';
 import { StatusBadge, STATUS_LABELS } from './statusLabels.jsx';
 import { useSort, SortTh } from '../../components/useSort.jsx';
+import { useAchatFormat } from './useAchatFormat';
 
 // Rapport détaillé des achats (service Achat) : KPIs + historique, filtrable par période (serveur) et
 // par Business Unit / entité / statut / recherche (client). S'appuie sur l'endpoint d'export existant.
@@ -19,13 +20,13 @@ function currentMonthRange() {
   return { from: `${y}-${pad2(m + 1)}-01`, to: `${y}-${pad2(m + 1)}-${pad2(new Date(y, m + 1, 0).getDate())}` };
 }
 const dateStr = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
-const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 // Montant « achat » d'une ligne : le montant final (devis retenu) sinon le montant du bon de commande.
 const rowMontant = (r) => (r.montant_final != null ? Number(r.montant_final) : (r.montant_bon_commande != null ? Number(r.montant_bon_commande) : null));
 
 export default function ReportPage() {
   const { user } = useAuth();
   const { sort, by, apply } = useSort();
+  const { money } = useAchatFormat();
   const [from, setFrom] = useState(() => currentMonthRange().from);
   const [to, setTo] = useState(() => currentMonthRange().to);
   const [rows, setRows] = useState([]);

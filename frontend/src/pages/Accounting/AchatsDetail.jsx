@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import ComptaSubnav, { ProcessingBadge } from './ComptaSubnav.jsx';
 import { StatusBadge } from '../PurchaseRequests/statusLabels.jsx';
+import { useAchatFormat } from '../PurchaseRequests/useAchatFormat';
 import { useI18n } from '../../i18n/I18nContext';
 
 async function openAuthenticatedFile(path) {
@@ -12,12 +13,13 @@ async function openAuthenticatedFile(path) {
   window.open(url, '_blank');
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 4 }));
 
 export default function AchatsDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const { money: fmtMoney } = useAchatFormat();
+  const money = (n) => (n == null || n === '' ? '—' : fmtMoney(n));
   const canProcess = hasSubModuleLevel(user, 'comptabilite.achats', 'edition');
   const [bdc, setBdc] = useState(null);
   const [error, setError] = useState('');

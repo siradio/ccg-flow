@@ -6,6 +6,7 @@ const poRepo = require('../purchase-orders/purchase-orders.repository');
 const prRepo = require('../purchase-requests/purchase-requests.repository');
 const pdf = require('../../utils/pdf');
 const branding = require('../referentials/entity-branding.service');
+const settings = require('../settings/settings.service');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -54,6 +55,7 @@ router.get('/purchase-orders/:id/pdf', canView, async (req, res, next) => {
       purchaseOrder: po, purchaseRequest: { numero: po.purchase_request_numero }, lines,
       entityNom: po.entity_nom, entityCode: po.entity_code, businessUnitNom: po.business_unit_nom,
       supplierNom: po.supplier_nom, logoBuffer: images.logo, signatureBuffer: images.signature, stampBuffer: images.stamp,
+      decimals: await settings.getIntValue('achats_decimales', 4),
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="BC_${po.numero}.pdf"`);

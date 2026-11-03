@@ -120,8 +120,10 @@ router.delete('/admin/feries/:id', async (req, res, next) => {
 });
 
 // Jours ouvrables entre deux dates (calcul en direct côté formulaire).
+// Renvoie { jours, feries:[{date,libelle}] } : la liste des fériés non comptés est affichée
+// à titre informatif. On conserve « jours » au même niveau pour la compatibilité.
 router.get('/working-days', async (req, res, next) => {
-  try { res.json({ jours: await service.workingDays(req.query.from, req.query.to) }); }
+  try { res.json(await service.workingDaysDetail(req.query.from, req.query.to)); }
   catch (e) { next(e); }
 });
 

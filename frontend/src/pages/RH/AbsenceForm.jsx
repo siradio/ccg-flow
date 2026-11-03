@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import RhSubnav from './RhSubnav';
+import FeriesInfo from './FeriesInfo.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -12,14 +13,17 @@ export default function AbsenceForm() {
   const [types, setTypes] = useState([]);
   const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '', remplacement: '' });
   const [jours, setJours] = useState(null);
+  const [feries, setFeries] = useState([]);
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { client.get('/rh/types?domaine=absence').then(r => setTypes(r.data)).catch(() => {}); }, []);
   useEffect(() => {
-    if (!form.date_debut || !form.date_fin) { setJours(null); return; }
-    client.get(`/rh/working-days?from=${form.date_debut}&to=${form.date_fin}`).then(r => setJours(r.data.jours)).catch(() => setJours(null));
+    if (!form.date_debut || !form.date_fin) { setJours(null); setFeries([]); return; }
+    client.get(`/rh/working-days?from=${form.date_debut}&to=${form.date_fin}`)
+      .then(r => { setJours(r.data.jours); setFeries(r.data.feries || []); })
+      .catch(() => { setJours(null); setFeries([]); });
   }, [form.date_debut, form.date_fin]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -69,6 +73,7 @@ export default function AbsenceForm() {
               <div style={{ padding: '8px 0', fontWeight: 700, fontSize: 18 }}>{jours != null ? jours : '—'}</div>
             </div>
           </div>
+          <FeriesInfo feries={feries} />
           <label className="field">{t('rh.absence.motif')}
             <input value={form.motif} onChange={e => set('motif', e.target.value)} placeholder={t('rh.absence.motifPlaceholder')} />
           </label>

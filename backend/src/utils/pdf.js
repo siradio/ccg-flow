@@ -22,11 +22,13 @@ const COMPANY = {
 // Formatage manuel plutôt que toLocaleString('fr-FR') : Node/ICU utilise une espace fine
 // insécable (U+202F) comme séparateur de milliers, un caractère absent de l'encodage WinAnsi des
 // polices standard de pdfkit (Helvetica) — le rendu produisait des "/" à la place des espaces.
-function money(n) {
-  // 2 à 4 décimales : on conserve les décimales réellement présentes (jusqu'à 4) sans afficher de
+function money(n, decimals = 4) {
+  // On conserve les décimales réellement présentes (jusqu'au maximum demandé) sans afficher de
   // zéros superflus au-delà de 2 (ex. 1000 -> "1 000,00", 28,6977 -> "28,6977", 9,50 -> "9,50").
-  const [intPart, dec4] = Number(n || 0).toFixed(4).split('.');
-  let dec = dec4.replace(/0+$/, '');
+  // `decimals` est paramétrable pour le module Achat (app_settings.achats_decimales, défaut 4).
+  const max = Math.min(8, Math.max(0, Math.round(Number(decimals) || 0)));
+  const [intPart, decMax = ''] = Number(n || 0).toFixed(max).split('.');
+  let dec = decMax.replace(/0+$/, '');
   if (dec.length < 2) dec = dec.padEnd(2, '0');
   const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${withSpaces},${dec}`;
@@ -84,7 +86,7 @@ function renderLetterhead(doc, title, logoBuffer) {
 // Tableau des lignes, partagé par les deux documents. `showPrices` ajoute Prix unitaire/Montant —
 // pertinent sur un bon de commande (prix négocié acté), pas sur une demande de devis (on demande
 // justement un prix : y afficher notre estimation interne désavantagerait la négociation).
-function linesTable(doc, lines, { showPrices = false } = {}) {
+function linesTable(doc, lines, { showPrices = false, decimals = 4 } = {}) {
   const cols = showPrices
     ? [
         { key: 'designation', label: 'Désignation', width: 180 },
@@ -128,8 +130,8 @@ function linesTable(doc, lines, { showPrices = false } = {}) {
       designation: line.description_libre || line.designation || '—',
       quantite: String(line.quantite),
       unite: line.unite || '',
-      prix: money(prixUnitaire),
-      montant: money(montantLigne),
+      prix: money(prixUnitaire, decimals),
+      montant: money(montantLigne, decimals),
     };
     x = 50;
     for (const col of cols) {
@@ -199,7 +201,7 @@ function renderFooters(doc, note = 'Document généré automatiquement') {
   }
 }
 
-async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supplierNom, logoBuffer }) {
+async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supplierNom, logoBuffer, decimals = 4 }) {
   return renderPdf(doc => {
     renderLetterhead(doc, 'Demande de devis', logoBuffer);
     doc.fontSize(11).font('Helvetica').fillColor('black');
@@ -208,13 +210,13 @@ async function generateQuoteRequestPdf({ purchaseRequest, lines, entityNom, supp
     doc.text(`Objet : ${purchaseRequest.objet}`);
     doc.text(`Fournisseur sollicité : ${supplierNom}`);
     doc.text(`Date : ${new Date().toLocaleDateString('fr-FR')}`);
-    linesTable(doc, lines, { showPrices: false });
+    linesTable(doc, lines, { showPrices: false, decimals });
     doc.moveDown(1.5);
     doc.text('Merci de nous faire parvenir votre meilleure offre de prix pour les articles ci-dessus.');
   });
 }
 
-async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, entityCode, businessUnitNom, supplierNom, logoBuffer, signatureBuffer, stampBuffer }) {
+async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines, entityNom, entityCode, businessUnitNom, supplierNom, logoBuffer, signatureBuffer, stampBuffer, decimals = 4 }) {
   return renderPdf(doc => {
     renderLetterhead(doc, 'Bon de commande', logoBuffer);
     doc.fontSize(11).font('Helvetica').fillColor('black');
@@ -225,10 +227,10 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
     doc.text(`Fournisseur : ${supplierNom}`);
     doc.text(`Référence demande d'achat : ${purchaseRequest.numero}`);
     doc.text(`Date : ${new Date(purchaseOrder.generated_at).toLocaleDateString('fr-FR')}`);
-    linesTable(doc, lines, { showPrices: true });
+    linesTable(doc, lines, { showPrices: true, decimals });
     doc.moveDown(0.5);
     doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
-      .text(`Montant total : ${money(purchaseOrder.montant)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+      .text(`Montant total : ${money(purchaseOrder.montant, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
     doc.fillColor('black');
     if (purchaseOrder.mode_paiement || purchaseOrder.conditions_paiement) {
       doc.moveDown(0.8).fontSize(10).font('Helvetica');

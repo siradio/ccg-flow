@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import RhSubnav from './RhSubnav';
 import SearchableSelect from '../../components/SearchableSelect.jsx';
+import FeriesInfo from './FeriesInfo.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -16,6 +17,7 @@ export default function CongeForm() {
   const [onBehalf, setOnBehalf] = useState(false);
   const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '', remplacement: '', on_behalf_employee_id: '' });
   const [jours, setJours] = useState(null);
+  const [feries, setFeries] = useState([]);
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -28,8 +30,10 @@ export default function CongeForm() {
     client.get(url).then(r => setSolde(r.data)).catch(() => setSolde(null));
   }, [onBehalf, form.on_behalf_employee_id]);
   useEffect(() => {
-    if (!form.date_debut || !form.date_fin) { setJours(null); return; }
-    client.get(`/rh/working-days?from=${form.date_debut}&to=${form.date_fin}`).then(r => setJours(r.data.jours)).catch(() => setJours(null));
+    if (!form.date_debut || !form.date_fin) { setJours(null); setFeries([]); return; }
+    client.get(`/rh/working-days?from=${form.date_debut}&to=${form.date_fin}`)
+      .then(r => { setJours(r.data.jours); setFeries(r.data.feries || []); })
+      .catch(() => { setJours(null); setFeries([]); });
   }, [form.date_debut, form.date_fin]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -111,6 +115,7 @@ export default function CongeForm() {
               <div style={{ padding: '8px 0', fontWeight: 700, fontSize: 18 }}>{jours != null ? jours : '—'}</div>
             </div>
           </div>
+          <FeriesInfo feries={feries} />
           {depasse && (
             <div className="alert alert-danger" style={{ margin: 0 }}>{t('rh.solde.exceeded', { jours, dispo: solde.disponible })}</div>
           )}

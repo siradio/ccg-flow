@@ -6,9 +6,8 @@ import Loading from '../../components/Loading';
 import Pagination from '../../components/Pagination.jsx';
 import ComptaSubnav, { ProcessingBadge } from './ComptaSubnav.jsx';
 import { StatusBadge } from '../PurchaseRequests/statusLabels.jsx';
+import { useAchatFormat } from '../PurchaseRequests/useAchatFormat';
 import { useI18n } from '../../i18n/I18nContext';
-
-const money = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 4 }));
 
 // Colonnes optionnelles du tableau (N° BDC et l'action restent toujours visibles). L'ordre ici est
 // l'ordre d'affichage. Le choix est mémorisé par navigateur (localStorage).
@@ -22,6 +21,8 @@ const loadHiddenCols = () => {
 export default function AchatsQueue() {
   const { user } = useAuth();
   const { t, lang } = useI18n();
+  const { money: fmtMoney } = useAchatFormat();
+  const money = (n) => (n == null || n === '' ? '—' : fmtMoney(n));
   const canProcess = hasSubModuleLevel(user, 'comptabilite.achats', 'edition');
   const [data, setData] = useState(null);
   const [stats, setStats] = useState(null);
