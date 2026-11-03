@@ -720,6 +720,7 @@ export const translations = {
     // ── Achats : liste des demandes ──
     'pr.newBtn': '+ Nouvelle demande',
     'pr.export.btn': 'Exporter (Excel)',
+    'pr.reportBtn': 'Rapport des achats',
     'pr.export.from': 'Du',
     'pr.export.to': 'Au',
     'pr.export.download': 'Télécharger',
@@ -793,6 +794,7 @@ export const translations = {
     'prd.attachments': 'Pièces jointes',
     'prd.kb': 'Ko',
     'prd.lines': 'Lignes',
+    'prd.editDeselectWarn': 'Un devis est déjà retenu : modifier une ligne annulera la sélection du devis (prix et montant final effacés) et ramènera la demande en « Devis en cours ».',
     'prd.designation': 'Désignation',
     'prd.quantity': 'Quantité',
     'prd.unit': 'Unité',
@@ -3063,6 +3065,7 @@ export const translations = {
     // ── Purchasing: request list ──
     'pr.newBtn': '+ New request',
     'pr.export.btn': 'Export (Excel)',
+    'pr.reportBtn': 'Purchase report',
     'pr.export.from': 'From',
     'pr.export.to': 'To',
     'pr.export.download': 'Download',
@@ -3136,6 +3139,7 @@ export const translations = {
     'prd.attachments': 'Attachments',
     'prd.kb': 'KB',
     'prd.lines': 'Line items',
+    'prd.editDeselectWarn': 'A quote is already selected: editing a line will cancel the quote selection (price and final amount cleared) and return the request to “Quotes in progress”.',
     'prd.designation': 'Designation',
     'prd.quantity': 'Quantity',
     'prd.unit': 'Unit',

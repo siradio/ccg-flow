@@ -87,10 +87,43 @@ function assertOwnerAndStatus(pr, user, expectedStatus) {
   }
 }
 
+// Statuts de la phase achat où le SERVICE ACHAT peut encore corriger les lignes d'une DA (ex. demande
+// renvoyée pour complément, article/quantité à ajuster) — tant que le circuit de validation aval n'a
+// pas démarré. 'devis_selectionne' est inclus : l'édition y annule la sélection (voir ensureEditable).
+const ACHAT_EDIT_STATUSES = ['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'];
+
+// Annule la sélection d'un devis pour rouvrir l'édition des lignes (bug « modifier une DA avec un
+// fournisseur déjà sélectionné ») : efface fournisseur retenu + prix/montant final, retire les
+// validations en attente et repasse la demande en 'devis_en_cours'. Idempotent par le statut.
+async function deselectForEdit(prId, user) {
+  await repo.unselectAllQuotes(prId);
+  await repo.clearLinesSelection(prId);
+  await repo.clearMontantFinal(prId);
+  await repo.deletePendingApprovals(prId);
+  await repo.updateStatusAndStep(prId, 'devis_en_cours', null);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'devis_deselectionne_edition', userId: user.id });
+}
+
+// Qui peut modifier les lignes d'une DA, et dans quels statuts :
+//  - le DEMANDEUR (auteur), uniquement en 'brouillon' (saisie initiale) ;
+//  - le SERVICE ACHAT, pendant la phase achat (ACHAT_EDIT_STATUSES). Si un devis est déjà retenu
+//    ('devis_selectionne'), l'édition le dé-sélectionne d'abord (prix/montant effacés) pour ne jamais
+//    désynchroniser la DA et un devis validé.
+async function ensureCanEditLines(pr, user) {
+  const isOwner = pr.requester_user_id === user.id || hasRoleOnEntity(user, 'super_admin', null);
+  if (isOwner && pr.status === 'brouillon') return;
+  if (hasRoleOnEntity(user, 'service_achat', pr.entity_id) && ACHAT_EDIT_STATUSES.includes(pr.status)) {
+    if (pr.status === 'devis_selectionne') await deselectForEdit(pr.id, user);
+    return;
+  }
+  if (pr.requester_user_id === user.id) throw httpError(400, `La demande n'est plus modifiable (statut "${pr.status}").`);
+  throw httpError(403, "Vous n'êtes pas autorisé à modifier cette demande à ce stade.");
+}
+
 async function addLine(user, prId, data) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  assertOwnerAndStatus(pr, user, 'brouillon');
+  await ensureCanEditLines(pr, user);
   if (!data.quantite) throw httpError(400, 'quantite requise.');
   const line = await repo.addLine(prId, data);
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: line.id, purchaseRequestId: prId, action: 'add_line', userId: user.id, details: data });
@@ -100,7 +133,7 @@ async function addLine(user, prId, data) {
 async function updateLine(user, prId, lineId, data) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  assertOwnerAndStatus(pr, user, 'brouillon');
+  await ensureCanEditLines(pr, user);
   const line = await repo.updateLine(lineId, data);
   if (!line) throw httpError(404, 'Ligne introuvable.');
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: lineId, purchaseRequestId: prId, action: 'update_line', userId: user.id, details: data });
@@ -110,7 +143,7 @@ async function updateLine(user, prId, lineId, data) {
 async function deleteLine(user, prId, lineId) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  assertOwnerAndStatus(pr, user, 'brouillon');
+  await ensureCanEditLines(pr, user);
   await repo.deleteLine(lineId);
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: lineId, purchaseRequestId: prId, action: 'delete_line', userId: user.id });
 }

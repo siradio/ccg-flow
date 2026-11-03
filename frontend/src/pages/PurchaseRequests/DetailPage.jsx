@@ -102,6 +102,10 @@ export default function DetailPage() {
   // le BC n'est pas généré (statuts devis_selectionne / en_validation).
   const canEditDevise = hasRoleOnEntity(user, 'service_achat', pr.entity_id) && ['devis_selectionne', 'en_validation'].includes(pr.status);
   const isRequester = pr.requester_user_id === user.id;
+  // Édition des lignes : le demandeur en brouillon, OU le service achat pendant la phase achat
+  // (y compris devis_selectionne — l'édition y annule alors la sélection du devis, côté serveur).
+  const canEditLines = (pr.status === 'brouillon' && isRequester)
+    || (['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'].includes(pr.status) && hasRoleOnEntity(user, 'service_achat', pr.entity_id));
 
   return (
     <div>
@@ -169,7 +173,7 @@ export default function DetailPage() {
         </section>
       )}
 
-      <LinesSection pr={pr} products={products} isRequester={isRequester} guarded={guarded} />
+      <LinesSection pr={pr} products={products} isRequester={isRequester} canEditLines={canEditLines} guarded={guarded} />
 
       {pr.status === 'brouillon' && isRequester && (
         <section className="card">
@@ -212,12 +216,15 @@ export default function DetailPage() {
   );
 }
 
-function LinesSection({ pr, products, isRequester, guarded }) {
+function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
   const { t } = useI18n();
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
-  const editable = pr.status === 'brouillon' && isRequester;
+  // Compat : canEditLines est calculé par le parent ; repli sur l'ancienne règle si non fourni.
+  const editable = canEditLines != null ? canEditLines : (pr.status === 'brouillon' && isRequester);
+  // Avertissement : éditer une DA dont le devis est déjà retenu annulera la sélection (règle serveur).
+  const warnDeselect = editable && pr.status === 'devis_selectionne';
   const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
   const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 });
 
@@ -251,6 +258,11 @@ function LinesSection({ pr, products, isRequester, guarded }) {
   return (
     <section className="card">
       <h2>{t('prd.lines')}</h2>
+      {warnDeselect && (
+        <div className="alert" style={{ marginBottom: 10, background: 'var(--status-amber-bg)', color: 'var(--status-amber-fg)', fontSize: 13 }}>
+          {t('prd.editDeselectWarn')}
+        </div>
+      )}
       <div className="table-wrap" style={{ marginBottom: editable ? 12 : 0 }}>
         <table>
           <thead><tr>
