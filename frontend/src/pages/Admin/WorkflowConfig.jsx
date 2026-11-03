@@ -24,6 +24,8 @@ export default function WorkflowConfig() {
   const [overId, setOverId] = useState(null);
   const [minSuppliers, setMinSuppliers] = useState('');
   const [minSuppliersSaved, setMinSuppliersSaved] = useState(false);
+  const [decimals, setDecimals] = useState('');
+  const [decimalsSaved, setDecimalsSaved] = useState(false);
   const nextTempId = useRef(-1);
 
   const entry = catalog.find(c => c.module_code === moduleCode) || null;
@@ -45,7 +47,10 @@ export default function WorkflowConfig() {
     setError(''); setSavedMessage('');
     client.get(`/workflows/${moduleCode}`).then(res => { setTemplate(res.data); setSteps(res.data.steps); });
     if (moduleCode === 'demande_achat') {
-      client.get('/settings').then(res => setMinSuppliers(res.data.min_suppliers_devis ?? '2')).catch(() => {});
+      client.get('/settings').then(res => {
+        setMinSuppliers(res.data.min_suppliers_devis ?? '2');
+        setDecimals(res.data.achats_decimales ?? '4');
+      }).catch(() => {});
     }
   }, [moduleCode]);
 
@@ -53,6 +58,15 @@ export default function WorkflowConfig() {
     setMinSuppliersSaved(false);
     await client.put('/settings/min_suppliers_devis', { value: minSuppliers });
     setMinSuppliersSaved(true);
+  }
+
+  async function saveDecimals() {
+    setDecimalsSaved(false);
+    // Borné 0→8 (capacité de la base, cf. migration 105) avant enregistrement.
+    const n = Math.min(8, Math.max(0, Math.round(Number(decimals) || 0)));
+    setDecimals(String(n));
+    await client.put('/settings/achats_decimales', { value: String(n) });
+    setDecimalsSaved(true);
   }
 
   function updateStep(id, field, value) {
@@ -157,6 +171,16 @@ export default function WorkflowConfig() {
           <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={saveMinSuppliers} className="btn btn-primary btn-sm">{t('common.save')}</button>
             {minSuppliersSaved && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
+          </div>
+
+          <label className="field" style={{ marginTop: 16 }}>
+            {t('adm.wf.decimalsLabel')}
+            <input type="number" min="0" max="8" step="1" value={decimals} onChange={e => { setDecimals(e.target.value); setDecimalsSaved(false); }} style={{ width: 100 }} />
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{t('adm.wf.decimalsHint')}</span>
+          </label>
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={saveDecimals} className="btn btn-primary btn-sm">{t('common.save')}</button>
+            {decimalsSaved && <span style={{ color: 'var(--color-success-fg)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
           </div>
         </section>
       )}

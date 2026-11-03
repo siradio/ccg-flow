@@ -253,6 +253,7 @@ async function sendQuoteRequest(user, prId, quoteRequestId, cc) {
     try {
       const buffer = await pdf.generateQuoteRequestPdf({
         purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom, logoBuffer: logo,
+        decimals: await settings.getIntValue('achats_decimales', 4),
       });
       await mailer.sendMail({
         to: s.supplier_email,
@@ -301,6 +302,7 @@ async function sendQuoteRequestToSupplier(user, prId, qrsId, emailOverride, cc) 
   const { logo } = await branding.getEntityImages(pr.entity_id);
   const buffer = await pdf.generateQuoteRequestPdf({
     purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: s.supplier_nom, logoBuffer: logo,
+    decimals: await settings.getIntValue('achats_decimales', 4),
   });
   try {
     await mailer.sendMail({
@@ -334,7 +336,7 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   if (!supplier) throw httpError(404, 'Fournisseur sollicité introuvable.');
   const lines = await repo.getLines(prId);
   const { logo } = await branding.getEntityImages(pr.entity_id);
-  return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo });
+  return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo, decimals: await settings.getIntValue('achats_decimales', 4) });
 }
 
 async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes, lignes }, file) {

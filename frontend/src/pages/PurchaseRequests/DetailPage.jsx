@@ -9,6 +9,7 @@ import { FieldInput, emptyForm } from '../Referentials/ReferentialPage.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 import { useConfirm } from '../../components/ConfirmProvider.jsx';
 import { CURRENCIES } from '../../config/currencies';
+import { useAchatFormat } from './useAchatFormat';
 
 // Les téléchargements passent par l'API JWT : un <a href> direct n'enverrait pas le header
 // d'autorisation, d'où un fetch authentifié suivi de l'ouverture d'une blob URL.
@@ -226,7 +227,7 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
   // Avertissement : éditer une DA dont le devis est déjà retenu annulera la sélection (règle serveur).
   const warnDeselect = editable && pr.status === 'devis_selectionne';
   const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
-  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 });
+  const { money, step } = useAchatFormat();
 
   async function addLine(e) {
     e.preventDefault();
@@ -283,7 +284,7 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
                       onChange={e => setEditForm({ ...editForm, descriptionLibre: e.target.value })} style={{ display: 'block', marginTop: 4, minWidth: 180 }} />
                   )}
                 </td>
-                <td><input type="number" value={editForm.quantite} onChange={e => setEditForm({ ...editForm, quantite: e.target.value })} style={{ width: 80 }} /></td>
+                <td><input type="number" min="0" step={step} value={editForm.quantite} onChange={e => setEditForm({ ...editForm, quantite: e.target.value })} style={{ width: 80 }} /></td>
                 <td><input value={editForm.unite} onChange={e => setEditForm({ ...editForm, unite: e.target.value })} style={{ width: 80 }} /></td>
                 {showPrices && <><td /><td /></>}
                 <td>{l.fournisseur_retenu_id ? '✓' : '—'}</td>
@@ -327,7 +328,7 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
             <input placeholder={t('prd.description')} value={form.descriptionLibre}
               onChange={e => setForm({ ...form, descriptionLibre: e.target.value })} />
           )}
-          <input placeholder={t('prd.quantity')} type="number" required value={form.quantite}
+          <input placeholder={t('prd.quantity')} type="number" min="0" step={step} required value={form.quantite}
             onChange={e => setForm({ ...form, quantite: e.target.value })} style={{ width: 100 }} />
           <input placeholder={t('prd.unit')} value={form.unite} onChange={e => setForm({ ...form, unite: e.target.value })} style={{ width: 100 }} />
           <button type="submit" className="btn btn-primary">{t('common.add')}</button>
@@ -565,6 +566,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
   const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {} };
   const [form, setForm] = useState(emptyQuoteForm);
+  const { money, step } = useAchatFormat();
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
@@ -593,7 +595,6 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
       .then(ok => { if (ok) setForm(emptyQuoteForm); });
   }
-  const money = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 4 });
 
   return (
     <section className="card">
@@ -654,7 +655,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                       <td>{l.designation || l.description_libre}</td>
                       <td className="num">{l.quantite} {l.unite || ''}</td>
                       <td className="num">
-                        <input type="number" min="0" step="0.0001" style={{ width: 130, textAlign: 'right' }}
+                        <input type="number" min="0" step={step} style={{ width: 130, textAlign: 'right' }}
                           value={form.prices[l.id] ?? ''} onChange={e => setForm(f => ({ ...f, prices: { ...f.prices, [l.id]: e.target.value } }))} />
                       </td>
                       <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{money((Number(form.prices[l.id]) || 0) * Number(l.quantite || 0))} {form.devise}</td>

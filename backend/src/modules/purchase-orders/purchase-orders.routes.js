@@ -7,6 +7,7 @@ const pdf = require('../../utils/pdf');
 const mailer = require('../../utils/mailer');
 const audit = require('../audit/audit.service');
 const branding = require('../referentials/entity-branding.service');
+const settings = require('../settings/settings.service');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -39,6 +40,7 @@ async function buildPoPdf(po) {
     logoBuffer: images.logo,
     signatureBuffer: images.signature,
     stampBuffer: images.stamp,
+    decimals: await settings.getIntValue('achats_decimales', 4),
   });
 }
 

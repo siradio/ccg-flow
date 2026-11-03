@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { useAuth, isSuperAdmin } from '../../auth/AuthContext';
 import WorkflowTimeline from '../../components/WorkflowTimeline';
 import { useI18n } from '../../i18n/I18nContext';
+import { useAchatFormat } from './useAchatFormat';
 
 // Statut fictif "rien n'a encore démarré" : sert uniquement à faire afficher WorkflowTimeline en
 // mode aperçu (toutes les étapes "à venir") avant même qu'une demande existe.
@@ -26,6 +27,7 @@ export default function CreatePage() {
   const [lines, setLines] = useState([emptyLine()]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false); // 'submit' | 'draft' | false
+  const { step } = useAchatFormat();
 
   const allowedEntityIds = useMemo(() => {
     if (isSuperAdmin(user)) return 'all';
@@ -175,7 +177,7 @@ export default function CreatePage() {
                   )}
                   <label className="field" style={{ flex: '1 1 90px', minWidth: 0 }}>
                     {t('prc.qty')}
-                    <input type="number" min="0" step="0.0001" value={l.quantite} onChange={e => setLine(l.key, { quantite: e.target.value })} />
+                    <input type="number" min="0" step={step} value={l.quantite} onChange={e => setLine(l.key, { quantite: e.target.value })} />
                   </label>
                   <label className="field" style={{ flex: '1 1 90px', minWidth: 0 }}>
                     {t('prc.unit')}
