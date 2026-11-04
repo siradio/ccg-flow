@@ -27,9 +27,11 @@ export default function LoginBackground() {
   const [busy, setBusy] = useState(false);
   const fileInputs = useRef({});
 
-  // Bandeau d'informations défilant (config globale). messages : un par ligne dans le textarea.
-  const [tk, setTk] = useState({ enabled: false, messages: '', speed: 'normal' });
+  // Apparence de la connexion. tk = bandeau (messages un par ligne, période du/au). variant = fond.
+  const [tk, setTk] = useState({ enabled: false, messages: '', speed: 'normal', from: '', to: '' });
   const [tkSaved, setTkSaved] = useState(false);
+  const [variant, setVariant] = useState('combine');
+  const [variantSaved, setVariantSaved] = useState(false);
 
   function load() {
     client.get('/login-backgrounds')
@@ -39,16 +41,28 @@ export default function LoginBackground() {
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     client.get('/login-backgrounds/ticker')
-      .then(res => setTk({ enabled: !!res.data.enabled, messages: (res.data.messages || []).join('\n'), speed: res.data.speed || 'normal' }))
+      .then(res => applyAppearance(res.data))
       .catch(() => {});
   }, []);
+
+  function applyAppearance(d) {
+    setTk({ enabled: !!d.enabled, messages: (d.messages || []).join('\n'), speed: d.speed || 'normal', from: d.from || '', to: d.to || '' });
+    setVariant(d.variant || 'combine');
+  }
 
   async function saveTicker() {
     setTkSaved(false);
     const messages = tk.messages.split('\n').map(s => s.trim()).filter(Boolean);
-    const res = await client.put('/login-backgrounds/ticker', { enabled: tk.enabled, messages, speed: tk.speed });
-    setTk({ enabled: !!res.data.enabled, messages: (res.data.messages || []).join('\n'), speed: res.data.speed || 'normal' });
+    const res = await client.put('/login-backgrounds/ticker', { enabled: tk.enabled, messages, speed: tk.speed, from: tk.from, to: tk.to });
+    applyAppearance(res.data);
     setTkSaved(true);
+  }
+
+  async function saveVariant() {
+    setVariantSaved(false);
+    const res = await client.put('/login-backgrounds/ticker', { variant });
+    applyAppearance(res.data);
+    setVariantSaved(true);
   }
 
   async function add(e) {
@@ -124,9 +138,38 @@ export default function LoginBackground() {
             <option value="fast">{t('adm.loginBg.ticker.fast')}</option>
           </select>
         </label>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+          <label className="field" style={{ flex: '1 1 160px' }}>
+            {t('adm.loginBg.ticker.from')}
+            <input type="date" value={tk.from} onChange={e => { setTk(s => ({ ...s, from: e.target.value })); setTkSaved(false); }} />
+          </label>
+          <label className="field" style={{ flex: '1 1 160px' }}>
+            {t('adm.loginBg.ticker.to')}
+            <input type="date" value={tk.to} min={tk.from || undefined} onChange={e => { setTk(s => ({ ...s, to: e.target.value })); setTkSaved(false); }} />
+          </label>
+        </div>
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginTop: 4 }}>{t('adm.loginBg.ticker.periodHint')}</span>
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" className="btn btn-primary btn-sm" onClick={saveTicker}>{t('adm.loginBg.save')}</button>
           {tkSaved && <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
+        </div>
+      </section>
+
+      {/* Variante d'animation du fond de la page de connexion. */}
+      <section className="card" style={{ maxWidth: 680, marginBottom: 18 }}>
+        <h2 style={{ marginTop: 0 }}>{t('adm.loginBg.anim.title')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('adm.loginBg.anim.intro')}</p>
+        <label className="field" style={{ maxWidth: 260 }}>
+          {t('adm.loginBg.anim.variant')}
+          <select value={variant} onChange={e => { setVariant(e.target.value); setVariantSaved(false); }}>
+            <option value="reseau">{t('adm.loginBg.anim.reseau')}</option>
+            <option value="aurore">{t('adm.loginBg.anim.aurore')}</option>
+            <option value="combine">{t('adm.loginBg.anim.combine')}</option>
+          </select>
+        </label>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={saveVariant}>{t('adm.loginBg.save')}</button>
+          {variantSaved && <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
         </div>
       </section>
 

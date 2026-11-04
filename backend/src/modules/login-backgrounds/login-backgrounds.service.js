@@ -93,29 +93,54 @@ async function getImageBytes(id) {
   return { buffer, mime: row.image_mime || 'application/octet-stream' };
 }
 
-// ─── Bandeau d'informations défilant (ticker) ───────────────────────────────────────────────
-// Configuration GLOBALE (indépendante des habillages) stockée dans app_settings : activation,
-// messages (un par ligne) et vitesse de défilement. Exposée publiquement sur la page de connexion.
-const TICKER = { enabled: 'login_ticker_enabled', messages: 'login_ticker_messages', speed: 'login_ticker_speed' };
-const TICKER_SPEEDS = ['slow', 'normal', 'fast'];
+// ─── Apparence de la page de connexion (bandeau défilant + variante d'animation) ───────────────
+// Configuration GLOBALE (indépendante des habillages) stockée dans app_settings :
+//  - bandeau : activation, messages (un par ligne), vitesse, PÉRIODE d'affichage (du/au) ;
+//  - fond : variante d'animation (reseau | aurore | combine).
+// Exposée publiquement sur la page de connexion (vue publique : le bandeau n'est actif que dans
+// sa période d'affichage).
+const KEYS = {
+  enabled: 'login_ticker_enabled', messages: 'login_ticker_messages', speed: 'login_ticker_speed',
+  from: 'login_ticker_from', to: 'login_ticker_to', variant: 'login_anim_variant',
+};
+const SPEEDS = ['slow', 'normal', 'fast'];
+const VARIANTS = ['reseau', 'aurore', 'combine'];
 
-async function getTicker() {
-  const enabled = (await settings.getValue(TICKER.enabled, 'false')) === 'true';
-  const raw = (await settings.getValue(TICKER.messages, '')) || '';
+function cleanDate(v) { const s = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; }
+function todayIso() { const d = new Date(); const p = n => String(n).padStart(2, '0'); return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`; }
+function withinPeriod(from, to) { const t = todayIso(); if (from && t < from) return false; if (to && t > to) return false; return true; }
+
+// Config brute (écran d'admin) : tous les champs, dates comprises.
+async function getAppearance() {
+  const enabled = (await settings.getValue(KEYS.enabled, 'false')) === 'true';
+  const raw = (await settings.getValue(KEYS.messages, '')) || '';
   const messages = raw.split('\n').map(s => s.trim()).filter(Boolean);
-  let speed = (await settings.getValue(TICKER.speed, 'normal')) || 'normal';
-  if (!TICKER_SPEEDS.includes(speed)) speed = 'normal';
-  return { enabled, messages, speed };
+  let speed = (await settings.getValue(KEYS.speed, 'normal')) || 'normal';
+  if (!SPEEDS.includes(speed)) speed = 'normal';
+  const from = cleanDate(await settings.getValue(KEYS.from, ''));
+  const to = cleanDate(await settings.getValue(KEYS.to, ''));
+  let variant = (await settings.getValue(KEYS.variant, 'combine')) || 'combine';
+  if (!VARIANTS.includes(variant)) variant = 'combine';
+  return { enabled, messages, speed, from, to, variant };
 }
 
-async function setTicker({ enabled, messages, speed }) {
-  if (enabled !== undefined) await settings.setValue(TICKER.enabled, enabled ? 'true' : 'false');
-  if (messages !== undefined) {
-    const value = Array.isArray(messages) ? messages.join('\n') : String(messages || '');
-    await settings.setValue(TICKER.messages, value);
+// Vue PUBLIQUE (page de connexion) : le bandeau n'est "enabled" que dans sa période d'affichage.
+async function getPublicAppearance() {
+  const a = await getAppearance();
+  return { enabled: a.enabled && withinPeriod(a.from, a.to), messages: a.messages, speed: a.speed, variant: a.variant };
+}
+
+async function setAppearance(fields = {}) {
+  if (fields.enabled !== undefined) await settings.setValue(KEYS.enabled, fields.enabled ? 'true' : 'false');
+  if (fields.messages !== undefined) {
+    const value = Array.isArray(fields.messages) ? fields.messages.join('\n') : String(fields.messages || '');
+    await settings.setValue(KEYS.messages, value);
   }
-  if (speed !== undefined) await settings.setValue(TICKER.speed, TICKER_SPEEDS.includes(speed) ? speed : 'normal');
-  return getTicker();
+  if (fields.speed !== undefined) await settings.setValue(KEYS.speed, SPEEDS.includes(fields.speed) ? fields.speed : 'normal');
+  if (fields.from !== undefined) await settings.setValue(KEYS.from, cleanDate(fields.from));
+  if (fields.to !== undefined) await settings.setValue(KEYS.to, cleanDate(fields.to));
+  if (fields.variant !== undefined) await settings.setValue(KEYS.variant, VARIANTS.includes(fields.variant) ? fields.variant : 'combine');
+  return getAppearance();
 }
 
-module.exports = { list, get, create, update, setImage, remove, activate, getActive, getImageBytes, getTicker, setTicker };
+module.exports = { list, get, create, update, setImage, remove, activate, getActive, getImageBytes, getAppearance, getPublicAppearance, setAppearance };
