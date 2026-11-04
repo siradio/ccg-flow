@@ -1,5 +1,6 @@
 const { all, one, run, withTransaction } = require('../../db');
 const blob = require('../../storage/blob');
+const settings = require('../settings/settings.service');
 
 // Habillages de la page de connexion. Image stockée en Blob (clé) ou BYTEA (repli dev),
 // comme les autres médias. Un seul habillage actif à la fois (voir activate()).
@@ -92,4 +93,29 @@ async function getImageBytes(id) {
   return { buffer, mime: row.image_mime || 'application/octet-stream' };
 }
 
-module.exports = { list, get, create, update, setImage, remove, activate, getActive, getImageBytes };
+// ─── Bandeau d'informations défilant (ticker) ───────────────────────────────────────────────
+// Configuration GLOBALE (indépendante des habillages) stockée dans app_settings : activation,
+// messages (un par ligne) et vitesse de défilement. Exposée publiquement sur la page de connexion.
+const TICKER = { enabled: 'login_ticker_enabled', messages: 'login_ticker_messages', speed: 'login_ticker_speed' };
+const TICKER_SPEEDS = ['slow', 'normal', 'fast'];
+
+async function getTicker() {
+  const enabled = (await settings.getValue(TICKER.enabled, 'false')) === 'true';
+  const raw = (await settings.getValue(TICKER.messages, '')) || '';
+  const messages = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  let speed = (await settings.getValue(TICKER.speed, 'normal')) || 'normal';
+  if (!TICKER_SPEEDS.includes(speed)) speed = 'normal';
+  return { enabled, messages, speed };
+}
+
+async function setTicker({ enabled, messages, speed }) {
+  if (enabled !== undefined) await settings.setValue(TICKER.enabled, enabled ? 'true' : 'false');
+  if (messages !== undefined) {
+    const value = Array.isArray(messages) ? messages.join('\n') : String(messages || '');
+    await settings.setValue(TICKER.messages, value);
+  }
+  if (speed !== undefined) await settings.setValue(TICKER.speed, TICKER_SPEEDS.includes(speed) ? speed : 'normal');
+  return getTicker();
+}
+
+module.exports = { list, get, create, update, setImage, remove, activate, getActive, getImageBytes, getTicker, setTicker };

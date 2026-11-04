@@ -900,6 +900,45 @@ a.kpi-tile:hover {
 }
 .login-page--custom-bg .login-shell { position: relative; z-index: 2; }
 
+/* Fond animé par défaut : réseau de nœuds (canvas) + halos d'aurore (variante « combiné »). */
+.login-net { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
+.login-aurora { position: absolute; inset: -20%; z-index: 0; pointer-events: none; filter: blur(40px); }
+.login-aurora span { position: absolute; border-radius: 50%; mix-blend-mode: screen; opacity: 0.5; }
+.login-aurora span:nth-child(1) { width: 46vmax; height: 46vmax; left: -6vmax; top: -12vmax; background: radial-gradient(circle, rgba(37,99,235,0.9), transparent 62%); }
+.login-aurora span:nth-child(2) { width: 40vmax; height: 40vmax; right: -8vmax; top: 2vmax; background: radial-gradient(circle, rgba(23,162,160,0.8), transparent 62%); }
+.login-aurora span:nth-child(3) { width: 38vmax; height: 38vmax; left: 24vmax; bottom: -16vmax; background: radial-gradient(circle, rgba(142,68,173,0.7), transparent 62%); }
+@media (prefers-reduced-motion: no-preference) {
+  .login-aurora span:nth-child(1) { animation: loginDrift1 18s ease-in-out infinite; }
+  .login-aurora span:nth-child(2) { animation: loginDrift2 22s ease-in-out infinite; }
+  .login-aurora span:nth-child(3) { animation: loginDrift3 26s ease-in-out infinite; }
+}
+@keyframes loginDrift1 { 50% { transform: translate(8vmax, 6vmax) scale(1.1); } }
+@keyframes loginDrift2 { 50% { transform: translate(-7vmax, 5vmax) scale(1.08); } }
+@keyframes loginDrift3 { 50% { transform: translate(5vmax, -6vmax) scale(1.12); } }
+
+/* La carte et le panneau marque passent au-dessus du fond animé. */
+.login-page .login-shell { position: relative; z-index: 2; }
+.login-page--ticker { padding-bottom: 48px; }
+
+/* Bandeau d'informations défilant (piloté par le super_admin). */
+.login-ticker { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; align-items: stretch; height: 40px;
+  background: rgba(10, 18, 38, 0.72); border-top: 1px solid rgba(130, 160, 230, 0.25);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.login-ticker-tag { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 12px; font-weight: 800;
+  letter-spacing: 0.5px; color: #fff; background: linear-gradient(135deg, #2563eb, #1746b8); }
+.login-ticker-view { flex: 1; overflow: hidden; position: relative; }
+.login-ticker-track { position: absolute; top: 0; left: 0; height: 100%; display: flex; align-items: center; white-space: nowrap;
+  will-change: transform; animation: loginMarquee var(--login-marquee, 34s) linear infinite; }
+.login-ticker:hover .login-ticker-track { animation-play-state: paused; }
+.login-ticker--slow { --login-marquee: 52s; }
+.login-ticker--normal { --login-marquee: 34s; }
+.login-ticker--fast { --login-marquee: 20s; }
+.login-ticker-seq { display: inline-flex; align-items: center; }
+.login-ticker-item { display: inline-flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; color: #eaf0ff; padding: 0 6px 0 12px; }
+.login-ticker-sep { color: #7fa0ff; font-size: 9px; }
+@keyframes loginMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .login-ticker-track { animation: none; } }
+
 /* Message d'événement affiché en haut de la carte de connexion. */
 .login-event {
   margin: -4px 0 18px;

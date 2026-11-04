@@ -12,6 +12,12 @@ router.get('/login-background', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Bandeau d'informations défilant actif (public, sans auth). Renvoie toujours un objet ; côté
+// client, on n'affiche rien si enabled=false ou messages vide.
+router.get('/login-ticker', async (req, res, next) => {
+  try { res.json(await service.getTicker()); } catch (e) { next(e); }
+});
+
 router.get('/login-background/image', async (req, res, next) => {
   try {
     const active = await service.getActive();

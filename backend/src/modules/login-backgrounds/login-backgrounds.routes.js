@@ -12,6 +12,18 @@ router.use(requireAuth, requireSuperAdmin);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 6 * 1024 * 1024 } });
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
+// Bandeau d'informations défilant (config globale) — DÉCLARÉ AVANT les routes '/:id' pour que
+// « ticker » ne soit pas capturé comme un identifiant.
+router.get('/ticker', async (req, res, next) => {
+  try { res.json(await service.getTicker()); } catch (e) { next(e); }
+});
+router.put('/ticker', async (req, res, next) => {
+  try {
+    const { enabled, messages, speed } = req.body || {};
+    res.json(await service.setTicker({ enabled, messages, speed }));
+  } catch (e) { next(e); }
+});
+
 router.get('/', async (req, res, next) => {
   try { res.json(await service.list()); } catch (e) { next(e); }
 });
