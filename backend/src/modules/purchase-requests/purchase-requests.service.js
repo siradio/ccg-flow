@@ -36,6 +36,11 @@ async function getFullDetail(id) {
   for (const qr of quoteRequests) {
     qr.suppliers = await repo.getQuoteRequestSuppliers(qr.id);
   }
+  // Prix par ligne de chaque devis (pour l'affichage détaillé et l'édition des prix par le service achat).
+  for (const q of quotes) {
+    const ql = await repo.getQuoteLines(q.id);
+    q.lignes = ql.map(x => ({ lineId: x.purchase_request_line_id, prixUnitaire: Number(x.prix_unitaire) }));
+  }
   return { ...pr, lines, quote_requests: quoteRequests, quotes, approvals, purchase_order: purchaseOrder, attachments };
 }
 
@@ -87,43 +92,13 @@ function assertOwnerAndStatus(pr, user, expectedStatus) {
   }
 }
 
-// Statuts de la phase achat où le SERVICE ACHAT peut encore corriger les lignes d'une DA (ex. demande
-// renvoyée pour complément, article/quantité à ajuster) — tant que le circuit de validation aval n'a
-// pas démarré. 'devis_selectionne' est inclus : l'édition y annule la sélection (voir ensureEditable).
-const ACHAT_EDIT_STATUSES = ['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'];
-
-// Annule la sélection d'un devis pour rouvrir l'édition des lignes (bug « modifier une DA avec un
-// fournisseur déjà sélectionné ») : efface fournisseur retenu + prix/montant final, retire les
-// validations en attente et repasse la demande en 'devis_en_cours'. Idempotent par le statut.
-async function deselectForEdit(prId, user) {
-  await repo.unselectAllQuotes(prId);
-  await repo.clearLinesSelection(prId);
-  await repo.clearMontantFinal(prId);
-  await repo.deletePendingApprovals(prId);
-  await repo.updateStatusAndStep(prId, 'devis_en_cours', null);
-  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'devis_deselectionne_edition', userId: user.id });
-}
-
-// Qui peut modifier les lignes d'une DA, et dans quels statuts :
-//  - le DEMANDEUR (auteur), uniquement en 'brouillon' (saisie initiale) ;
-//  - le SERVICE ACHAT, pendant la phase achat (ACHAT_EDIT_STATUSES). Si un devis est déjà retenu
-//    ('devis_selectionne'), l'édition le dé-sélectionne d'abord (prix/montant effacés) pour ne jamais
-//    désynchroniser la DA et un devis validé.
-async function ensureCanEditLines(pr, user) {
-  const isOwner = pr.requester_user_id === user.id || hasRoleOnEntity(user, 'super_admin', null);
-  if (isOwner && pr.status === 'brouillon') return;
-  if (hasRoleOnEntity(user, 'service_achat', pr.entity_id) && ACHAT_EDIT_STATUSES.includes(pr.status)) {
-    if (pr.status === 'devis_selectionne') await deselectForEdit(pr.id, user);
-    return;
-  }
-  if (pr.requester_user_id === user.id) throw httpError(400, `La demande n'est plus modifiable (statut "${pr.status}").`);
-  throw httpError(403, "Vous n'êtes pas autorisé à modifier cette demande à ce stade.");
-}
-
+// NB : la modification d'une DA déjà engagée dans le circuit achat ne passe PAS par l'édition des
+// lignes. Pour revenir sur un devis déjà retenu, le service achat utilise « Rouvrir la consultation »
+// (reopenConsultation) qui ramène la demande en 'devis_en_cours' de façon tracée.
 async function addLine(user, prId, data) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  await ensureCanEditLines(pr, user);
+  assertOwnerAndStatus(pr, user, 'brouillon');
   if (!data.quantite) throw httpError(400, 'quantite requise.');
   const line = await repo.addLine(prId, data);
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: line.id, purchaseRequestId: prId, action: 'add_line', userId: user.id, details: data });
@@ -133,7 +108,7 @@ async function addLine(user, prId, data) {
 async function updateLine(user, prId, lineId, data) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  await ensureCanEditLines(pr, user);
+  assertOwnerAndStatus(pr, user, 'brouillon');
   const line = await repo.updateLine(lineId, data);
   if (!line) throw httpError(404, 'Ligne introuvable.');
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: lineId, purchaseRequestId: prId, action: 'update_line', userId: user.id, details: data });
@@ -143,7 +118,7 @@ async function updateLine(user, prId, lineId, data) {
 async function deleteLine(user, prId, lineId) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
-  await ensureCanEditLines(pr, user);
+  assertOwnerAndStatus(pr, user, 'brouillon');
   await repo.deleteLine(lineId);
   await audit.logAction({ tableName: 'purchase_request_lines', recordId: lineId, purchaseRequestId: prId, action: 'delete_line', userId: user.id });
 }
@@ -343,7 +318,10 @@ async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, n
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
-  if (pr.status !== 'devis_en_cours') throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
+  // Saisie possible pendant la phase devis, y compris quand un devis est déjà retenu
+  // ('devis_selectionne') : permet d'ajouter/comparer un autre fournisseur puis de re-sélectionner,
+  // sans « rouvrir la consultation ». Au-delà (validation aval, BC), la réouverture reste requise.
+  if (!['devis_en_cours', 'devis_selectionne'].includes(pr.status)) throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
 
   // Nouveau modèle : prix unitaire par ligne → montant = somme(quantité × prix). Repli sur le
   // montant global (ancien client) si aucune ligne n'est fournie.
@@ -405,6 +383,42 @@ async function selectQuote(user, prId, quoteId) {
     return q;
   });
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
+  return getFullDetail(prId);
+}
+
+// Édition des prix d'un devis déjà saisi par le service achat (ex. corriger la précision décimale).
+// Possible pendant la phase devis (devis_en_cours / devis_selectionne). Si le devis édité est le devis
+// RETENU, les nouveaux prix sont répercutés sur les lignes de la DA (prix_unitaire_final + montant final).
+async function updateQuote(user, prId, quoteId, { devise, lignes }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'modifier un devis');
+  if (!['devis_en_cours', 'devis_selectionne'].includes(pr.status)) {
+    throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
+  }
+  const quotes = await repo.getQuotesForPR(prId);
+  const quote = quotes.find(q => q.id === Number(quoteId));
+  if (!quote) throw httpError(404, 'Devis introuvable.');
+
+  const prLines = await repo.getLines(prId);
+  const byId = new Map(prLines.map(l => [l.id, l]));
+  const lignesRows = (Array.isArray(lignes) ? lignes : [])
+    .filter(x => byId.has(Number(x.lineId)))
+    .map(x => ({ lineId: Number(x.lineId), prixUnitaire: Number(x.prixUnitaire) || 0 }));
+  const total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
+  if (!total) throw httpError(400, 'Saisissez au moins un prix de ligne.');
+  const newDevise = devise || quote.devise;
+
+  await withTransaction(async (tx) => {
+    await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
+    await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
+    if (quote.selectionne) {                                       // devis retenu : répercuter sur la DA
+      const ql = await repo.getQuoteLines(quoteId, tx);
+      await repo.applyQuoteLinesToPrLines(prId, ql, tx);
+      await repo.setMontantFinal(prId, total, newDevise, tx);
+    }
+  });
+  await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: total, devise: newDevise } });
   return getFullDetail(prId);
 }
 
@@ -771,7 +785,7 @@ async function exportRows(user, { from, to }) {
 
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
-  quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
+  quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, updateQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
   validateStep, rejectStep, requestChanges, listForUser, exportRows, markReception,
 };

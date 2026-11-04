@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import client from '../../api/client';
 import { useAuth, hasRoleOnEntity } from '../../auth/AuthContext';
@@ -103,10 +103,9 @@ export default function DetailPage() {
   // le BC n'est pas généré (statuts devis_selectionne / en_validation).
   const canEditDevise = hasRoleOnEntity(user, 'service_achat', pr.entity_id) && ['devis_selectionne', 'en_validation'].includes(pr.status);
   const isRequester = pr.requester_user_id === user.id;
-  // Édition des lignes : le demandeur en brouillon, OU le service achat pendant la phase achat
-  // (y compris devis_selectionne — l'édition y annule alors la sélection du devis, côté serveur).
-  const canEditLines = (pr.status === 'brouillon' && isRequester)
-    || (['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'].includes(pr.status) && hasRoleOnEntity(user, 'service_achat', pr.entity_id));
+  // Édition des lignes : réservée au demandeur (auteur) tant que la demande est en brouillon.
+  // Pour revenir sur un devis déjà retenu, le service achat utilise « Rouvrir la consultation ».
+  const canEditLines = pr.status === 'brouillon' && isRequester;
 
   return (
     <div>
@@ -222,10 +221,8 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
   const [form, setForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ productId: '', descriptionLibre: '', quantite: '', unite: '' });
-  // Compat : canEditLines est calculé par le parent ; repli sur l'ancienne règle si non fourni.
+  // Compat : canEditLines est calculé par le parent ; repli sur la règle brouillon si non fourni.
   const editable = canEditLines != null ? canEditLines : (pr.status === 'brouillon' && isRequester);
-  // Avertissement : éditer une DA dont le devis est déjà retenu annulera la sélection (règle serveur).
-  const warnDeselect = editable && pr.status === 'devis_selectionne';
   const showPrices = (pr.lines || []).some(l => l.prix_unitaire_final != null);
   const { money, step } = useAchatFormat();
 
@@ -259,11 +256,6 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
   return (
     <section className="card">
       <h2>{t('prd.lines')}</h2>
-      {warnDeselect && (
-        <div className="alert" style={{ marginBottom: 10, background: 'var(--status-amber-bg)', color: 'var(--status-amber-fg)', fontSize: 13 }}>
-          {t('prd.editDeselectWarn')}
-        </div>
-      )}
       <div className="table-wrap" style={{ marginBottom: editable ? 12 : 0 }}>
         <table>
           <thead><tr>
@@ -567,10 +559,19 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
   const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {} };
   const [form, setForm] = useState(emptyQuoteForm);
   const { money, step } = useAchatFormat();
+  // Édition des prix d'un devis déjà saisi (service achat, phase devis).
+  const [editId, setEditId] = useState(null);
+  const [editDevise, setEditDevise] = useState('');
+  const [editPrices, setEditPrices] = useState({});
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
-  const canAddQuote = canAct && pr.status === 'devis_en_cours';
+  // Saisir un devis reste possible même après qu'un devis est retenu ('devis_selectionne') : le
+  // service achat peut ainsi ajouter/comparer un autre fournisseur et re-sélectionner, sans avoir à
+  // « rouvrir la consultation » (tant que la demande n'est pas partie en validation aval).
+  const canAddQuote = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
+  // Modifier les prix d'un devis existant : même fenêtre (phase devis) que l'ajout/la sélection.
+  const canEditQuote = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
   const canSelect = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
   const lines = pr.lines || [];
 
@@ -581,6 +582,20 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
   const deviseOptions = (chosenSupplier?.devises?.length ? chosenSupplier.devises : CURRENCIES.map(c => c.code));
 
   const quoteTotal = lines.reduce((s, l) => s + (Number(form.prices[l.id]) || 0) * Number(l.quantite || 0), 0);
+  const editTotal = lines.reduce((s, l) => s + (Number(editPrices[l.id]) || 0) * Number(l.quantite || 0), 0);
+
+  function startEditQuote(q) {
+    setEditId(q.id);
+    setEditDevise(q.devise || pr.devise || 'GNF');
+    const m = {};
+    (q.lignes || []).forEach(l => { m[l.lineId] = String(l.prixUnitaire ?? ''); });
+    setEditPrices(m);
+  }
+  function saveEditQuote() {
+    const lignes = lines.map(l => ({ lineId: l.id, prixUnitaire: Number(editPrices[l.id]) || 0 }));
+    guarded(() => client.put(`/purchase-requests/${pr.id}/quotes/${editId}`, { devise: editDevise, lignes }), t('prd.quoteUpdatedToast'))
+      .then(ok => { if (ok) setEditId(null); });
+  }
 
   if (pr.quotes.length === 0 && withoutQuote.length === 0) return null;
 
@@ -601,12 +616,13 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
       <h2>{t('prd.quotesReceived')}</h2>
       <div className="table-wrap" style={{ marginBottom: 12 }}>
         <table>
-          <thead><tr><th>{t('prd.supplier')}</th><th>{t('prd.amount')}</th><th>{t('prd.currency')}</th><th>{t('prd.quotePdf')}</th><th>{t('prd.selected')}</th>{canSelect && <th />}</tr></thead>
+          <thead><tr><th>{t('prd.supplier')}</th><th className="num">{t('prd.amount')}</th><th>{t('prd.currency')}</th><th>{t('prd.quotePdf')}</th><th>{t('prd.selected')}</th>{(canSelect || canEditQuote) && <th />}</tr></thead>
           <tbody>
             {pr.quotes.map(q => (
-              <tr key={q.id}>
+              <Fragment key={q.id}>
+              <tr>
                 <td>{q.supplier_nom}</td>
-                <td>{q.montant}</td>
+                <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(q.montant)}</td>
                 <td>{q.devise}</td>
                 <td>
                   {q.attachment_id ? (
@@ -616,13 +632,55 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                   ) : '—'}
                 </td>
                 <td>{q.selectionne ? '✓' : ''}</td>
-                {canSelect && !q.selectionne && (
-                  <td><button className="btn btn-primary btn-sm"
-                    onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), t('prd.quoteSelectedToast'))}>
-                    {t('prd.selectBtn')}
-                  </button></td>
+                {(canSelect || canEditQuote) && (
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {canSelect && !q.selectionne && (
+                      <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }}
+                        onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), t('prd.quoteSelectedToast'))}>
+                        {t('prd.selectBtn')}
+                      </button>
+                    )}
+                    {canEditQuote && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => (editId === q.id ? setEditId(null) : startEditQuote(q))}>
+                        {editId === q.id ? t('common.cancel') : t('common.edit')}
+                      </button>
+                    )}
+                  </td>
                 )}
               </tr>
+              {editId === q.id && (
+                <tr>
+                  <td colSpan={5 + ((canSelect || canEditQuote) ? 1 : 0)} style={{ background: 'var(--color-bg)' }}>
+                    <div style={{ padding: '6px 2px' }}>
+                      <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>{t('prd.editQuoteHint')}</div>
+                      <div className="table-wrap">
+                        <table>
+                          <thead><tr><th>{t('prd.designation')}</th><th className="num">{t('prd.quantity')}</th><th className="num">{t('prd.unitPrice')}</th><th className="num">{t('prd.lineTotal')}</th></tr></thead>
+                          <tbody>
+                            {lines.map(l => (
+                              <tr key={l.id}>
+                                <td>{l.designation || l.description_libre}</td>
+                                <td className="num">{l.quantite} {l.unite || ''}</td>
+                                <td className="num">
+                                  <input type="number" min="0" step={step} style={{ width: 140, textAlign: 'right' }}
+                                    value={editPrices[l.id] ?? ''} onChange={e => setEditPrices(p => ({ ...p, [l.id]: e.target.value }))} />
+                                </td>
+                                <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{money((Number(editPrices[l.id]) || 0) * Number(l.quantite || 0))} {editDevise}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.quoteTotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(editTotal)} {editDevise}</td></tr></tfoot>
+                        </table>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button className="btn btn-primary btn-sm" disabled={editTotal <= 0} onClick={saveEditQuote}>{t('common.save')}</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setEditId(null)}>{t('common.cancel')}</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>
