@@ -36,6 +36,11 @@ async function getFullDetail(id) {
   for (const qr of quoteRequests) {
     qr.suppliers = await repo.getQuoteRequestSuppliers(qr.id);
   }
+  // Prix par ligne de chaque devis (pour l'affichage détaillé et l'édition des prix par le service achat).
+  for (const q of quotes) {
+    const ql = await repo.getQuoteLines(q.id);
+    q.lignes = ql.map(x => ({ lineId: x.purchase_request_line_id, prixUnitaire: Number(x.prix_unitaire) }));
+  }
   return { ...pr, lines, quote_requests: quoteRequests, quotes, approvals, purchase_order: purchaseOrder, attachments };
 }
 
@@ -378,6 +383,42 @@ async function selectQuote(user, prId, quoteId) {
     return q;
   });
   await audit.logAction({ tableName: 'quotes', recordId: quoteId, purchaseRequestId: prId, action: 'quote_selected', userId: user.id, details: { supplier: quote.supplier_nom, montant: quote.montant } });
+  return getFullDetail(prId);
+}
+
+// Édition des prix d'un devis déjà saisi par le service achat (ex. corriger la précision décimale).
+// Possible pendant la phase devis (devis_en_cours / devis_selectionne). Si le devis édité est le devis
+// RETENU, les nouveaux prix sont répercutés sur les lignes de la DA (prix_unitaire_final + montant final).
+async function updateQuote(user, prId, quoteId, { devise, lignes }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  await assertRole(user, 'service_achat', pr.entity_id, 'modifier un devis');
+  if (!['devis_en_cours', 'devis_selectionne'].includes(pr.status)) {
+    throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
+  }
+  const quotes = await repo.getQuotesForPR(prId);
+  const quote = quotes.find(q => q.id === Number(quoteId));
+  if (!quote) throw httpError(404, 'Devis introuvable.');
+
+  const prLines = await repo.getLines(prId);
+  const byId = new Map(prLines.map(l => [l.id, l]));
+  const lignesRows = (Array.isArray(lignes) ? lignes : [])
+    .filter(x => byId.has(Number(x.lineId)))
+    .map(x => ({ lineId: Number(x.lineId), prixUnitaire: Number(x.prixUnitaire) || 0 }));
+  const total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
+  if (!total) throw httpError(400, 'Saisissez au moins un prix de ligne.');
+  const newDevise = devise || quote.devise;
+
+  await withTransaction(async (tx) => {
+    await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
+    await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
+    if (quote.selectionne) {                                       // devis retenu : répercuter sur la DA
+      const ql = await repo.getQuoteLines(quoteId, tx);
+      await repo.applyQuoteLinesToPrLines(prId, ql, tx);
+      await repo.setMontantFinal(prId, total, newDevise, tx);
+    }
+  });
+  await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: total, devise: newDevise } });
   return getFullDetail(prId);
 }
 
@@ -744,7 +785,7 @@ async function exportRows(user, { from, to }) {
 
 module.exports = {
   getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
-  quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, selectQuote,
+  quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, updateQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
   validateStep, rejectStep, requestChanges, listForUser, exportRows, markReception,
 };

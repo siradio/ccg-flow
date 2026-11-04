@@ -298,14 +298,19 @@ async function createQuote(quoteRequestSupplierId, montant, devise, notes) {
 }
 
 // Prix par ligne d'un devis (nouveau modèle : un prix unitaire par article de la demande).
-async function createQuoteLines(quoteId, rows) {
+async function createQuoteLines(quoteId, rows, x = DB) {
   for (const r of rows) {
-    await run(
+    await x.run(
       `INSERT INTO quote_lines (quote_id, purchase_request_line_id, prix_unitaire) VALUES ($1,$2,$3)
        ON CONFLICT (quote_id, purchase_request_line_id) DO UPDATE SET prix_unitaire = EXCLUDED.prix_unitaire`,
       [quoteId, r.lineId, r.prixUnitaire]
     );
   }
+}
+
+// Met à jour le montant et la devise d'un devis (après édition des prix par le service achat).
+async function updateQuoteAmount(quoteId, montant, devise, x = DB) {
+  return x.one('UPDATE quotes SET montant = $2, devise = $3 WHERE id = $1 RETURNING *', [quoteId, montant, devise]);
 }
 
 async function getQuoteLines(quoteId, x = DB) {
@@ -442,7 +447,7 @@ module.exports = {
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,
   createQuote, getQuote, getQuotesForPR, selectQuote, getAttachments,
-  createQuoteLines, getQuoteLines, applyQuoteLinesToPrLines,
+  createQuoteLines, updateQuoteAmount, getQuoteLines, applyQuoteLinesToPrLines,
   createApproval, getPendingApproval, decideApproval, getApprovalsForPR,
   unselectAllQuotes, clearLinesSelection, clearMontantFinal, deletePendingApprovals,
 };
