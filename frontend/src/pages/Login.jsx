@@ -190,9 +190,10 @@ export default function Login() {
   function updateReq(field, value) { setReq(r => ({ ...r, [field]: value })); }
 
   const showTicker = !!(ticker && ticker.enabled && ticker.messages && ticker.messages.length > 0);
+  const animVariant = (ticker && ticker.variant) || 'combine';
 
   return (
-    <div className={`login-page${hasCustomBg ? ' login-page--custom-bg' : ''}${showTicker ? ' login-page--ticker' : ''}`}>
+    <div className={`login-page login-page--anim-${animVariant}${hasCustomBg ? ' login-page--custom-bg' : ''}${showTicker ? ' login-page--ticker' : ''}`}>
       {/* Habillage événementiel (super_admin) : image d'arrière-plan + voile de lisibilité. */}
       {hasCustomBg && (
         <>

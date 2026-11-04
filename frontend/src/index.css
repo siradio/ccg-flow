@@ -916,6 +916,10 @@ a.kpi-tile:hover {
 @keyframes loginDrift2 { 50% { transform: translate(-7vmax, 5vmax) scale(1.08); } }
 @keyframes loginDrift3 { 50% { transform: translate(5vmax, -6vmax) scale(1.12); } }
 
+/* Variante d'animation pilotée par l'admin : reseau (nœuds seuls), aurore (halos seuls), combine (les deux). */
+.login-page--anim-reseau .login-aurora { display: none; }
+.login-page--anim-aurore .login-net { opacity: 0.35; }
+
 /* La carte et le panneau marque passent au-dessus du fond animé. */
 .login-page .login-shell { position: relative; z-index: 2; }
 .login-page--ticker { padding-bottom: 48px; }

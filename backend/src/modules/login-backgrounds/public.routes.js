@@ -12,10 +12,10 @@ router.get('/login-background', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Bandeau d'informations défilant actif (public, sans auth). Renvoie toujours un objet ; côté
-// client, on n'affiche rien si enabled=false ou messages vide.
+// Apparence publique de la page de connexion : bandeau (actif uniquement dans sa période) +
+// variante d'animation. Côté client, on n'affiche le bandeau que si enabled=true et messages non vide.
 router.get('/login-ticker', async (req, res, next) => {
-  try { res.json(await service.getTicker()); } catch (e) { next(e); }
+  try { res.json(await service.getPublicAppearance()); } catch (e) { next(e); }
 });
 
 router.get('/login-background/image', async (req, res, next) => {
