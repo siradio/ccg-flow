@@ -562,7 +562,10 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
-  const canAddQuote = canAct && pr.status === 'devis_en_cours';
+  // Saisir un devis reste possible même après qu'un devis est retenu ('devis_selectionne') : le
+  // service achat peut ainsi ajouter/comparer un autre fournisseur et re-sélectionner, sans avoir à
+  // « rouvrir la consultation » (tant que la demande n'est pas partie en validation aval).
+  const canAddQuote = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
   const canSelect = canAct && ['devis_en_cours', 'devis_selectionne'].includes(pr.status);
   const lines = pr.lines || [];
 

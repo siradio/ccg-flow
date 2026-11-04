@@ -313,7 +313,10 @@ async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, n
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
-  if (pr.status !== 'devis_en_cours') throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
+  // Saisie possible pendant la phase devis, y compris quand un devis est déjà retenu
+  // ('devis_selectionne') : permet d'ajouter/comparer un autre fournisseur puis de re-sélectionner,
+  // sans « rouvrir la consultation ». Au-delà (validation aval, BC), la réouverture reste requise.
+  if (!['devis_en_cours', 'devis_selectionne'].includes(pr.status)) throw httpError(400, `Action impossible depuis le statut "${pr.status}".`);
 
   // Nouveau modèle : prix unitaire par ligne → montant = somme(quantité × prix). Repli sur le
   // montant global (ancien client) si aucune ligne n'est fournie.
