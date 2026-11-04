@@ -525,6 +525,66 @@ async function getDashboard(user) {
   };
 }
 
+// Tableau de bord Congés : série mensuelle (jours de congé validés), KPIs et répartitions (par BU,
+// par type), filtrable par période, entité, BU et type. Respecte le périmètre RH de l'utilisateur.
+async function getCongesDashboard(user, filters = {}) {
+  const ent = dashboardScope(user);
+  const scoped = ent !== null;
+  const y = new Date().getUTCFullYear();
+  const okDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+  const from = okDate(filters.from) ? filters.from : `${y}-01-01`;
+  const to = okDate(filters.to) ? filters.to : `${y}-12-31`;
+  const empty = { from, to, series: [], parBu: [], parType: [],
+    kpis: { jours: 0, demandes: 0, employes: 0, moyenne: 0, enCours: 0, enAttente: 0 } };
+  if (scoped && ent.length === 0) return empty;
+
+  // Clauses de base communes (congé + périmètre + filtres optionnels), avec un tableau de params frais.
+  function base() {
+    const params = [];
+    const cl = ["r.type = 'conge'"];
+    const P = (v) => { params.push(v); return `$${params.length}`; };
+    if (scoped) cl.push(`r.entity_id = ANY(${P(ent)})`);
+    if (filters.entityId) cl.push(`r.entity_id = ${P(Number(filters.entityId))}`);
+    if (filters.businessUnitId) cl.push(`r.business_unit_id = ${P(Number(filters.businessUnitId))}`);
+    if (filters.typeId) cl.push(`r.type_id = ${P(Number(filters.typeId))}`);
+    return { cl, params, P };
+  }
+  // Clauses « période » : congés validés dont la date de début est dans l'intervalle.
+  function period() {
+    const b = base();
+    const where = [...b.cl, "r.statut = 'validee'", `r.date_debut BETWEEN ${b.P(from)} AND ${b.P(to)}`].join(' AND ');
+    return { where, params: b.params };
+  }
+
+  const pSeries = period(), pKpi = period(), pBu = period(), pType = period();
+  const bCours = base(), bAtt = base();
+
+  const [series, kpi, parBu, parType, enCours, enAttente] = await Promise.all([
+    all(`SELECT to_char(date_trunc('month', r.date_debut), 'YYYY-MM') AS periode,
+            COALESCE(SUM(r.jours),0)::int AS jours, count(*)::int AS demandes
+         FROM rh_requests r WHERE ${pSeries.where} GROUP BY 1 ORDER BY 1`, pSeries.params),
+    one(`SELECT COALESCE(SUM(r.jours),0)::int AS jours, count(*)::int AS demandes,
+            count(DISTINCT r.employee_id)::int AS employes
+         FROM rh_requests r WHERE ${pKpi.where}`, pKpi.params),
+    all(`SELECT COALESCE(bu.nom,'—') AS label, COALESCE(SUM(r.jours),0)::int AS jours
+         FROM rh_requests r LEFT JOIN business_units bu ON bu.id = r.business_unit_id
+         WHERE ${pBu.where} GROUP BY 1 ORDER BY jours DESC`, pBu.params),
+    all(`SELECT COALESCE(t.libelle,'—') AS label, COALESCE(SUM(r.jours),0)::int AS jours
+         FROM rh_requests r LEFT JOIN rh_types t ON t.id = r.type_id
+         WHERE ${pType.where} GROUP BY 1 ORDER BY jours DESC`, pType.params),
+    one(`SELECT count(*)::int AS n FROM rh_requests r
+         WHERE ${bCours.cl.join(' AND ')} AND r.statut='validee' AND r.date_debut <= CURRENT_DATE AND r.date_fin >= CURRENT_DATE`, bCours.params),
+    one(`SELECT count(*)::int AS n FROM rh_requests r
+         WHERE ${bAtt.cl.join(' AND ')} AND r.statut='en_validation'`, bAtt.params),
+  ]);
+
+  const moyenne = kpi.demandes ? Math.round((kpi.jours / kpi.demandes) * 10) / 10 : 0;
+  return {
+    from, to, series, parBu, parType,
+    kpis: { jours: kpi.jours, demandes: kpi.demandes, employes: kpi.employes, moyenne, enCours: enCours.n, enAttente: enAttente.n },
+  };
+}
+
 // Solde de congés d'un membre de l'équipe (pour le formulaire « demande pour un membre »).
 async function getTeamMemberCongeSolde(user, employeeId) {
   const target = await one('SELECT * FROM employees WHERE id = $1', [Number(employeeId)]);
@@ -716,7 +776,7 @@ module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
   listFeries, createFerie, updateFerie, deleteFerie, prefillFeries,
   listMine, listPending, listAll, canSeeAll, canDelete, workingDays, workingDaysDetail, listMyTeam, getTeamMemberCongeSolde,
-  getCongeSolde, getMyCongeSolde, getDashboard, canSeeDashboard,
+  getCongeSolde, getMyCongeSolde, getDashboard, getCongesDashboard, canSeeDashboard,
   listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
   createJournaliers, updateJournaliers, journaliersDashboard,
   getJournaliersConfig, setJournaliersConfig, isJournaliersSubmissionClosed,
