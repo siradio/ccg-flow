@@ -389,7 +389,7 @@ async function selectQuote(user, prId, quoteId) {
 // Édition des prix d'un devis déjà saisi par le service achat (ex. corriger la précision décimale).
 // Possible pendant la phase devis (devis_en_cours / devis_selectionne). Si le devis édité est le devis
 // RETENU, les nouveaux prix sont répercutés sur les lignes de la DA (prix_unitaire_final + montant final).
-async function updateQuote(user, prId, quoteId, { devise, lignes }) {
+async function updateQuote(user, prId, quoteId, { devise, lignes }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'modifier un devis');
@@ -405,20 +405,30 @@ async function updateQuote(user, prId, quoteId, { devise, lignes }) {
   const lignesRows = (Array.isArray(lignes) ? lignes : [])
     .filter(x => byId.has(Number(x.lineId)))
     .map(x => ({ lineId: Number(x.lineId), prixUnitaire: Number(x.prixUnitaire) || 0 }));
+  const hasLignes = lignesRows.length > 0;
   const total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
-  if (!total) throw httpError(400, 'Saisissez au moins un prix de ligne.');
+  if (hasLignes && !total) throw httpError(400, 'Saisissez au moins un prix de ligne.');
+  if (!hasLignes && !file) throw httpError(400, 'Rien à modifier.');
   const newDevise = devise || quote.devise;
 
-  await withTransaction(async (tx) => {
-    await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
-    await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
-    if (quote.selectionne) {                                       // devis retenu : répercuter sur la DA
-      const ql = await repo.getQuoteLines(quoteId, tx);
-      await repo.applyQuoteLinesToPrLines(prId, ql, tx);
-      await repo.setMontantFinal(prId, total, newDevise, tx);
-    }
-  });
-  await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: total, devise: newDevise } });
+  if (hasLignes) {
+    await withTransaction(async (tx) => {
+      await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
+      await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
+      if (quote.selectionne) {                                       // devis retenu : répercuter sur la DA
+        const ql = await repo.getQuoteLines(quoteId, tx);
+        await repo.applyQuoteLinesToPrLines(prId, ql, tx);
+        await repo.setMontantFinal(prId, total, newDevise, tx);
+      }
+    });
+    await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: total, devise: newDevise } });
+  }
+
+  // Pièce jointe (devis PDF) : rattachée à CE devis — permet d'ajouter le PDF oublié à la saisie.
+  if (file) {
+    const attachment = await attachmentsService.attachToQuote(Number(quoteId), file, user.id);
+    await audit.logAction({ tableName: 'attachments', recordId: attachment.id, purchaseRequestId: prId, action: 'attachment_uploaded', userId: user.id, details: { filename: file.originalname, quoteId: Number(quoteId) } });
+  }
   return getFullDetail(prId);
 }
 

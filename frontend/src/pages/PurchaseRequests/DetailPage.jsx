@@ -559,10 +559,11 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
   const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {} };
   const [form, setForm] = useState(emptyQuoteForm);
   const { money, step } = useAchatFormat();
-  // Édition des prix d'un devis déjà saisi (service achat, phase devis).
+  // Édition d'un devis déjà saisi : prix et/ou ajout du PDF oublié (service achat, phase devis).
   const [editId, setEditId] = useState(null);
   const [editDevise, setEditDevise] = useState('');
   const [editPrices, setEditPrices] = useState({});
+  const [editFile, setEditFile] = useState(null);
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
   const withoutQuote = sentSuppliers.filter(s => !pr.quotes.some(q => q.supplier_id === s.supplier_id));
@@ -590,11 +591,16 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     const m = {};
     (q.lignes || []).forEach(l => { m[l.lineId] = String(l.prixUnitaire ?? ''); });
     setEditPrices(m);
+    setEditFile(null);
   }
   function saveEditQuote() {
     const lignes = lines.map(l => ({ lineId: l.id, prixUnitaire: Number(editPrices[l.id]) || 0 }));
-    guarded(() => client.put(`/purchase-requests/${pr.id}/quotes/${editId}`, { devise: editDevise, lignes }), t('prd.quoteUpdatedToast'))
-      .then(ok => { if (ok) setEditId(null); });
+    const data = new FormData();
+    data.append('devise', editDevise || 'GNF');
+    data.append('lignes', JSON.stringify(lignes));
+    if (editFile) data.append('file', editFile);
+    guarded(() => client.put(`/purchase-requests/${pr.id}/quotes/${editId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteUpdatedToast'))
+      .then(ok => { if (ok) { setEditId(null); setEditFile(null); } });
   }
 
   if (pr.quotes.length === 0 && withoutQuote.length === 0) return null;
@@ -672,9 +678,21 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                           <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.quoteTotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(editTotal)} {editDevise}</td></tr></tfoot>
                         </table>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                        <button className="btn btn-primary btn-sm" disabled={editTotal <= 0} onClick={saveEditQuote}>{t('common.save')}</button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setEditId(null)}>{t('common.cancel')}</button>
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+                        <label style={{ fontSize: 13, fontWeight: 600 }}>
+                          {t('prd.quoteFileLabel')}{' '}
+                          <input type="file" accept="application/pdf,image/*" onChange={e => setEditFile(e.target.files[0] || null)} />
+                        </label>
+                        {q.attachment_id && (
+                          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {t('prd.quoteHasPdf')}
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => openAuthenticatedFile(`/attachments/${q.attachment_id}`)}>{t('prd.view')}</button>
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <button className="btn btn-primary btn-sm" disabled={editTotal <= 0 && !editFile} onClick={saveEditQuote}>{t('common.save')}</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => { setEditId(null); setEditFile(null); }}>{t('common.cancel')}</button>
                       </div>
                     </div>
                   </td>

@@ -140,11 +140,13 @@ router.post('/:id/quotes/:quoteId/select', requireAuth, async (req, res, next) =
   catch (e) { next(e); }
 });
 
-// Édition des prix (par ligne) d'un devis déjà saisi — service achat, pendant la phase devis.
-router.put('/:id/quotes/:quoteId', requireAuth, async (req, res, next) => {
+// Édition d'un devis déjà saisi (prix par ligne et/ou ajout du PDF oublié) — service achat, phase devis.
+router.put('/:id/quotes/:quoteId', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
-    const { devise, lignes } = req.body || {};
-    res.json(await service.updateQuote(req.user, Number(req.params.id), Number(req.params.quoteId), { devise, lignes }));
+    const { devise } = req.body || {};
+    let lignes = null;
+    try { lignes = req.body.lignes ? JSON.parse(req.body.lignes) : null; } catch { lignes = null; }
+    res.json(await service.updateQuote(req.user, Number(req.params.id), Number(req.params.quoteId), { devise, lignes }, req.file));
   } catch (e) { next(e); }
 });
 
