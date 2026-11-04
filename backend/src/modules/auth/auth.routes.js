@@ -4,18 +4,24 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const env = require('../../config/env');
 const { requireAuth } = require('../../middleware/auth');
+const { loginLimiter } = require('../../middleware/rateLimiters');
 const usersService = require('../users/users.service');
 
 const router = express.Router();
 
-router.post('/login', async (req, res, next) => {
+// Hash factice : on compare TOUJOURS le mot de passe à un hash bcrypt, même quand l'email est
+// inconnu, pour que le temps de réponse ne révèle pas l'existence d'un compte (anti-énumération).
+const DUMMY_HASH = bcrypt.hashSync('invalid-password-placeholder', 10);
+
+router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: 'Email et mot de passe requis.' });
     }
     const user = await usersService.findByEmail(email);
-    if (!user || !user.actif || !bcrypt.compareSync(password, user.password_hash)) {
+    const passwordOk = bcrypt.compareSync(password, user ? user.password_hash : DUMMY_HASH);
+    if (!user || !user.actif || !passwordOk) {
       return res.status(401).json({ error: 'Identifiants incorrects ou compte désactivé.' });
     }
     // Un compte issu d'une demande d'accès non encore traitée ne peut pas se connecter.

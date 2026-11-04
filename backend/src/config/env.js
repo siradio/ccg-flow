@@ -12,10 +12,24 @@ const appUrl = (process.env.APP_URL
   || (process.env.WEBSITE_HOSTNAME ? `https://${process.env.WEBSITE_HOSTNAME}` : '')
 ).replace(/\/+$/, '');
 
+// Secret de signature des JWT — OBLIGATOIRE, aucun fallback en dur (un secret commité au dépôt
+// permettrait de forger des jetons et d'usurper n'importe quel compte). On échoue au démarrage s'il
+// est absent, et on exige une longueur suffisante en production. En dev/test, on se contente d'un
+// avertissement pour ne pas bloquer un secret court (ex. base de test de la CI).
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET est obligatoire : définissez-le dans l\'environnement (32+ octets aléatoires). Aucun secret par défaut n\'est utilisé.');
+}
+if (jwtSecret.length < 32) {
+  const msg = '[sécurité] JWT_SECRET fait moins de 32 caractères — utilisez un secret aléatoire de 32 octets ou plus.';
+  if (process.env.NODE_ENV === 'production') throw new Error(msg);
+  console.warn(msg);
+}
+
 module.exports = {
   port: process.env.PORT || 4001,
   databaseUrl: process.env.DATABASE_URL,
-  jwtSecret: process.env.JWT_SECRET || 'dev-secret-a-changer',
+  jwtSecret,
   appUrl,
   smtp: {
     host: process.env.SMTP_HOST || '',
