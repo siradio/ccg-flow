@@ -27,12 +27,29 @@ export default function LoginBackground() {
   const [busy, setBusy] = useState(false);
   const fileInputs = useRef({});
 
+  // Bandeau d'informations défilant (config globale). messages : un par ligne dans le textarea.
+  const [tk, setTk] = useState({ enabled: false, messages: '', speed: 'normal' });
+  const [tkSaved, setTkSaved] = useState(false);
+
   function load() {
     client.get('/login-backgrounds')
       .then(res => setItems(res.data))
       .catch(() => setError(t('adm.common.loading')));
   }
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    client.get('/login-backgrounds/ticker')
+      .then(res => setTk({ enabled: !!res.data.enabled, messages: (res.data.messages || []).join('\n'), speed: res.data.speed || 'normal' }))
+      .catch(() => {});
+  }, []);
+
+  async function saveTicker() {
+    setTkSaved(false);
+    const messages = tk.messages.split('\n').map(s => s.trim()).filter(Boolean);
+    const res = await client.put('/login-backgrounds/ticker', { enabled: tk.enabled, messages, speed: tk.speed });
+    setTk({ enabled: !!res.data.enabled, messages: (res.data.messages || []).join('\n'), speed: res.data.speed || 'normal' });
+    setTkSaved(true);
+  }
 
   async function add(e) {
     e.preventDefault();
@@ -84,6 +101,34 @@ export default function LoginBackground() {
         {t('adm.loginBg.intro')}
       </p>
       {error && <div className="alert alert-danger" style={{ maxWidth: 680 }}>{error}</div>}
+
+      {/* Bandeau d'informations défilant de la page de connexion. */}
+      <section className="card" style={{ maxWidth: 680, marginBottom: 18 }}>
+        <h2 style={{ marginTop: 0 }}>{t('adm.loginBg.ticker.title')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('adm.loginBg.ticker.intro')}</p>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 12 }}>
+          <input type="checkbox" checked={tk.enabled} onChange={e => { setTk(s => ({ ...s, enabled: e.target.checked })); setTkSaved(false); }} />
+          {t('adm.loginBg.ticker.enabled')}
+        </label>
+        <label className="field">
+          {t('adm.loginBg.ticker.messages')}
+          <textarea rows={4} value={tk.messages} onChange={e => { setTk(s => ({ ...s, messages: e.target.value })); setTkSaved(false); }}
+            placeholder={t('adm.loginBg.ticker.messagesPlaceholder')} />
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{t('adm.loginBg.ticker.messagesHint')}</span>
+        </label>
+        <label className="field" style={{ marginTop: 10, maxWidth: 220 }}>
+          {t('adm.loginBg.ticker.speed')}
+          <select value={tk.speed} onChange={e => { setTk(s => ({ ...s, speed: e.target.value })); setTkSaved(false); }}>
+            <option value="slow">{t('adm.loginBg.ticker.slow')}</option>
+            <option value="normal">{t('adm.loginBg.ticker.normal')}</option>
+            <option value="fast">{t('adm.loginBg.ticker.fast')}</option>
+          </select>
+        </label>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={saveTicker}>{t('adm.loginBg.save')}</button>
+          {tkSaved && <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
+        </div>
+      </section>
 
       <section className="card" style={{ maxWidth: 680, marginBottom: 18 }}>
         <h2 style={{ marginTop: 0 }}>{t('adm.loginBg.addTitle')}</h2>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import client from '../api/client';
@@ -40,6 +40,9 @@ export default function Login() {
 
   // Habillage événementiel de la page (configuré par le super_admin). null = fond par défaut.
   const [bg, setBg] = useState(null);
+  // Bandeau d'informations défilant (configuré par le super_admin). { enabled, messages[], speed }.
+  const [ticker, setTicker] = useState(null);
+  const netRef = useRef(null);
 
   // Message éventuel de fin de session (ex. compte utilisé sur un autre appareil), posé par le
   // client HTTP avant redirection ici. Lu une seule fois puis effacé.
@@ -53,7 +56,99 @@ export default function Login() {
 
   useEffect(() => {
     client.get('/public/login-background').then(res => setBg(res.data.active)).catch(() => {});
+    client.get('/public/login-ticker').then(res => setTicker(res.data)).catch(() => {});
   }, []);
+
+  // Fond animé « CCG Flow » : réseau de nœuds vivant où circulent des paquets de données (clin
+  // d'œil à « Flow »). Désactivé si un habillage image est actif. Respecte « animations réduites ».
+  useEffect(() => {
+    const custom = !!(bg && bg.has_image);
+    const canvas = netRef.current;
+    if (custom || !canvas) return undefined;
+    const ctx = canvas.getContext('2d');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const PK = ['#3fa34d', '#2563eb', '#f39c12', '#17a2a0', '#8e44ad', '#f5b301', '#e4442f'];
+    let W = 0, H = 0, raf = 0, nodes = [], edges = [], packets = [], last = 0, acc = 0, rt = 0;
+
+    function build() {
+      const r = canvas.getBoundingClientRect();
+      W = r.width; H = r.height;
+      canvas.width = W * DPR; canvas.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const count = Math.max(14, Math.min(30, Math.round((W * H) / 42000)));
+      nodes = [];
+      for (let i = 0; i < count; i++) {
+        const hub = i % 6 === 0;
+        nodes.push({ x: Math.random() * W, y: Math.random() * H,
+          vx: (Math.random() - 0.5) * (reduced ? 0 : 0.22), vy: (Math.random() - 0.5) * (reduced ? 0 : 0.22),
+          r: hub ? 4 : 2.3, hub, phase: Math.random() * Math.PI * 2 });
+      }
+      edges = [];
+      const THR = Math.min(W, H) * 0.33;
+      for (let a = 0; a < nodes.length; a++) {
+        const near = [];
+        for (let b = 0; b < nodes.length; b++) {
+          if (a === b) continue;
+          const d = Math.hypot(nodes[a].x - nodes[b].x, nodes[a].y - nodes[b].y);
+          if (d < THR) near.push({ b, d });
+        }
+        near.sort((p, q) => p.d - q.d);
+        near.slice(0, nodes[a].hub ? 4 : 2).forEach(e => { if (a < e.b) edges.push({ a, b: e.b }); });
+      }
+    }
+    function spawn() {
+      if (!edges.length) return;
+      const e = edges[(Math.random() * edges.length) | 0];
+      const dir = Math.random() < 0.5;
+      packets.push({ a: dir ? e.a : e.b, b: dir ? e.b : e.a, t: 0, speed: 0.004 + Math.random() * 0.006, color: PK[(Math.random() * PK.length) | 0] });
+    }
+    function frame(ts) {
+      const dt = Math.min(40, ts - last); last = ts;
+      ctx.clearRect(0, 0, W, H);
+      for (const n of nodes) { n.x += n.vx; n.y += n.vy; if (n.x < 0 || n.x > W) n.vx *= -1; if (n.y < 0 || n.y > H) n.vy *= -1; n.phase += 0.015; }
+      const THR = Math.min(W, H) * 0.33;
+      ctx.lineWidth = 1;
+      for (const e of edges) {
+        const A = nodes[e.a], B = nodes[e.b];
+        const d = Math.hypot(A.x - B.x, A.y - B.y);
+        if (d > THR) continue;
+        ctx.strokeStyle = 'rgba(150,180,255,' + (0.18 * (1 - d / THR)).toFixed(3) + ')';
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      }
+      if (!reduced) {
+        acc += dt;
+        if (acc > 420) { acc = 0; if (packets.length < Math.min(26, edges.length)) spawn(); }
+        for (let p = packets.length - 1; p >= 0; p--) {
+          const pk = packets[p]; pk.t += pk.speed * (dt / 16.7);
+          if (pk.t >= 1) { packets.splice(p, 1); continue; }
+          const A = nodes[pk.a], B = nodes[pk.b];
+          const x = A.x + (B.x - A.x) * pk.t, y = A.y + (B.y - A.y) * pk.t;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, 7);
+          g.addColorStop(0, pk.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 7, 0, 6.283); ctx.fill();
+          ctx.fillStyle = pk.color; ctx.beginPath(); ctx.arc(x, y, 2, 0, 6.283); ctx.fill();
+        }
+      }
+      for (const m of nodes) {
+        const pr = m.r + (m.hub ? Math.sin(m.phase) * 1.1 : 0);
+        if (m.hub) {
+          const gg = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, pr * 5);
+          gg.addColorStop(0, 'rgba(59,106,219,0.28)'); gg.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(m.x, m.y, pr * 5, 0, 6.283); ctx.fill();
+        }
+        ctx.fillStyle = m.hub ? 'rgba(190,210,255,0.95)' : 'rgba(170,200,255,0.8)';
+        ctx.beginPath(); ctx.arc(m.x, m.y, pr, 0, 6.283); ctx.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+
+    build();
+    if (reduced) { frame(0); cancelAnimationFrame(raf); }
+    else { last = performance.now(); raf = requestAnimationFrame(frame); }
+    const onResize = () => { clearTimeout(rt); rt = setTimeout(build, 180); };
+    window.addEventListener('resize', onResize);
+    return () => { cancelAnimationFrame(raf); clearTimeout(rt); window.removeEventListener('resize', onResize); };
+  }, [bg]);
 
   useEffect(() => {
     if (mode === 'request' && entities.length === 0) {
@@ -94,8 +189,10 @@ export default function Login() {
 
   function updateReq(field, value) { setReq(r => ({ ...r, [field]: value })); }
 
+  const showTicker = !!(ticker && ticker.enabled && ticker.messages && ticker.messages.length > 0);
+
   return (
-    <div className={`login-page${hasCustomBg ? ' login-page--custom-bg' : ''}`}>
+    <div className={`login-page${hasCustomBg ? ' login-page--custom-bg' : ''}${showTicker ? ' login-page--ticker' : ''}`}>
       {/* Habillage événementiel (super_admin) : image d'arrière-plan + voile de lisibilité. */}
       {hasCustomBg && (
         <>
@@ -103,57 +200,12 @@ export default function Login() {
           <div className="login-page-scrim" aria-hidden="true" />
         </>
       )}
-      {/* Arrière-plan par défaut « CCG Flow » : un réseau de nœuds reliés, illustrant la connexion / le lien. */}
+      {/* Arrière-plan par défaut « CCG Flow » : réseau de nœuds vivant (canvas animé) + halos d'aurore. */}
       {!hasCustomBg && (
-      <svg className="login-page-art" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        {/* halos d'ambiance */}
-        <circle cx="1080" cy="160" r="240" />
-        <circle cx="120" cy="120" r="150" />
-        {/* liens entre les nœuds */}
-        <g>
-          <line className="net-line" x1="120" y1="120" x2="300" y2="240" />
-          <line className="net-line" x1="300" y1="240" x2="90" y2="360" />
-          <line className="net-line" x1="90" y1="360" x2="240" y2="520" />
-          <line className="net-line" x1="240" y1="520" x2="140" y2="680" />
-          <line className="net-line" x1="140" y1="680" x2="420" y2="700" />
-          <line className="net-line" x1="120" y1="120" x2="90" y2="360" />
-          <line className="net-line" x1="120" y1="120" x2="600" y2="120" />
-          <line className="net-line" x1="300" y1="240" x2="600" y2="120" />
-          <line className="net-line" x1="240" y1="520" x2="420" y2="700" />
-          <line className="net-line" x1="600" y1="120" x2="1080" y2="160" />
-          <line className="net-line" x1="600" y1="120" x2="900" y2="280" />
-          <line className="net-line" x1="1080" y1="160" x2="900" y2="280" />
-          <line className="net-line" x1="1080" y1="160" x2="1120" y2="380" />
-          <line className="net-line" x1="900" y1="280" x2="1120" y2="380" />
-          <line className="net-line" x1="1120" y1="380" x2="960" y2="560" />
-          <line className="net-line" x1="960" y1="560" x2="1100" y2="660" />
-          <line className="net-line" x1="1100" y1="660" x2="780" y2="700" />
-          <line className="net-line" x1="960" y1="560" x2="780" y2="700" />
-          <line className="net-line" x1="900" y1="280" x2="960" y2="560" />
-          <line className="net-line" x1="780" y1="700" x2="600" y2="760" />
-          <line className="net-line" x1="600" y1="760" x2="420" y2="700" />
-        </g>
-        {/* halos des nœuds principaux */}
-        <circle className="net-glow" cx="120" cy="120" r="30" />
-        <circle className="net-glow" cx="600" cy="120" r="30" style={{ animationDelay: '1.5s' }} />
-        <circle className="net-glow" cx="1080" cy="160" r="30" style={{ animationDelay: '2.8s' }} />
-        {/* nœuds */}
-        <circle className="net-node net-node--hub" cx="120" cy="120" r="8" />
-        <circle className="net-node net-node--hub" cx="600" cy="120" r="8" />
-        <circle className="net-node net-node--hub" cx="1080" cy="160" r="8" />
-        <circle className="net-node" cx="300" cy="240" r="5" />
-        <circle className="net-node" cx="90" cy="360" r="5" />
-        <circle className="net-node" cx="240" cy="520" r="5" />
-        <circle className="net-node" cx="140" cy="680" r="5" />
-        <circle className="net-node" cx="420" cy="700" r="5" />
-        <circle className="net-node" cx="900" cy="280" r="5" />
-        <circle className="net-node" cx="1120" cy="380" r="5" />
-        <circle className="net-node" cx="960" cy="560" r="5" />
-        <circle className="net-node" cx="1100" cy="660" r="5" />
-        <circle className="net-node" cx="780" cy="700" r="5" />
-        <circle className="net-node" cx="600" cy="760" r="5" />
-        <text x="860" y="745" textAnchor="middle" className="login-watermark login-watermark-sm" transform="rotate(-8 860 745)">CCG</text>
-      </svg>
+        <>
+          <canvas ref={netRef} className="login-net" aria-hidden="true" />
+          <div className="login-aurora" aria-hidden="true"><span /><span /><span /></div>
+        </>
       )}
       <div style={{ position: 'absolute', top: 14, right: 16, zIndex: 5 }}><LanguageSwitcher /></div>
       <div className="login-shell">
@@ -295,6 +347,24 @@ export default function Login() {
           Ensemble, nous bâtissons un avenir <strong>durable</strong>, <strong>performant</strong> et centré sur le <strong>client</strong>.
         </p>
       </div>
+
+      {/* Bandeau d'informations défilant (configuré par le super_admin). Masqué si désactivé/vide. */}
+      {ticker && ticker.enabled && ticker.messages && ticker.messages.length > 0 && (
+        <aside className={`login-ticker login-ticker--${ticker.speed || 'normal'}`} aria-label="Informations">
+          <span className="login-ticker-tag" aria-hidden="true">📣 INFOS</span>
+          <div className="login-ticker-view">
+            <div className="login-ticker-track">
+              {[0, 1].map(dup => (
+                <span className="login-ticker-seq" key={dup} aria-hidden={dup === 1 ? 'true' : undefined}>
+                  {ticker.messages.map((m, i) => (
+                    <span className="login-ticker-item" key={`${dup}_${i}`}>{m}<span className="login-ticker-sep">◆</span></span>
+                  ))}
+                </span>
+              ))}
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
