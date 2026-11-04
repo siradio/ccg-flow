@@ -229,6 +229,14 @@ router.get('/dashboard', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Tableau de bord Congés : série mensuelle + KPIs + répartitions, filtrable (from/to/entityId/businessUnitId/typeId).
+router.get('/dashboard/conges', async (req, res, next) => {
+  try {
+    if (!service.canSeeDashboard(req.user)) return res.status(403).json({ error: 'Accès réservé au RH.' });
+    res.json(await service.getCongesDashboard(req.user, req.query));
+  } catch (e) { next(e); }
+});
+
 router.get('/requests/:id', async (req, res, next) => {
   try {
     const detail = await service.getDetail(Number(req.params.id));
