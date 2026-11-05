@@ -7,11 +7,33 @@ const { runMigrations } = require('./db');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
+
+// Derrière le reverse-proxy d'Azure App Service : nécessaire pour que req.ip / req.protocol
+// reflètent le vrai client (rate-limiting fiable, détection HTTPS). On fait confiance au 1er proxy.
+app.set('trust proxy', 1);
+
+// En-têtes de sécurité (anti-clickjacking, nosniff, HSTS, referrer...). La CSP est désactivée pour
+// l'instant (le SPA n'est pas encore audité pour une CSP stricte) — à activer en report-only ensuite.
+const helmet = require('helmet');
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // le SPA charge des ressources tierces (tuiles carto, polices)
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+}));
+
 // Compression gzip de toutes les réponses (API JSON + build React) — le bundle passe de ~2,1 Mo
 // à ~0,6 Mo, déterminant pour les connexions lentes.
 const compression = require('compression');
 app.use(compression());
-app.use(cors());
+
+// CORS restreint aux origines connues (l'API et le SPA sont même origine en prod ; le cross-origin
+// ne sert qu'au dev local). Une origine absente (même origine / outils) reste autorisée ; une
+// origine inconnue ne reçoit pas d'en-têtes CORS (le navigateur bloque).
+const corsOrigins = [env.appUrl, 'http://localhost:5173'].filter(Boolean);
+app.use(cors({
+  origin(origin, cb) { cb(null, !origin || corsOrigins.includes(origin)); },
+  credentials: false,
+}));
 app.use(express.json({ limit: '15mb' }));
 
 app.use('/api/auth', require('./modules/auth/auth.routes'));

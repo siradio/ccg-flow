@@ -10,7 +10,7 @@ async function requireAuth(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Authentification requise.' });
   try {
-    const payload = jwt.verify(token, env.jwtSecret);
+    const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
     const full = await usersService.loadUserWithRoles(payload.id);
     if (!full || !full.actif) {
       return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });

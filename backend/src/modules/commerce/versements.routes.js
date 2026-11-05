@@ -7,6 +7,7 @@ const {
 } = require('../../middleware/permissions');
 const { logAction } = require('../audit/audit.service');
 const blob = require('../../storage/blob');
+const { setSafeDownloadHeaders } = require('../../utils/safeDownload');
 
 // Versements commerciaux. Modèle normalisé : en-tête (commercial_payments) + lignes par moyen
 // (commercial_payment_details). Workflow de validation OPTIONNEL (paramètre global ou par BU) :
@@ -258,8 +259,8 @@ router.get('/attachments/:attId', requireAuth, requireSubModule('commerce.versem
     const visible = visibleBusinessUnitIds(req.user);
     if (visible && att.business_unit_id && !visible.includes(att.business_unit_id)) return res.status(404).json({ error: 'Pièce introuvable.' });
     const buf = att.content_key ? await blob.getBuffer(att.content_key) : att.content;
-    res.setHeader('Content-Type', att.mimetype || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${att.filename}"`);
+    // Durcissement anti-XSS : type sûr + nosniff (un .html/.svg uploadé ne s'exécutera pas).
+    setSafeDownloadHeaders(res, att.mimetype, att.filename);
     res.send(buf);
   } catch (e) { next(e); }
 });
