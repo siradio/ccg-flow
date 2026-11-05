@@ -27,6 +27,9 @@ export default function LogistiqueSubnav() {
       it('/logistique/garages', 'log.nav.garages', 'logistique.maintenance'),
       it('/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'),
     ] },
+    { key: 'depenses', label: t('log.grp.depenses'), items: [
+      it('/logistique/depenses/config', 'log.nav.depensesConfig', 'logistique.depenses'),
+    ] },
   ];
   return <GroupedSubnav groups={groups} />;
 }
