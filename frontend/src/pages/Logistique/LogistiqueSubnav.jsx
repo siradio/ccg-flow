@@ -28,6 +28,8 @@ export default function LogistiqueSubnav() {
       it('/logistique/accidents', 'log.nav.accidents', 'logistique.accidents'),
     ] },
     { key: 'depenses', label: t('log.grp.depenses'), items: [
+      it('/logistique/depenses', 'log.nav.depenses', 'logistique.depenses'),
+      it('/logistique/depenses/dashboard', 'log.nav.depensesDash', 'logistique.depenses'),
       it('/logistique/depenses/config', 'log.nav.depensesConfig', 'logistique.depenses'),
     ] },
   ];

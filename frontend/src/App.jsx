@@ -20,6 +20,9 @@ import AccidentsPage from './pages/Logistique/AccidentsPage';
 import CartographiePage from './pages/Logistique/CartographiePage';
 import CarburantPage from './pages/Logistique/CarburantPage';
 import DepensesConfig from './pages/Logistique/DepensesConfig';
+import DepensesListPage from './pages/Logistique/DepensesListPage';
+import DepenseDetailPage from './pages/Logistique/DepenseDetailPage';
+import DepensesDashboard from './pages/Logistique/DepensesDashboard';
 import LiensPage from './pages/Liens/LiensPage';
 import UsersListPage from './pages/Admin/Users/ListPage';
 import UsersDetailPage from './pages/Admin/Users/DetailPage';
@@ -216,7 +219,10 @@ export default function App() {
         <Route path="logistique/accidents" element={<AccidentsPage />} />
         <Route path="logistique/cartographie" element={<CartographiePage />} />
         <Route path="logistique/carburant" element={<CarburantPage />} />
+        <Route path="logistique/depenses" element={<RequireModule subModule="logistique.depenses"><DepensesListPage /></RequireModule>} />
+        <Route path="logistique/depenses/dashboard" element={<RequireModule subModule="logistique.depenses"><DepensesDashboard /></RequireModule>} />
         <Route path="logistique/depenses/config" element={<RequireModule subModule="logistique.depenses"><DepensesConfig /></RequireModule>} />
+        <Route path="logistique/depenses/:id" element={<RequireModule subModule="logistique.depenses"><DepenseDetailPage /></RequireModule>} />
         <Route path="logistique/:type" element={<LogistiqueIndex />} />
         <Route path="admin/users" element={<RequireAdmin level="user"><UsersListPage /></RequireAdmin>} />
         <Route path="admin/users/:id" element={<RequireAdmin level="user"><UsersDetailPage /></RequireAdmin>} />

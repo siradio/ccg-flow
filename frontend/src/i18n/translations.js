@@ -1149,6 +1149,8 @@ export const translations = {
     'log.grp.exploitation': 'Exploitation',
     'log.grp.entretien': 'Entretien & coûts',
     'log.grp.depenses': 'Dépenses',
+    'log.nav.depenses': 'Autorisations',
+    'log.nav.depensesDash': 'Tableau de bord',
     'log.nav.depensesConfig': 'Configuration',
     'log.nav.conducteurs': 'Conducteurs',
     'log.nav.missions': 'Missions',
@@ -1537,6 +1539,7 @@ export const translations = {
     'adm.role.rh': 'RH',
     'adm.role.daf': 'DAF',
     'adm.role.dg': 'DGA (Direction générale adjointe)',
+    'adm.role.operations': 'Direction des Opérations',
     'adm.role.responsable_commercial': 'Responsable commercial',
     'adm.role.gestionnaire_stock': 'Gestionnaire de stock',
     // Niveaux d'accès module
@@ -3540,6 +3543,8 @@ export const translations = {
     'log.grp.exploitation': 'Operations',
     'log.grp.entretien': 'Maintenance & costs',
     'log.grp.depenses': 'Expenses',
+    'log.nav.depenses': 'Authorizations',
+    'log.nav.depensesDash': 'Dashboard',
     'log.nav.depensesConfig': 'Configuration',
     'log.nav.conducteurs': 'Drivers',
     'log.nav.missions': 'Missions',
@@ -3928,6 +3933,7 @@ export const translations = {
     'adm.role.rh': 'HR',
     'adm.role.daf': 'CFO',
     'adm.role.dg': 'DGA (Deputy GM)',
+    'adm.role.operations': 'Operations Department',
     'adm.role.responsable_commercial': 'Sales manager',
     'adm.role.gestionnaire_stock': 'Stock manager',
     // Module access levels

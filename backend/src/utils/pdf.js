@@ -386,8 +386,86 @@ async function generateCommercialFichePdf({ commercial, metrics, mensuel, journa
   });
 }
 
+// Fiche « Autorisation de dépense » (module Logistique) — en-tête CCG, informations de la fiche,
+// tableau des lignes (désignation / quantité / PU / montant), récapitulatif (total, avance, reste à
+// payer), circuit de validation (étapes validées + commentaires), puis bloc signature.
+const STATUT_EXPENSE_LABEL = {
+  brouillon: 'Brouillon', en_validation: 'En cours de validation', validee: 'Approuvée', rejetee: 'Refusée',
+};
+async function generateExpenseAuthorizationPdf({ authorization: a, lignes = [], approvals = [], logoBuffer, signatureBuffer, stampBuffer }) {
+  const devise = a.devise || 'GNF';
+  return renderPdf(doc => {
+    renderLetterhead(doc, 'Autorisation de dépense', logoBuffer);
+    doc.fontSize(11).font('Helvetica').fillColor('black');
+    doc.text(`Numéro : ${a.numero || '—'}`);
+    doc.text(`Entité : ${a.entity_nom || '—'}`);
+    if (a.entity_code === 'SOGUIPAL') doc.text(`Business Unit : ${a.bu_nom || '—'}`);
+    if (a.service) doc.text(`Service : ${a.service}`);
+    doc.text(`Type de dépense : ${a.expense_type_libelle || '—'}`);
+    if (a.demandeur_nom) doc.text(`Demandeur : ${a.demandeur_nom}`);
+    doc.text(`Objet : ${a.objet || '—'}`);
+    doc.text(`Date : ${new Date(a.created_at || Date.now()).toLocaleDateString('fr-FR')}`);
+    doc.text(`Statut : ${STATUT_EXPENSE_LABEL[a.statut] || a.statut}`);
+
+    if (lignes.length) {
+      const cols = [
+        { key: 'designation', label: 'Désignation', width: 215 },
+        { key: 'quantite', label: 'Quantité', width: 70, align: 'right' },
+        { key: 'prix', label: 'Prix unitaire', width: 100, align: 'right' },
+        { key: 'montant', label: 'Montant', width: 110, align: 'right' },
+      ];
+      doc.moveDown();
+      const headerY = doc.y;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('white');
+      doc.rect(50, headerY - 4, PAGE_WIDTH, 20).fill(BRAND_BLUE);
+      doc.fillColor('white');
+      let x = 50;
+      for (const c of cols) { doc.text(c.label, x + 6, headerY, { width: c.width - 8, align: c.align || 'left' }); x += c.width; }
+      doc.y = headerY + 20;
+      doc.fillColor('black').font('Helvetica').fontSize(9);
+      lignes.forEach((l, i) => {
+        const rowY = doc.y;
+        if (i % 2 === 1) { doc.rect(50, rowY - 3, PAGE_WIDTH, 18).fill('#f3f4f6'); doc.fillColor('black'); }
+        const vals = { designation: l.designation || '—', quantite: String(l.quantite), prix: money(l.prix_unitaire, 2), montant: money(l.montant, 2) };
+        x = 50;
+        for (const c of cols) { doc.text(vals[c.key], x + 6, rowY, { width: c.width - 8, align: c.align || 'left' }); x += c.width; }
+        doc.y = rowY + 18;
+      });
+      doc.moveTo(50, doc.y).lineTo(50 + PAGE_WIDTH, doc.y).lineWidth(0.5).strokeColor('#d1d5db').stroke();
+      doc.moveDown(0.5); doc.x = 50;
+    }
+
+    // Récapitulatif montants, aligné à droite.
+    doc.moveDown(0.6).fontSize(11).font('Helvetica');
+    const line = (label, val, bold) => {
+      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fillColor(bold ? BRAND_NAVY : 'black')
+        .text(`${label} : ${money(val, 2)} ${devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+    };
+    line('Montant total', a.montant_total);
+    line('Avance', a.avance);
+    line('Reste à payer', a.reste_a_payer, true);
+    doc.fillColor('black').font('Helvetica');
+
+    // Circuit de validation.
+    const decided = (approvals || []).filter(ap => ap.statut !== 'en_attente');
+    if (decided.length) {
+      doc.moveDown(1).fontSize(11).font('Helvetica-Bold').fillColor(BRAND_NAVY).text('Circuit de validation');
+      doc.moveDown(0.3).fontSize(9.5).font('Helvetica').fillColor('black');
+      decided.forEach(ap => {
+        const who = `${ap.user_prenom || ''} ${ap.user_nom || ''}`.trim();
+        const mark = ap.statut === 'valide' ? '✓' : '✗';
+        const dte = ap.created_at ? new Date(ap.created_at).toLocaleDateString('fr-FR') : '';
+        doc.text(`${mark} ${ap.step_nom} — ${ap.statut === 'valide' ? 'validé' : 'refusé'}${who ? ' par ' + who : ''}${dte ? ' le ' + dte : ''}${ap.commentaire ? ' — ' + ap.commentaire : ''}`, { width: PAGE_WIDTH });
+      });
+    }
+
+    renderSignatureBlock(doc, { signatureBuffer, stampBuffer, entityNom: a.entity_nom });
+  });
+}
+
 module.exports = {
   generateQuoteRequestPdf, generatePurchaseOrderPdf, generateCommercialFichePdf, generateCommandeCommercialePdf, generateEvaluationPdf,
+  generateExpenseAuthorizationPdf,
   // Helpers réutilisables (ex. module Reporting) :
   renderPdf, renderLetterhead, simpleTable, money,
   BRAND_BLUE, BRAND_NAVY, MUTED_GRAY, PAGE_WIDTH,
