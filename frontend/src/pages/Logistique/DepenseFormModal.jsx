@@ -22,7 +22,7 @@ function initialForm(existing, user) {
     };
   }
   return {
-    entityId: '', businessUnitId: '', service: '', expenseTypeId: '', objet: '',
+    entityId: '', businessUnitId: '', service: 'Logistique', expenseTypeId: '', objet: '',
     demandeurNom: user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : '', devise: 'GNF', avance: '', lignes: [emptyLine()],
   };
 }
@@ -51,7 +51,9 @@ export default function DepenseFormModal({ user, existing, onClose, onSaved }) {
   const addLine = () => setForm(f => ({ ...f, lignes: [...f.lignes, emptyLine()] }));
   const removeLine = (key) => setForm(f => ({ ...f, lignes: f.lignes.length > 1 ? f.lignes.filter(l => l.key !== key) : f.lignes }));
 
-  async function save(e) {
+  // `submitAfter` : enregistre PUIS soumet dans le circuit, en un seul geste (évite le détour
+  // « enregistrer le brouillon d'abord, soumettre ensuite »).
+  async function save(e, submitAfter = false) {
     e.preventDefault();
     if (saving) return;
     if (!form.entityId) { setError('Choisissez une entité.'); return; }
@@ -66,9 +68,10 @@ export default function DepenseFormModal({ user, existing, onClose, onSaved }) {
         service: form.service, expenseTypeId: form.expenseTypeId ? Number(form.expenseTypeId) : null,
         objet: form.objet, demandeurNom: form.demandeurNom, devise: form.devise, avance: Number(form.avance) || 0, lignes,
       };
-      const r = editing
+      let r = editing
         ? await client.put(`/logistique/depenses/${existing.id}`, body)
         : await client.post('/logistique/depenses', body);
+      if (submitAfter) r = await client.post(`/logistique/depenses/${r.data.id}/submit`);
       onSaved(r.data);
     } catch (err) { setError(err.response?.data?.error || 'Erreur serveur.'); }
     finally { setSaving(false); }
@@ -81,7 +84,7 @@ export default function DepenseFormModal({ user, existing, onClose, onSaved }) {
           <label className="field" style={{ minWidth: 200 }}>Entité *
             <select value={form.entityId} onChange={e => setForm(f => ({ ...f, entityId: e.target.value, businessUnitId: '' }))} required disabled={editing}>
               <option value="" disabled>Choisir…</option>
-              {entities.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              {entities.map(e => <option key={e.id} value={e.id}>{e.code || e.nom}</option>)}
             </select>
           </label>
           {isSoguipal && (
@@ -134,9 +137,10 @@ export default function DepenseFormModal({ user, existing, onClose, onSaved }) {
         </div>
 
         {error && <div className="alert alert-danger" style={{ marginTop: 10 }}>{error}</div>}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : (editing ? 'Enregistrer' : 'Créer (brouillon)')}</button>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Annuler</button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <button type="submit" className="btn btn-secondary" disabled={saving}>{saving ? 'Enregistrement…' : (editing ? 'Enregistrer (brouillon)' : 'Enregistrer en brouillon')}</button>
+          <button type="button" className="btn btn-primary" disabled={saving} onClick={(e) => save(e, true)}>{editing ? 'Enregistrer et soumettre' : 'Créer et soumettre'}</button>
+          <button type="button" className="btn btn-secondary" onClick={onClose} style={{ marginLeft: 'auto' }}>Annuler</button>
         </div>
       </form>
     </Modal>
