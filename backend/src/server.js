@@ -92,6 +92,7 @@ app.use('/api/reparations', require('./modules/logistique/reparations.routes'));
 app.use('/api/accidents', require('./modules/logistique/accidents.routes'));
 app.use('/api/fuel', require('./modules/logistique/carburant.routes'));
 app.use('/api/positions', require('./modules/logistique/positions.routes'));
+app.use('/api/logistique/depenses', require('./modules/logistique/depenses/depenses.routes'));
 app.use('/api/production', require('./modules/production/production.routes'));
 // Module Commerce — Phase D : référentiels & affectations (versements en Phase F).
 app.use('/api/commerce/payment-methods', require('./modules/commerce/payment-methods.routes'));

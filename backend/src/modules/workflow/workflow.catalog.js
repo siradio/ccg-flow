@@ -20,6 +20,18 @@ const CATALOG = {
       { table: 'purchase_requests', col: 'current_step_id' },
     ],
   },
+  autorisation_depense: {
+    label: 'Autorisation de dépense (Logistique)',
+    // Circuit librement éditable : la saisie (Resp. Logistique) est gérée par le sous-module
+    // logistique.depenses ; les étapes ci-dessous sont les validations successives.
+    locked: false,
+    roleOptions: ['operations', 'controle_gestion', 'daf', 'dg', 'finances'],
+    protectedCodes: [],
+    usage: [
+      { table: 'expense_authorization_approvals', col: 'workflow_step_id' },
+      { table: 'expense_authorizations', col: 'current_step_id' },
+    ],
+  },
   bon_commande_commercial: {
     label: 'Bon de commande commercial',
     // Circuit figé : le moteur (commande.workflow.js) s'appuie sur les CODES des étapes

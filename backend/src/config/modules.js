@@ -48,6 +48,7 @@ const MODULES = [
       { key: 'logistique.carburant', label: 'Carburant (pleins, conso, fraude)' },
       { key: 'logistique.accidents', label: 'Accidents' },
       { key: 'logistique.suivi', label: 'Cartographie / suivi GPS' },
+      { key: 'logistique.depenses', label: 'Autorisations de dépense' },
     ],
   },
   // Module Production — démarre avec le relevé de production journalière ; s'enrichira (planification,

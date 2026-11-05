@@ -11,4 +11,9 @@ function formatRhNumber(prefix, entityCode, id, date = new Date()) {
   return `${prefix}-${entityCode}-${date.getFullYear()}-${String(id).padStart(4, '0')}`;
 }
 
-module.exports = { formatRequestNumber, formatOrderNumber, formatRhNumber };
+// Autorisation de dépense (Logistique), ex. AD-CCG-2026-0007.
+function formatExpenseNumber(entityCode, id, date = new Date()) {
+  return `AD-${entityCode}-${date.getFullYear()}-${String(id).padStart(4, '0')}`;
+}
+
+module.exports = { formatRequestNumber, formatOrderNumber, formatRhNumber, formatExpenseNumber };
