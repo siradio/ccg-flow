@@ -55,9 +55,13 @@ export default function CartographiePage() {
   useEffect(() => {
     if (!canView || mapRef.current || !mapEl.current) return;
     const map = L.map(mapEl.current).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap',
+    // Fonds de carte CARTO (gratuits, prévus pour l'embarquement en application, sans clé API) —
+    // les serveurs communautaires d'OpenStreetMap (tile.openstreetmap.org) bloquent les apps (403
+    // « Access blocked », politique d'usage des tuiles). CARTO sert les mêmes données OSM.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      subdomains: 'abcd',
+      attribution: '© OpenStreetMap, © CARTO',
     }).addTo(map);
     missionLayerRef.current = L.layerGroup().addTo(map); // sous les véhicules
     layerRef.current = L.layerGroup().addTo(map);
