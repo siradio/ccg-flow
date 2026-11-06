@@ -55,9 +55,13 @@ export default function CartographiePage() {
   useEffect(() => {
     if (!canView || mapRef.current || !mapEl.current) return;
     const map = L.map(mapEl.current).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Fonds de carte Esri « World Street Map » : servis sans clé API et sans watermark, adaptés à
+    // l'embarquement en application. On évite ainsi les serveurs OpenStreetMap communautaires
+    // (tile.openstreetmap.org) qui bloquent les apps (403 « Access blocked ») et CARTO qui exige
+    // désormais une clé API. ⚠️ Esri utilise l'ordre {z}/{y}/{x} (y avant x).
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap',
+      attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors',
     }).addTo(map);
     missionLayerRef.current = L.layerGroup().addTo(map); // sous les véhicules
     layerRef.current = L.layerGroup().addTo(map);
