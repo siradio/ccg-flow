@@ -55,13 +55,13 @@ export default function CartographiePage() {
   useEffect(() => {
     if (!canView || mapRef.current || !mapEl.current) return;
     const map = L.map(mapEl.current).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    // Fonds de carte CARTO (gratuits, prévus pour l'embarquement en application, sans clé API) —
-    // les serveurs communautaires d'OpenStreetMap (tile.openstreetmap.org) bloquent les apps (403
-    // « Access blocked », politique d'usage des tuiles). CARTO sert les mêmes données OSM.
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-      subdomains: 'abcd',
-      attribution: '© OpenStreetMap, © CARTO',
+    // Fonds de carte Esri « World Street Map » : servis sans clé API et sans watermark, adaptés à
+    // l'embarquement en application. On évite ainsi les serveurs OpenStreetMap communautaires
+    // (tile.openstreetmap.org) qui bloquent les apps (403 « Access blocked ») et CARTO qui exige
+    // désormais une clé API. ⚠️ Esri utilise l'ordre {z}/{y}/{x} (y avant x).
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors',
     }).addTo(map);
     missionLayerRef.current = L.layerGroup().addTo(map); // sous les véhicules
     layerRef.current = L.layerGroup().addTo(map);
