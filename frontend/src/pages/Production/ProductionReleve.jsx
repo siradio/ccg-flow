@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
@@ -60,6 +60,12 @@ export default function ProductionReleve() {
   const [evoGran, setEvoGran] = useState('semaine');
   const [evoProduct, setEvoProduct] = useState('');
   const [evo, setEvo] = useState([]);
+  // Unité d'affichage du suivi : tonnes ou quantité brute (unités). Permet de voir la production même
+  // quand le poids unitaire des produits n'est pas renseigné (tonnage = 0). Tant que l'utilisateur
+  // n'a pas choisi explicitement, on bascule automatiquement sur « Unités » si le tonnage est
+  // indisponible sur la période (sinon on reste en Tonnes).
+  const [suiviUnite, setSuiviUnite] = useState('tonnes');
+  const uniteTouchee = useRef(false);
 
   useEffect(() => { if (canView) client.get('/business-units/mine').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
 
@@ -89,6 +95,15 @@ export default function ProductionReleve() {
     const qs = `granularity=${evoGran}&date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}${evoProduct ? `&product_id=${evoProduct}` : ''}`;
     client.get(`/production/evolution?${qs}`).then(r => setEvo(r.data)).catch(() => setEvo([]));
   }, [canSuivi, tab, period, evoGran, evoProduct]);
+  // Défaut intelligent de l'unité d'affichage : tant que l'utilisateur n'a pas choisi, on affiche en
+  // « Unités » quand aucun tonnage n'est disponible sur la période (poids non renseignés), sinon en
+  // « Tonnes ». Se recalcule à chaque jeu de données.
+  useEffect(() => {
+    if (uniteTouchee.current) return;
+    const tT = suivi.reduce((s, r) => s + Number(r.total_tonnes || 0), 0);
+    const tQ = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
+    setSuiviUnite(tT === 0 && tQ > 0 ? 'quantite' : 'tonnes');
+  }, [suivi]);
 
   if (!canView) return <p>{t('prodrel.notAllowed')}</p>;
 
@@ -113,12 +128,18 @@ export default function ProductionReleve() {
   const totalJourT = grid.reduce((s, r) => s + tonnes(edits[r.product_id]?.quantite, r.poids_unitaire_g), 0);
   const saisieExport = grid.map(r => ({ ...r, produit: edits[r.product_id]?.quantite ?? '', qte_t: tonnes(edits[r.product_id]?.quantite, r.poids_unitaire_g) }));
   const totalPeriodeT = suivi.reduce((s, r) => s + Number(r.total_tonnes || 0), 0);
+  const totalPeriodeQ = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
+  // Les produits sont saisis mais tout le tonnage est à 0 (poids unitaire non renseigné) : on le
+  // signale et on invite à basculer en « Unités ».
+  const tonnageManquant = suivi.length > 0 && totalPeriodeT === 0 && totalPeriodeQ > 0;
+  const enTonnes = suiviUnite === 'tonnes';
+  const fmtVal = enTonnes ? fmtT : fmt;
   const fmtBucket = b => {
     const s = String(b).slice(0, 10);
     if (evoGran === 'mois') { const [y, m] = s.split('-'); return `${m}/${y}`; }
     return s.split('-').slice(1).reverse().join('/');
   };
-  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: e.valeur_t }));
+  const evoData = evo.map(e => ({ x: fmtBucket(e.bucket), valeur: enTonnes ? e.valeur_t : e.valeur }));
 
   return (
     <div>
@@ -209,19 +230,30 @@ export default function ProductionReleve() {
                 <option value="">{t('stockcommon.all')}</option>{bus.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
               </select>
             </label>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>{t('prodrel.totalPeriodT', { v: fmtT(totalPeriodeT) })}</div>
+            <label className="field" style={{ minWidth: 150 }}>{t('prodrel.showIn')}
+              <select value={suiviUnite} onChange={e => { uniteTouchee.current = true; setSuiviUnite(e.target.value); }}>
+                <option value="tonnes">{t('prodrel.unitT')}</option>
+                <option value="quantite">{t('prodrel.unitQ')}</option>
+              </select>
+            </label>
+            <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-text-muted)' }}>
+              {enTonnes ? t('prodrel.totalPeriodT', { v: fmtT(totalPeriodeT) }) : t('prodrel.totalPeriod', { v: fmt(totalPeriodeQ) })}
+            </div>
           </div>
+          {tonnageManquant && enTonnes && (
+            <div className="alert alert-warning" style={{ marginBottom: 12 }}>⚠︎ {t('prodrel.weightHint')}</div>
+          )}
           {suivi.length === 0 && <p className="empty-row">{t('prodrel.noneInPeriod')}</p>}
           {suivi.length > 0 && (
             <>
               <section className="card" style={{ marginBottom: 16 }}>
-                <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{t('prodrel.byProduct')} ({t('prodrel.inTonnes')})</h2>
+                <h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{t('prodrel.byProduct')} ({enTonnes ? t('prodrel.inTonnes') : t('prodrel.inUnits')})</h2>
                 <div style={{ width: '100%', height: 280 }}>
                   <ResponsiveContainer>
-                    <BarChart data={suivi.slice(0, 12).map(r => ({ nom: r.code || r.designation, total: Number(r.total_tonnes) }))} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
+                    <BarChart data={suivi.slice(0, 12).map(r => ({ nom: r.code || r.designation, total: Number(enTonnes ? r.total_tonnes : r.total_produit) }))} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis dataKey="nom" fontSize={11} /><YAxis fontSize={11} tickFormatter={fmtT} width={60} />
-                      <Tooltip formatter={v => fmtT(v)} />
+                      <XAxis dataKey="nom" fontSize={11} /><YAxis fontSize={11} tickFormatter={fmtVal} width={60} />
+                      <Tooltip formatter={v => fmtVal(v)} />
                       <Bar dataKey="total" fill="#0f766e" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -249,8 +281,8 @@ export default function ProductionReleve() {
                       <LineChart data={evoData} margin={{ top: 6, right: 12, bottom: 6, left: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                         <XAxis dataKey="x" fontSize={11} />
-                        <YAxis fontSize={11} width={60} tickFormatter={fmtT} />
-                        <Tooltip formatter={v => fmtT(v)} />
+                        <YAxis fontSize={11} width={60} tickFormatter={fmtVal} />
+                        <Tooltip formatter={v => fmtVal(v)} />
                         <Line type="monotone" dataKey="valeur" stroke="var(--color-primary, #2454e0)" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
