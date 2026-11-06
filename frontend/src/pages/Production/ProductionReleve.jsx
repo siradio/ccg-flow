@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import client from '../../api/client';
@@ -60,9 +60,12 @@ export default function ProductionReleve() {
   const [evoGran, setEvoGran] = useState('semaine');
   const [evoProduct, setEvoProduct] = useState('');
   const [evo, setEvo] = useState([]);
-  // Unité d'affichage du suivi : tonnes (défaut) ou quantité brute (unités). Permet de voir la
-  // production même quand le poids unitaire des produits n'est pas renseigné (tonnage = 0).
+  // Unité d'affichage du suivi : tonnes ou quantité brute (unités). Permet de voir la production même
+  // quand le poids unitaire des produits n'est pas renseigné (tonnage = 0). Tant que l'utilisateur
+  // n'a pas choisi explicitement, on bascule automatiquement sur « Unités » si le tonnage est
+  // indisponible sur la période (sinon on reste en Tonnes).
   const [suiviUnite, setSuiviUnite] = useState('tonnes');
+  const uniteTouchee = useRef(false);
 
   useEffect(() => { if (canView) client.get('/business-units/mine').then(r => { setBus(r.data); if (r.data[0]) setBuId(String(r.data[0].id)); }).catch(() => {}); }, [canView]);
 
@@ -92,6 +95,15 @@ export default function ProductionReleve() {
     const qs = `granularity=${evoGran}&date_from=${period.from}&date_to=${period.to}${period.bu ? `&business_unit_id=${period.bu}` : ''}${evoProduct ? `&product_id=${evoProduct}` : ''}`;
     client.get(`/production/evolution?${qs}`).then(r => setEvo(r.data)).catch(() => setEvo([]));
   }, [canSuivi, tab, period, evoGran, evoProduct]);
+  // Défaut intelligent de l'unité d'affichage : tant que l'utilisateur n'a pas choisi, on affiche en
+  // « Unités » quand aucun tonnage n'est disponible sur la période (poids non renseignés), sinon en
+  // « Tonnes ». Se recalcule à chaque jeu de données.
+  useEffect(() => {
+    if (uniteTouchee.current) return;
+    const tT = suivi.reduce((s, r) => s + Number(r.total_tonnes || 0), 0);
+    const tQ = suivi.reduce((s, r) => s + Number(r.total_produit || 0), 0);
+    setSuiviUnite(tT === 0 && tQ > 0 ? 'quantite' : 'tonnes');
+  }, [suivi]);
 
   if (!canView) return <p>{t('prodrel.notAllowed')}</p>;
 
@@ -219,7 +231,7 @@ export default function ProductionReleve() {
               </select>
             </label>
             <label className="field" style={{ minWidth: 150 }}>{t('prodrel.showIn')}
-              <select value={suiviUnite} onChange={e => setSuiviUnite(e.target.value)}>
+              <select value={suiviUnite} onChange={e => { uniteTouchee.current = true; setSuiviUnite(e.target.value); }}>
                 <option value="tonnes">{t('prodrel.unitT')}</option>
                 <option value="quantite">{t('prodrel.unitQ')}</option>
               </select>
