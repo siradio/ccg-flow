@@ -646,6 +646,15 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                         {t('prd.selectBtn')}
                       </button>
                     )}
+                    {/* État piégé : devis retenu mais demande restée en 'devis_en_cours' (pas de bouton
+                        Valider). Ré-invoque la sélection (atomique) → recalcule prix/fournisseur/montant
+                        et repasse en 'devis_selectionne', débloquant la validation. */}
+                    {canSelect && q.selectionne && pr.status === 'devis_en_cours' && (
+                      <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} title={t('prd.quoteResyncHint')}
+                        onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), t('prd.quoteResyncToast'))}>
+                        {t('prd.quoteResync')}
+                      </button>
+                    )}
                     {canEditQuote && (
                       <button className="btn btn-secondary btn-sm" onClick={() => (editId === q.id ? setEditId(null) : startEditQuote(q))}>
                         {editId === q.id ? t('common.cancel') : t('common.edit')}
