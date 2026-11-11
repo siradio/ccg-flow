@@ -646,15 +646,6 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                         {t('prd.selectBtn')}
                       </button>
                     )}
-                    {/* État piégé : devis retenu mais demande restée en 'devis_en_cours' (pas de bouton
-                        Valider). Ré-invoque la sélection (atomique) → recalcule prix/fournisseur/montant
-                        et repasse en 'devis_selectionne', débloquant la validation. */}
-                    {canSelect && q.selectionne && pr.status === 'devis_en_cours' && (
-                      <button className="btn btn-primary btn-sm" style={{ marginRight: 6 }} title={t('prd.quoteResyncHint')}
-                        onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/quotes/${q.id}/select`), t('prd.quoteResyncToast'))}>
-                        {t('prd.quoteResync')}
-                      </button>
-                    )}
                     {canEditQuote && (
                       <button className="btn btn-secondary btn-sm" onClick={() => (editId === q.id ? setEditId(null) : startEditQuote(q))}>
                         {editId === q.id ? t('common.cancel') : t('common.edit')}
@@ -862,13 +853,17 @@ function ValidationSection({ pr, refresh, showToast, steps = [] }) {
   // l'API), jamais d'une copie figée côté front — sinon éditer le workflow n'aurait aucun effet visible ici.
   // Phase de traitement achat AVANT sélection d'un devis : pas de validation ici, mais le service
   // achat peut renvoyer pour complément une demande incomplète.
-  const isProcessing = ['soumise', 'en_analyse_achat', 'devis_en_cours'].includes(pr.status);
+  // 'devis_en_cours' AVEC un devis déjà retenu = état piégé : on propose la validation directe de
+  // l'étape achat (le serveur normalise la sélection avant d'avancer). Sans devis retenu, on reste en
+  // phase de traitement (seul le renvoi pour complément est proposé, après avoir retenu un devis).
+  const hasSelectedQuote = (pr.quotes || []).some(q => q.selectionne);
+  const isProcessing = ['soumise', 'en_analyse_achat'].includes(pr.status) || (pr.status === 'devis_en_cours' && !hasSelectedQuote);
   let requiredRole = null;
   if (pr.status === 'en_attente_validation_besoin') requiredRole = 'validateur_besoin';
   else if (pr.status === 'devis_selectionne') requiredRole = 'service_achat';
   else if (pr.status === 'en_validation') requiredRole = pr.current_step_role;
   else if (pr.status === 'en_validation_dga') requiredRole = 'validateur_besoin';
-  else if (isProcessing) requiredRole = 'service_achat';
+  else if (['soumise', 'en_analyse_achat', 'devis_en_cours'].includes(pr.status)) requiredRole = 'service_achat';
 
   if (!requiredRole || !hasRoleOnEntity(user, requiredRole, pr.entity_id)) return null;
   const canReject = pr.status === 'en_validation' || pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga';
