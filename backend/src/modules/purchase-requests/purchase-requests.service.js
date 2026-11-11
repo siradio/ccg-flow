@@ -494,6 +494,19 @@ async function validateStep(user, prId, commentaire) {
     return getFullDetail(prId);
   }
 
+  if (pr.status === 'devis_en_cours') {
+    // État piégé : un devis est retenu (selectionne=true) mais la demande est restée en
+    // 'devis_en_cours' (séquelle du bug « sélection non atomique »), ce qui privait le service achat
+    // du bouton Valider. On normalise en ré-invoquant la sélection (atomique → 'devis_selectionne',
+    // recalcule fournisseur/prix/montant) puis on enchaîne la validation de l'étape achat.
+    await assertRole(user, 'service_achat', pr.entity_id, "valider l'étape achat");
+    const quotes = await repo.getQuotesForPR(prId);
+    const sel = quotes.find(q => q.selectionne);
+    if (!sel) throw httpError(400, "Sélectionnez d'abord un devis avant de valider l'étape achat.");
+    await selectQuote(user, prId, sel.id);        // → 'devis_selectionne' (atomique)
+    return validateStep(user, prId, commentaire); // repasse dans la branche 'devis_selectionne' ci-dessous
+  }
+
   if (pr.status === 'devis_selectionne') {
     // Validation de l'étape "achat" : passage à l'étape suivante du circuit CONFIGURÉ (jamais un code en dur —
     // voir SPEC.md §3.2), ancrée sur l'étape fixe "validation_achat" pour retrouver son ordre.
