@@ -189,7 +189,7 @@ export default function DetailPage() {
       <ValidationSection pr={pr} refresh={refresh} showToast={showToast} steps={steps} />
 
       {pr.purchase_order && (
-        <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
+        <PurchaseOrderSection po={pr.purchase_order} fees={pr.fees} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
       )}
 
       {pr.status === 'bon_commande_genere' && (
@@ -869,8 +869,11 @@ function ReceptionSection({ pr, isRequester, guarded }) {
   );
 }
 
-function PurchaseOrderSection({ po, canSend }) {
+function PurchaseOrderSection({ po, fees = [], canSend }) {
   const { t } = useI18n();
+  const { money } = useAchatFormat();
+  const montantFrais = Number(po.montant_frais || 0);
+  const grandTotal = Number(po.montant || 0) + montantFrais;
   const [sending, setSending] = useState(false);
   const [needEmail, setNeedEmail] = useState(false);
   const [email, setEmail] = useState('');
@@ -896,7 +899,20 @@ function PurchaseOrderSection({ po, canSend }) {
   return (
     <section className="card">
       <h2>{t('prd.po')}</h2>
-      <p><strong>{po.numero}</strong> — {po.montant} {po.devise}</p>
+      <p style={{ marginBottom: 6 }}><strong>{po.numero}</strong></p>
+      {montantFrais > 0 ? (
+        <div style={{ maxWidth: 420, marginBottom: 10, fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}><span>{t('prd.fees.articles')}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(po.montant)} {po.devise}</span></div>
+          {fees.map((f, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: 'var(--color-text-muted)' }}><span style={{ paddingLeft: 12 }}>{f.libelle}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(f.montant)} {po.devise}</span></div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0', marginTop: 4, borderTop: '1px solid var(--color-border)', fontWeight: 800 }}>
+            <span>{t('prd.fees.grandTotal')}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-blue-fg)' }}>{money(grandTotal)} {po.devise}</span>
+          </div>
+        </div>
+      ) : (
+        <p style={{ marginTop: 0 }}>{money(po.montant)} {po.devise}</p>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/purchase-orders/${po.id}/pdf`)}>
           {t('prd.viewPdf')}

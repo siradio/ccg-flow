@@ -683,6 +683,10 @@ async function generatePurchaseOrder(prId, userId) {
     modePaiement: sup?.mode_paiement || null, conditionsPaiement: sup?.conditions_paiement || null,
   });
   po = await poRepo.setNumero(po.id, numbering.formatOrderNumber(pr.entity_code, po.id));
+  // Instantané des frais annexes (TVA, freight…) du devis retenu sur le bon de commande → BC
+  // auto-porteur pour le PDF et les rapports (coût complet = articles + frais).
+  const prFees = await repo.getPurchaseRequestFees(prId);
+  await poRepo.setFees(po.id, prFees);
   await audit.logAction({ tableName: 'purchase_orders', recordId: po.id, purchaseRequestId: prId, action: 'bon_commande_genere', userId, details: { numero: po.numero } });
 
   // Le BC est généré dès la validation Finances, MAIS la demande passe ensuite en validation DGA

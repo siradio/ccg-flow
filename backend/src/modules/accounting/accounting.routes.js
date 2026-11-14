@@ -51,8 +51,9 @@ router.get('/purchase-orders/:id/pdf', canView, async (req, res, next) => {
     if (!po) return res.status(404).json({ error: 'Bon de commande introuvable.' });
     const lines = await prRepo.getLines(po.purchase_request_id);
     const images = await branding.getEntityImages(po.entity_id);
+    const fees = await poRepo.getFees(po.id);
     const buf = await pdf.generatePurchaseOrderPdf({
-      purchaseOrder: po, purchaseRequest: { numero: po.purchase_request_numero }, lines,
+      purchaseOrder: { ...po, fees }, purchaseRequest: { numero: po.purchase_request_numero }, lines,
       entityNom: po.entity_nom, entityCode: po.entity_code, businessUnitNom: po.business_unit_nom,
       supplierNom: po.supplier_nom, logoBuffer: images.logo, signatureBuffer: images.signature, stampBuffer: images.stamp,
       decimals: await settings.getIntValue('achats_decimales', 4),
