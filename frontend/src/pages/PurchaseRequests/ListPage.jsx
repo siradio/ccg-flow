@@ -49,6 +49,7 @@ export default function ListPage() {
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const canAddSupplier = hasSubModuleLevel(user, 'referentiels.suppliers', 'ajout');
+  const canManageFees = isSuperAdmin(user) || hasSubModuleLevel(user, 'achats', 'edition');
   function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
 
   // Export Excel (analyse hors application) — réservé aux valideurs.
@@ -72,7 +73,9 @@ export default function ListPage() {
         'Objet': r.objet || '',
         'Demandeur': r.demandeur || '',
         'Statut': STATUS_LABELS[r.statut] || r.statut,
-        'Montant': r.montant_final != null ? Number(r.montant_final) : (r.montant_bon_commande != null ? Number(r.montant_bon_commande) : ''),
+        'Montant articles': r.montant_final != null ? Number(r.montant_final) : (r.montant_bon_commande != null ? Number(r.montant_bon_commande) : ''),
+        'Frais': r.montant_frais != null ? Number(r.montant_frais) : '',
+        'Total général': r.montant_total_general != null ? Number(r.montant_total_general) : (r.montant_final != null ? Number(r.montant_final) : ''),
         'Devise': r.devise || '',
         'Fournisseur retenu': r.fournisseur || '',
         'Bon de commande': r.bon_commande || '',
@@ -81,7 +84,7 @@ export default function ListPage() {
         'Date création': fmtDate(r.created_at),
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 24 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 12 }];
+      ws['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 24 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 12 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Achats');
       const suffix = [exportFrom, exportTo].filter(Boolean).join('_') || 'tout';
@@ -156,6 +159,9 @@ export default function ListPage() {
           )}
           {canAddSupplier && (
             <button type="button" className="btn btn-secondary" onClick={() => setAddSupplierOpen(true)}>{t('refx.addSupplierBtn')}</button>
+          )}
+          {canManageFees && (
+            <Link to="/purchase-requests/frais" className="btn btn-secondary">{t('pr.feeTypesBtn')}</Link>
           )}
           <Link to="/purchase-requests/new" className="btn btn-primary">{t('pr.newBtn')}</Link>
         </div>

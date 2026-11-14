@@ -146,8 +146,13 @@ async function exportRows({ from, to, entityIds }) {
   return all(
     `SELECT pr.numero, e.code AS entite, bu.nom AS business_unit, pr.objet, pr.justification,
             TRIM(CONCAT(u.prenom, ' ', u.nom)) AS demandeur, pr.status AS statut, pr.devise,
-            pr.montant_final, pr.created_at, pr.updated_at, pr.receptionnee,
-            po.numero AS bon_commande, po.montant AS montant_bon_commande, po.generated_at AS date_bon_commande,
+            pr.montant_final, pr.montant_frais,
+            (COALESCE(pr.montant_final,0) + COALESCE(pr.montant_frais,0)) AS montant_total_general,
+            pr.created_at, pr.updated_at, pr.receptionnee,
+            po.numero AS bon_commande, po.montant AS montant_bon_commande,
+            po.montant_frais AS frais_bon_commande,
+            (COALESCE(po.montant,0) + COALESCE(po.montant_frais,0)) AS total_bon_commande,
+            po.generated_at AS date_bon_commande,
             s.nom AS fournisseur
      FROM purchase_requests pr
      JOIN entities e ON e.id = pr.entity_id
@@ -441,6 +446,49 @@ async function deletePendingApprovals(prId) {
   await run("DELETE FROM approvals WHERE purchase_request_id = $1 AND statut = 'en_attente'", [prId]);
 }
 
+// ─── Frais annexes des devis (TVA, freight, FOB, transport, autres) ──────────
+// Référentiel paramétrable.
+async function listFeeTypes(activeOnly = false) {
+  return all(`SELECT id, libelle, ordre, actif FROM quote_fee_types ${activeOnly ? 'WHERE actif = true' : ''} ORDER BY ordre, libelle`);
+}
+
+// Frais d'un devis : on remplace l'ensemble (brouillon de saisie simple). libelle figé = instantané.
+async function setQuoteFees(quoteId, rows, x = DB) {
+  await x.run('DELETE FROM quote_fees WHERE quote_id = $1', [quoteId]);
+  let ordre = 0;
+  for (const r of rows) {
+    await x.run(
+      'INSERT INTO quote_fees (quote_id, fee_type_id, libelle_fige, montant, ordre) VALUES ($1,$2,$3,$4,$5)',
+      [quoteId, r.feeTypeId || null, r.libelle, Number(r.montant) || 0, ordre++]
+    );
+  }
+}
+async function getQuoteFees(quoteId, x = DB) {
+  return x.all('SELECT fee_type_id, libelle_fige AS libelle, montant FROM quote_fees WHERE quote_id = $1 ORDER BY ordre, id', [quoteId]);
+}
+
+// Report des frais du devis retenu sur la demande (+ sous-total mémorisé). Renvoie le sous-total.
+async function setPurchaseRequestFees(prId, rows, x = DB) {
+  await x.run('DELETE FROM purchase_request_fees WHERE purchase_request_id = $1', [prId]);
+  let ordre = 0, total = 0;
+  for (const r of rows) {
+    const m = Number(r.montant) || 0; total += m;
+    await x.run(
+      'INSERT INTO purchase_request_fees (purchase_request_id, fee_type_id, libelle_fige, montant, ordre) VALUES ($1,$2,$3,$4,$5)',
+      [prId, r.fee_type_id ?? r.feeTypeId ?? null, r.libelle, m, ordre++]
+    );
+  }
+  await x.run('UPDATE purchase_requests SET montant_frais = $2, updated_at = now() WHERE id = $1', [prId, total]);
+  return total;
+}
+async function getPurchaseRequestFees(prId, x = DB) {
+  return x.all('SELECT fee_type_id, libelle_fige AS libelle, montant FROM purchase_request_fees WHERE purchase_request_id = $1 ORDER BY ordre, id', [prId]);
+}
+async function clearPurchaseRequestFees(prId, x = DB) {
+  await x.run('DELETE FROM purchase_request_fees WHERE purchase_request_id = $1', [prId]);
+  await x.run('UPDATE purchase_requests SET montant_frais = 0, updated_at = now() WHERE id = $1', [prId]);
+}
+
 module.exports = {
   createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal, exportRows,
   addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu, setLinesPrixUnitaireFinal,
@@ -450,4 +498,5 @@ module.exports = {
   createQuoteLines, updateQuoteAmount, getQuoteLines, applyQuoteLinesToPrLines,
   createApproval, getPendingApproval, decideApproval, getApprovalsForPR,
   unselectAllQuotes, clearLinesSelection, clearMontantFinal, deletePendingApprovals,
+  listFeeTypes, setQuoteFees, getQuoteFees, setPurchaseRequestFees, getPurchaseRequestFees, clearPurchaseRequestFees,
 };

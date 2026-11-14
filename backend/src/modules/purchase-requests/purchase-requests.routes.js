@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const { requireAuth } = require('../../middleware/auth');
-const { requireSubModule, isSuperAdmin } = require('../../middleware/permissions');
+const { requireSubModule, isSuperAdmin, hasSubModuleLevel } = require('../../middleware/permissions');
+const { all, one, run } = require('../../db');
 
 // Accès à l'export : réservé aux membres de la chaîne de validation du workflow achats
 // (valideurs), pas aux simples demandeurs. Super_admin inclus.
@@ -40,6 +41,53 @@ router.get('/export', requireAuth, async (req, res, next) => {
   try {
     if (!canExport(req.user)) return res.status(403).json({ error: "Export réservé aux membres de la chaîne de validation des achats." });
     res.json(await service.exportRows(req.user, { from: req.query.from || null, to: req.query.to || null }));
+  } catch (e) { next(e); }
+});
+
+// ─── Référentiel « Types de frais » (TVA, Freight, Mise à FOB, Transport, Autres…) ─────────────
+// Défini AVANT GET /:id pour ne pas être capté par la route paramétrée. Lecture : tout accès au
+// module achats (gate requireSubModule('achats') au niveau du routeur). Écriture : super_admin ou
+// niveau 'edition' sur le sous-module achats.
+function canManageFees(req, res, next) {
+  if (isSuperAdmin(req.user) || hasSubModuleLevel(req.user, 'achats', 'edition')) return next();
+  return res.status(403).json({ error: 'Gestion des types de frais réservée aux administrateurs du module achats.' });
+}
+router.get('/fee-types', async (req, res, next) => {
+  try {
+    const activeOnly = req.query.actifs === 'true';
+    res.json(await all(`SELECT id, libelle, ordre, actif FROM quote_fee_types ${activeOnly ? 'WHERE actif = true' : ''} ORDER BY ordre, libelle`));
+  } catch (e) { next(e); }
+});
+router.post('/fee-types', canManageFees, async (req, res, next) => {
+  try {
+    const libelle = (req.body.libelle || '').trim();
+    if (!libelle) return res.status(400).json({ error: 'Le libellé est obligatoire.' });
+    const ordre = Number.isFinite(Number(req.body.ordre)) ? Number(req.body.ordre) : 0;
+    res.status(201).json(await one('INSERT INTO quote_fee_types (libelle, ordre) VALUES ($1,$2) RETURNING id, libelle, ordre, actif', [libelle, ordre]));
+  } catch (e) { next(e); }
+});
+router.put('/fee-types/:id', canManageFees, async (req, res, next) => {
+  try {
+    const { libelle, ordre, actif } = req.body || {};
+    const row = await one(
+      `UPDATE quote_fee_types SET libelle = COALESCE($2, libelle), ordre = COALESCE($3, ordre),
+         actif = COALESCE($4, actif), updated_at = now() WHERE id = $1 RETURNING id, libelle, ordre, actif`,
+      [Number(req.params.id), libelle !== undefined ? String(libelle).trim() : null,
+       ordre !== undefined ? Number(ordre) : null, actif !== undefined ? !!actif : null]);
+    if (!row) return res.status(404).json({ error: 'Type introuvable.' });
+    res.json(row);
+  } catch (e) { next(e); }
+});
+router.delete('/fee-types/:id', canManageFees, async (req, res, next) => {
+  try {
+    // Si le type est déjà utilisé (devis ou demande), on le désactive proprement plutôt que d'échouer.
+    const used = await one('SELECT 1 FROM quote_fees WHERE fee_type_id = $1 UNION ALL SELECT 1 FROM purchase_request_fees WHERE fee_type_id = $1 LIMIT 1', [Number(req.params.id)]);
+    if (used) {
+      await run('UPDATE quote_fee_types SET actif = false, updated_at = now() WHERE id = $1', [Number(req.params.id)]);
+      return res.json({ ok: true, deactivated: true });
+    }
+    await run('DELETE FROM quote_fee_types WHERE id = $1', [Number(req.params.id)]);
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
@@ -129,9 +177,10 @@ router.get('/:id/quote-requests/suppliers/:qrsId/pdf', requireAuth, async (req, 
 router.post('/:id/quotes', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     const { quoteRequestSupplierId, montant, devise, notes } = req.body || {};
-    let lignes = null;
+    let lignes = null, frais = null;
     try { lignes = req.body.lignes ? JSON.parse(req.body.lignes) : null; } catch { lignes = null; }
-    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes, lignes }, req.file));
+    try { frais = req.body.frais ? JSON.parse(req.body.frais) : null; } catch { frais = null; }
+    res.status(201).json(await service.addQuote(req.user, Number(req.params.id), { quoteRequestSupplierId, montant, devise, notes, lignes, frais }, req.file));
   } catch (e) { next(e); }
 });
 
@@ -144,9 +193,10 @@ router.post('/:id/quotes/:quoteId/select', requireAuth, async (req, res, next) =
 router.put('/:id/quotes/:quoteId', requireAuth, upload.single('file'), async (req, res, next) => {
   try {
     const { devise } = req.body || {};
-    let lignes = null;
+    let lignes = null, frais = null;
     try { lignes = req.body.lignes ? JSON.parse(req.body.lignes) : null; } catch { lignes = null; }
-    res.json(await service.updateQuote(req.user, Number(req.params.id), Number(req.params.quoteId), { devise, lignes }, req.file));
+    try { frais = req.body.frais ? JSON.parse(req.body.frais) : null; } catch { frais = null; }
+    res.json(await service.updateQuote(req.user, Number(req.params.id), Number(req.params.quoteId), { devise, lignes, frais }, req.file));
   } catch (e) { next(e); }
 });
 

@@ -38,4 +38,20 @@ async function deleteByPurchaseRequestId(prId) {
   await run('DELETE FROM purchase_orders WHERE purchase_request_id = $1', [prId]);
 }
 
-module.exports = { create, setNumero, getById, getByPurchaseRequestId, deleteByPurchaseRequestId };
+// Frais annexes du bon de commande (instantané des frais du devis retenu) + sous-total mémorisé.
+async function setFees(poId, rows) {
+  await run('DELETE FROM purchase_order_fees WHERE purchase_order_id = $1', [poId]);
+  let ordre = 0, total = 0;
+  for (const r of rows) {
+    const m = Number(r.montant) || 0; total += m;
+    await run('INSERT INTO purchase_order_fees (purchase_order_id, fee_type_id, libelle_fige, montant, ordre) VALUES ($1,$2,$3,$4,$5)',
+      [poId, r.fee_type_id ?? r.feeTypeId ?? null, r.libelle ?? r.libelle_fige, m, ordre++]);
+  }
+  await run('UPDATE purchase_orders SET montant_frais = $2 WHERE id = $1', [poId, total]);
+  return total;
+}
+async function getFees(poId) {
+  return all('SELECT fee_type_id, libelle_fige AS libelle, montant FROM purchase_order_fees WHERE purchase_order_id = $1 ORDER BY ordre, id', [poId]);
+}
+
+module.exports = { create, setNumero, getById, getByPurchaseRequestId, deleteByPurchaseRequestId, setFees, getFees };

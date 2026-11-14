@@ -29,8 +29,9 @@ async function loadAuthorized(req) {
 async function buildPoPdf(po) {
   const lines = await prRepo.getLines(po.purchase_request_id);
   const images = await branding.getEntityImages(po.entity_id);
+  const fees = await repo.getFees(po.id);
   return pdf.generatePurchaseOrderPdf({
-    purchaseOrder: po,
+    purchaseOrder: { ...po, fees },
     purchaseRequest: { numero: po.purchase_request_numero },
     lines,
     entityNom: po.entity_nom,
@@ -48,7 +49,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const po = await loadAuthorized(req);
     if (!po) return res.status(404).json({ error: 'Bon de commande introuvable.' });
-    res.json(po);
+    res.json({ ...po, fees: await repo.getFees(po.id) });
   } catch (e) { next(e); }
 });
 

@@ -189,7 +189,7 @@ export default function DetailPage() {
       <ValidationSection pr={pr} refresh={refresh} showToast={showToast} steps={steps} />
 
       {pr.purchase_order && (
-        <PurchaseOrderSection po={pr.purchase_order} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
+        <PurchaseOrderSection po={pr.purchase_order} fees={pr.fees} canSend={hasRoleOnEntity(user, 'service_achat', pr.entity_id)} />
       )}
 
       {pr.status === 'bon_commande_genere' && (
@@ -552,17 +552,62 @@ function QuoteRequestSection({ pr, suppliers, guarded, minSuppliers, addSupplier
   );
 }
 
+// Compteur de clés stables pour les lignes de frais (évite Math.random / index).
+let _feeKey = 0;
+const newFee = () => ({ key: ++_feeKey, feeTypeId: '', montant: '' });
+const feesToRows = (frais) => (frais || []).filter(f => (f.feeTypeId || f.libelle) && Number(f.montant) > 0)
+  .map(f => ({ feeTypeId: f.feeTypeId ? Number(f.feeTypeId) : null, montant: Number(f.montant) || 0 }));
+const feesTotal = (frais) => (frais || []).reduce((s, f) => s + (Number(f.montant) || 0), 0);
+
+// Éditeur de frais annexes (TVA, Freight, Mise à FOB, Transport, Autres…) — partagé saisie/édition.
+function FeesEditor({ value, onChange, feeTypes, devise, money, t }) {
+  const setRow = (key, patch) => onChange(value.map(r => (r.key === key ? { ...r, ...patch } : r)));
+  const add = () => onChange([...value, newFee()]);
+  const remove = (key) => onChange(value.filter(r => r.key !== key));
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, margin: '4px 0 6px' }}>{t('prd.fees.title')}</div>
+      {value.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>{t('prd.fees.type')}</th><th className="num">{t('prd.amount')}</th><th style={{ width: 40 }} /></tr></thead>
+            <tbody>
+              {value.map(r => (
+                <tr key={r.key}>
+                  <td>
+                    <select value={r.feeTypeId} onChange={e => setRow(r.key, { feeTypeId: e.target.value })} style={{ minWidth: 200 }}>
+                      <option value="">{t('prd.fees.typeDots')}</option>
+                      {feeTypes.map(ft => <option key={ft.id} value={ft.id}>{ft.libelle}</option>)}
+                    </select>
+                  </td>
+                  <td className="num"><input type="number" min="0" step="0.01" value={r.montant} onChange={e => setRow(r.key, { montant: e.target.value })} style={{ width: 140, textAlign: 'right' }} /> {devise}</td>
+                  <td><button type="button" className="btn btn-secondary btn-sm" onClick={() => remove(r.key)} title={t('prd.fees.remove')}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.fees.subtotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(feesTotal(value))} {devise}</td><td /></tr></tfoot>
+          </table>
+        </div>
+      )}
+      <button type="button" className="btn btn-secondary btn-sm" onClick={add} style={{ marginTop: 6 }}>{t('prd.fees.add')}</button>
+    </div>
+  );
+}
+
 function QuotesSection({ pr, guarded, suppliers = [] }) {
   const { user } = useAuth();
   const { t } = useI18n();
   const canAct = hasRoleOnEntity(user, 'service_achat', pr.entity_id);
-  const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {} };
+  const emptyQuoteForm = { quoteRequestSupplierId: '', devise: 'GNF', notes: '', file: null, prices: {}, frais: [] };
   const [form, setForm] = useState(emptyQuoteForm);
   const { money, step } = useAchatFormat();
-  // Édition d'un devis déjà saisi : prix et/ou ajout du PDF oublié (service achat, phase devis).
+  const [feeTypes, setFeeTypes] = useState([]);
+  useEffect(() => { client.get('/purchase-requests/fee-types?actifs=true').then(r => setFeeTypes(r.data)).catch(() => {}); }, []);
+  // Édition d'un devis déjà saisi : prix, frais, et/ou ajout du PDF oublié (service achat, phase devis).
   const [editId, setEditId] = useState(null);
   const [editDevise, setEditDevise] = useState('');
   const [editPrices, setEditPrices] = useState({});
+  const [editFrais, setEditFrais] = useState([]);
   const [editFile, setEditFile] = useState(null);
 
   const sentSuppliers = pr.quote_requests.flatMap(qr => qr.suppliers.filter(s => s.statut !== 'a_envoyer'));
@@ -591,6 +636,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     const m = {};
     (q.lignes || []).forEach(l => { m[l.lineId] = String(l.prixUnitaire ?? ''); });
     setEditPrices(m);
+    setEditFrais((q.frais || []).map(f => ({ key: ++_feeKey, feeTypeId: f.feeTypeId ? String(f.feeTypeId) : '', montant: String(f.montant ?? '') })));
     setEditFile(null);
   }
   function saveEditQuote() {
@@ -598,6 +644,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     const data = new FormData();
     data.append('devise', editDevise || 'GNF');
     data.append('lignes', JSON.stringify(lignes));
+    data.append('frais', JSON.stringify(feesToRows(editFrais)));
     if (editFile) data.append('file', editFile);
     guarded(() => client.put(`/purchase-requests/${pr.id}/quotes/${editId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteUpdatedToast'))
       .then(ok => { if (ok) { setEditId(null); setEditFile(null); } });
@@ -612,6 +659,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
     data.append('quoteRequestSupplierId', form.quoteRequestSupplierId);
     data.append('devise', form.devise || 'GNF');
     data.append('lignes', JSON.stringify(lignes));
+    data.append('frais', JSON.stringify(feesToRows(form.frais)));
     if (form.file) data.append('file', form.file);
     guarded(() => client.post(`/purchase-requests/${pr.id}/quotes`, data, { headers: { 'Content-Type': 'multipart/form-data' } }), t('prd.quoteSavedToast'))
       .then(ok => { if (ok) setForm(emptyQuoteForm); });
@@ -622,13 +670,15 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
       <h2>{t('prd.quotesReceived')}</h2>
       <div className="table-wrap" style={{ marginBottom: 12 }}>
         <table>
-          <thead><tr><th>{t('prd.supplier')}</th><th className="num">{t('prd.amount')}</th><th>{t('prd.currency')}</th><th>{t('prd.quotePdf')}</th><th>{t('prd.selected')}</th>{(canSelect || canEditQuote) && <th />}</tr></thead>
+          <thead><tr><th>{t('prd.supplier')}</th><th className="num">{t('prd.fees.articles')}</th><th className="num">{t('prd.fees.feesCol')}</th><th className="num">{t('prd.fees.total')}</th><th>{t('prd.currency')}</th><th>{t('prd.quotePdf')}</th><th>{t('prd.selected')}</th>{(canSelect || canEditQuote) && <th />}</tr></thead>
           <tbody>
             {pr.quotes.map(q => (
               <Fragment key={q.id}>
               <tr>
                 <td>{q.supplier_nom}</td>
                 <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(q.montant)}</td>
+                <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(q.montant_frais || 0)}</td>
+                <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', fontWeight: 700 }}>{money(q.total ?? q.montant)}</td>
                 <td>{q.devise}</td>
                 <td>
                   {q.attachment_id ? (
@@ -656,7 +706,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
               </tr>
               {editId === q.id && (
                 <tr>
-                  <td colSpan={5 + ((canSelect || canEditQuote) ? 1 : 0)} style={{ background: 'var(--color-bg)' }}>
+                  <td colSpan={7 + ((canSelect || canEditQuote) ? 1 : 0)} style={{ background: 'var(--color-bg)' }}>
                     <div style={{ padding: '6px 2px' }}>
                       <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>{t('prd.editQuoteHint')}</div>
                       <div className="table-wrap">
@@ -675,9 +725,11 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                               </tr>
                             ))}
                           </tbody>
-                          <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.quoteTotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(editTotal)} {editDevise}</td></tr></tfoot>
+                          <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.fees.articles')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(editTotal)} {editDevise}</td></tr></tfoot>
                         </table>
                       </div>
+                      <FeesEditor value={editFrais} onChange={setEditFrais} feeTypes={feeTypes} devise={editDevise} money={money} t={t} />
+                      <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 14 }}>{t('prd.fees.grandTotal')} : {money(editTotal + feesTotal(editFrais))} {editDevise}</div>
                       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
                         <label style={{ fontSize: 13, fontWeight: 600 }}>
                           {t('prd.quoteFileLabel')}{' '}
@@ -691,7 +743,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                        <button className="btn btn-primary btn-sm" disabled={editTotal <= 0 && !editFile} onClick={saveEditQuote}>{t('common.save')}</button>
+                        <button className="btn btn-primary btn-sm" disabled={editTotal <= 0 && !editFile && feesTotal(editFrais) <= 0} onClick={saveEditQuote}>{t('common.save')}</button>
                         <button className="btn btn-secondary btn-sm" onClick={() => { setEditId(null); setEditFile(null); }}>{t('common.cancel')}</button>
                       </div>
                     </div>
@@ -703,6 +755,31 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
           </tbody>
         </table>
       </div>
+
+      {/* Récapitulatif du coût complet de la demande (devis retenu) : articles + frais détaillés + total général. */}
+      {pr.montant_final != null && (
+        <div className="card" style={{ background: 'var(--color-bg)', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('prd.fees.recapTitle')}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+            <span>{t('prd.fees.articles')}</span><strong style={{ fontVariantNumeric: 'tabular-nums' }}>{money(pr.montant_final)} {pr.devise}</strong>
+          </div>
+          {(pr.fees || []).map((f, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0', color: 'var(--color-text-muted)' }}>
+              <span style={{ paddingLeft: 12 }}>{f.libelle}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(f.montant)} {pr.devise}</span>
+            </div>
+          ))}
+          {Number(pr.montant_frais) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+              <span>{t('prd.fees.subtotal')}</span><strong style={{ fontVariantNumeric: 'tabular-nums' }}>{money(pr.montant_frais)} {pr.devise}</strong>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, padding: '6px 0 0', marginTop: 4, borderTop: '1px solid var(--color-border)' }}>
+            <strong>{t('prd.fees.grandTotal')}</strong>
+            <strong style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-blue-fg)' }}>{money(Number(pr.montant_final) + Number(pr.montant_frais || 0))} {pr.devise}</strong>
+          </div>
+        </div>
+      )}
+
       {canAddQuote && withoutQuote.length > 0 && (
         <form onSubmit={submitQuote}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
@@ -738,9 +815,15 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.quoteTotal')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(quoteTotal)} {form.devise}</td></tr></tfoot>
+                <tfoot><tr><td colSpan={3} style={{ fontWeight: 700, textAlign: 'right' }}>{t('prd.fees.articles')}</td><td className="num" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(quoteTotal)} {form.devise}</td></tr></tfoot>
               </table>
             </div>
+          )}
+          {form.quoteRequestSupplierId && (
+            <>
+              <FeesEditor value={form.frais} onChange={(frais) => setForm(f => ({ ...f, frais }))} feeTypes={feeTypes} devise={form.devise} money={money} t={t} />
+              <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, marginBottom: 10 }}>{t('prd.fees.grandTotal')} : {money(quoteTotal + feesTotal(form.frais))} {form.devise}</div>
+            </>
           )}
           <button type="submit" className="btn btn-primary" disabled={!form.quoteRequestSupplierId || quoteTotal <= 0}>{t('prd.saveQuote')}</button>
         </form>
@@ -786,8 +869,11 @@ function ReceptionSection({ pr, isRequester, guarded }) {
   );
 }
 
-function PurchaseOrderSection({ po, canSend }) {
+function PurchaseOrderSection({ po, fees = [], canSend }) {
   const { t } = useI18n();
+  const { money } = useAchatFormat();
+  const montantFrais = Number(po.montant_frais || 0);
+  const grandTotal = Number(po.montant || 0) + montantFrais;
   const [sending, setSending] = useState(false);
   const [needEmail, setNeedEmail] = useState(false);
   const [email, setEmail] = useState('');
@@ -813,7 +899,20 @@ function PurchaseOrderSection({ po, canSend }) {
   return (
     <section className="card">
       <h2>{t('prd.po')}</h2>
-      <p><strong>{po.numero}</strong> — {po.montant} {po.devise}</p>
+      <p style={{ marginBottom: 6 }}><strong>{po.numero}</strong></p>
+      {montantFrais > 0 ? (
+        <div style={{ maxWidth: 420, marginBottom: 10, fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}><span>{t('prd.fees.articles')}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(po.montant)} {po.devise}</span></div>
+          {fees.map((f, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: 'var(--color-text-muted)' }}><span style={{ paddingLeft: 12 }}>{f.libelle}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(f.montant)} {po.devise}</span></div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 0', marginTop: 4, borderTop: '1px solid var(--color-border)', fontWeight: 800 }}>
+            <span>{t('prd.fees.grandTotal')}</span><span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-blue-fg)' }}>{money(grandTotal)} {po.devise}</span>
+          </div>
+        </div>
+      ) : (
+        <p style={{ marginTop: 0 }}>{money(po.montant)} {po.devise}</p>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/purchase-orders/${po.id}/pdf`)}>
           {t('prd.viewPdf')}

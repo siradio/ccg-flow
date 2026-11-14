@@ -229,8 +229,24 @@ async function generatePurchaseOrderPdf({ purchaseOrder, purchaseRequest, lines,
     doc.text(`Date : ${new Date(purchaseOrder.generated_at).toLocaleDateString('fr-FR')}`);
     linesTable(doc, lines, { showPrices: true, decimals });
     doc.moveDown(0.5);
+    // Frais annexes (TVA, freight, FOB, transport…) : détail + sous-total, puis total général
+    // (articles + frais) = coût complet de la commande.
+    const fees = purchaseOrder.fees || [];
+    const montantFrais = Number(purchaseOrder.montant_frais || 0);
+    if (fees.length || montantFrais > 0) {
+      doc.fontSize(10).font('Helvetica').fillColor('black')
+        .text(`Total articles : ${money(purchaseOrder.montant, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+      doc.fillColor(MUTED_GRAY);
+      for (const f of fees) {
+        doc.text(`${f.libelle} : ${money(f.montant, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+      }
+      doc.fillColor('black').font('Helvetica-Bold')
+        .text(`Sous-total frais : ${money(montantFrais, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+      doc.font('Helvetica').moveDown(0.2);
+    }
+    const grandTotal = Number(purchaseOrder.montant || 0) + montantFrais;
     doc.fontSize(12).font('Helvetica-Bold').fillColor(BRAND_NAVY)
-      .text(`Montant total : ${money(purchaseOrder.montant, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
+      .text(`Montant total : ${money(grandTotal, decimals)} ${purchaseOrder.devise}`, 50, doc.y, { width: PAGE_WIDTH, align: 'right' });
     doc.fillColor('black');
     if (purchaseOrder.mode_paiement || purchaseOrder.conditions_paiement) {
       doc.moveDown(0.8).fontSize(10).font('Helvetica');
