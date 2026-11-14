@@ -49,6 +49,7 @@ export default function ListPage() {
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const canAddSupplier = hasSubModuleLevel(user, 'referentiels.suppliers', 'ajout');
+  const canManageFees = isSuperAdmin(user) || hasSubModuleLevel(user, 'achats', 'edition');
   function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
 
   // Export Excel (analyse hors application) — réservé aux valideurs.
@@ -156,6 +157,9 @@ export default function ListPage() {
           )}
           {canAddSupplier && (
             <button type="button" className="btn btn-secondary" onClick={() => setAddSupplierOpen(true)}>{t('refx.addSupplierBtn')}</button>
+          )}
+          {canManageFees && (
+            <Link to="/purchase-requests/frais" className="btn btn-secondary">{t('pr.feeTypesBtn')}</Link>
           )}
           <Link to="/purchase-requests/new" className="btn btn-primary">{t('pr.newBtn')}</Link>
         </div>

@@ -36,12 +36,21 @@ async function getFullDetail(id) {
   for (const qr of quoteRequests) {
     qr.suppliers = await repo.getQuoteRequestSuppliers(qr.id);
   }
-  // Prix par ligne de chaque devis (pour l'affichage détaillé et l'édition des prix par le service achat).
+  // Prix par ligne de chaque devis (pour l'affichage détaillé et l'édition des prix par le service
+  // achat) + frais annexes (TVA, freight…). Le total d'un devis = articles + frais → coût complet
+  // comparable entre fournisseurs.
   for (const q of quotes) {
     const ql = await repo.getQuoteLines(q.id);
     q.lignes = ql.map(x => ({ lineId: x.purchase_request_line_id, prixUnitaire: Number(x.prix_unitaire) }));
+    const qf = await repo.getQuoteFees(q.id);
+    q.frais = qf.map(f => ({ feeTypeId: f.fee_type_id, libelle: f.libelle, montant: Number(f.montant) }));
+    q.montant_frais = q.frais.reduce((s, f) => s + f.montant, 0);
+    q.total = Number(q.montant || 0) + q.montant_frais;
   }
-  return { ...pr, lines, quote_requests: quoteRequests, quotes, approvals, purchase_order: purchaseOrder, attachments };
+  // Frais reportés sur la demande (copie du devis retenu) : détail + sous-total.
+  const feesPr = await repo.getPurchaseRequestFees(id);
+  const fees = feesPr.map(f => ({ feeTypeId: f.fee_type_id, libelle: f.libelle, montant: Number(f.montant) }));
+  return { ...pr, lines, quote_requests: quoteRequests, quotes, approvals, purchase_order: purchaseOrder, attachments, fees };
 }
 
 // À utiliser depuis les routes HTTP : vérifie que l'utilisateur a le droit de voir cette demande
@@ -314,7 +323,19 @@ async function getQuoteRequestSupplierPdf(user, prId, qrsId) {
   return pdf.generateQuoteRequestPdf({ purchaseRequest: pr, lines, entityNom: pr.entity_nom, supplierNom: supplier.supplier_nom, logoBuffer: logo, decimals: await settings.getIntValue('achats_decimales', 4) });
 }
 
-async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes, lignes }, file) {
+// Normalise une liste de frais annexes [{feeTypeId, montant, libelle?}] : ne garde que les montants
+// > 0, et fige le libellé depuis le référentiel des types (snapshot) si non fourni.
+async function normalizeFees(frais) {
+  const rows = (Array.isArray(frais) ? frais : [])
+    .map(f => ({ feeTypeId: f.feeTypeId ? Number(f.feeTypeId) : null, libelle: (f.libelle || '').trim(), montant: Number(f.montant) || 0 }))
+    .filter(f => (f.feeTypeId || f.libelle) && f.montant > 0);
+  if (!rows.length) return [];
+  const types = await repo.listFeeTypes(false);
+  const byId = new Map(types.map(t => [t.id, t.libelle]));
+  return rows.map(f => ({ feeTypeId: f.feeTypeId, montant: f.montant, libelle: f.libelle || byId.get(f.feeTypeId) || 'Frais' }));
+}
+
+async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, notes, lignes, frais }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'saisir un devis reçu');
@@ -339,6 +360,9 @@ async function addQuote(user, prId, { quoteRequestSupplierId, montant, devise, n
 
   const quote = await repo.createQuote(quoteRequestSupplierId, total, devise || pr.devise, notes);
   if (lignesRows) await repo.createQuoteLines(quote.id, lignesRows);
+  // Frais annexes du devis (TVA, freight, FOB, transport…) — comparables entre fournisseurs.
+  const feesRows = await normalizeFees(frais);
+  if (feesRows.length) await repo.setQuoteFees(quote.id, feesRows);
   await audit.logAction({ tableName: 'quotes', recordId: quote.id, purchaseRequestId: prId, action: 'quote_received', userId: user.id, details: { montant: total, devise } });
   // Le devis PDF du fournisseur s'attache ici, directement au moment de la saisie du montant —
   // remplace l'ancien flux à deux étapes (saisir le devis, puis chercher la pièce jointe générique
@@ -379,6 +403,9 @@ async function selectQuote(user, prId, quoteId) {
       montantFinal = q.montant;
     }
     await repo.setMontantFinal(prId, montantFinal, q.devise, tx);
+    // Report des frais annexes du devis retenu sur la demande (coût complet = articles + frais).
+    const qf = await repo.getQuoteFees(quoteId, tx);
+    await repo.setPurchaseRequestFees(prId, qf, tx);
     await repo.updateStatusAndStep(prId, 'devis_selectionne', null, tx);
     return q;
   });
@@ -389,7 +416,7 @@ async function selectQuote(user, prId, quoteId) {
 // Édition des prix d'un devis déjà saisi par le service achat (ex. corriger la précision décimale).
 // Possible pendant la phase devis (devis_en_cours / devis_selectionne). Si le devis édité est le devis
 // RETENU, les nouveaux prix sont répercutés sur les lignes de la DA (prix_unitaire_final + montant final).
-async function updateQuote(user, prId, quoteId, { devise, lignes }, file) {
+async function updateQuote(user, prId, quoteId, { devise, lignes, frais }, file) {
   const pr = await repo.getById(prId);
   if (!pr) throw httpError(404, 'Demande introuvable.');
   await assertRole(user, 'service_achat', pr.entity_id, 'modifier un devis');
@@ -408,20 +435,31 @@ async function updateQuote(user, prId, quoteId, { devise, lignes }, file) {
   const hasLignes = lignesRows.length > 0;
   const total = lignesRows.reduce((s, r) => s + r.prixUnitaire * Number(byId.get(r.lineId).quantite), 0);
   if (hasLignes && !total) throw httpError(400, 'Saisissez au moins un prix de ligne.');
-  if (!hasLignes && !file) throw httpError(400, 'Rien à modifier.');
+  // Frais annexes : un tableau fourni (même vide) remplace les frais du devis ; absent = inchangé.
+  const feesProvided = Array.isArray(frais);
+  const feesRows = feesProvided ? await normalizeFees(frais) : null;
+  if (!hasLignes && !file && !feesProvided) throw httpError(400, 'Rien à modifier.');
   const newDevise = devise || quote.devise;
 
-  if (hasLignes) {
+  if (hasLignes || feesProvided) {
     await withTransaction(async (tx) => {
-      await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
-      await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
-      if (quote.selectionne) {                                       // devis retenu : répercuter sur la DA
-        const ql = await repo.getQuoteLines(quoteId, tx);
-        await repo.applyQuoteLinesToPrLines(prId, ql, tx);
-        await repo.setMontantFinal(prId, total, newDevise, tx);
+      if (hasLignes) {
+        await repo.createQuoteLines(quoteId, lignesRows, tx);          // upsert des prix par ligne
+        await repo.updateQuoteAmount(quoteId, total, newDevise, tx);   // montant recalculé
+      } else if (devise) {
+        await repo.updateQuoteAmount(quoteId, Number(quote.montant) || 0, newDevise, tx); // devise seule
+      }
+      if (feesProvided) await repo.setQuoteFees(quoteId, feesRows, tx); // frais du devis remplacés
+      if (quote.selectionne) {                                         // devis retenu : répercuter sur la DA
+        if (hasLignes) {
+          const ql = await repo.getQuoteLines(quoteId, tx);
+          await repo.applyQuoteLinesToPrLines(prId, ql, tx);
+          await repo.setMontantFinal(prId, total, newDevise, tx);
+        }
+        if (feesProvided) await repo.setPurchaseRequestFees(prId, await repo.getQuoteFees(quoteId, tx), tx);
       }
     });
-    await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: total, devise: newDevise } });
+    await audit.logAction({ tableName: 'quotes', recordId: Number(quoteId), purchaseRequestId: prId, action: 'quote_updated', userId: user.id, details: { montant: hasLignes ? total : undefined, devise: newDevise, fraisModifies: feesProvided || undefined } });
   }
 
   // Pièce jointe (devis PDF) : rattachée à CE devis — permet d'ajouter le PDF oublié à la saisie.
@@ -465,6 +503,7 @@ async function reopenConsultation(user, prId, commentaire) {
   await repo.unselectAllQuotes(prId);             // plus aucun devis retenu
   await repo.clearLinesSelection(prId);           // fournisseur retenu + prix final effacés sur les lignes
   await repo.clearMontantFinal(prId);             // montant final effacé
+  await repo.clearPurchaseRequestFees(prId);      // frais annexes reportés effacés (nouveau devis à retenir)
   await repo.deletePendingApprovals(prId);        // validations en attente retirées (cycle abandonné)
   await repo.updateStatusAndStep(prId, 'devis_en_cours', null);
   await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'reouverture_consultation', userId: user.id, details: { depuis: pr.status, motif: commentaire.trim() } });

@@ -10,6 +10,7 @@ import ListPage from './pages/PurchaseRequests/ListPage';
 import CreatePage from './pages/PurchaseRequests/CreatePage';
 import DetailPage from './pages/PurchaseRequests/DetailPage';
 import PurchaseReportPage from './pages/PurchaseRequests/ReportPage';
+import FeeTypesPage from './pages/PurchaseRequests/FeeTypesPage';
 import ReferentialsIndex from './pages/Referentials/ReferentialsIndex';
 import LogistiqueIndex from './pages/Logistique/LogistiqueIndex';
 import ChecklistsPage from './pages/Logistique/ChecklistsPage';
@@ -117,6 +118,7 @@ export default function App() {
         <Route path="purchase-requests" element={<RequireModule subModule="achats"><ListPage /></RequireModule>} />
         <Route path="purchase-requests/new" element={<RequireModule subModule="achats"><CreatePage /></RequireModule>} />
         <Route path="purchase-requests/rapport" element={<RequireModule subModule="achats"><PurchaseReportPage /></RequireModule>} />
+        <Route path="purchase-requests/frais" element={<RequireModule subModule="achats"><FeeTypesPage /></RequireModule>} />
         <Route path="purchase-requests/:id" element={<RequireModule subModule="achats"><DetailPage /></RequireModule>} />
         <Route path="liens" element={<RequireModule subModule="liens"><LiensPage /></RequireModule>} />
         <Route path="liens/:categorie" element={<RequireModule subModule="liens"><LiensPage /></RequireModule>} />
