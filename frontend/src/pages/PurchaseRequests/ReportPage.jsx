@@ -20,8 +20,11 @@ function currentMonthRange() {
   return { from: `${y}-${pad2(m + 1)}-01`, to: `${y}-${pad2(m + 1)}-${pad2(new Date(y, m + 1, 0).getDate())}` };
 }
 const dateStr = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
-// Montant « achat » d'une ligne : le montant final (devis retenu) sinon le montant du bon de commande.
+// Montant « articles » d'une ligne : le montant final (devis retenu) sinon le montant du bon de
+// commande. Frais = sous-total des frais annexes ; total = articles + frais (coût complet).
 const rowMontant = (r) => (r.montant_final != null ? Number(r.montant_final) : (r.montant_bon_commande != null ? Number(r.montant_bon_commande) : null));
+const rowFrais = (r) => Number(r.montant_frais ?? r.frais_bon_commande ?? 0) || 0;
+const rowTotal = (r) => { const a = rowMontant(r); return a == null ? null : a + rowFrais(r); };
 
 export default function ReportPage() {
   const { user } = useAuth();
@@ -69,10 +72,10 @@ export default function ReportPage() {
       const v = rowMontant(r);
       if (v == null) continue;
       const d = r.devise || 'GNF';
-      if (!m[d]) m[d] = { devise: d, montant: 0, count: 0 };
-      m[d].montant += v; m[d].count += 1;
+      if (!m[d]) m[d] = { devise: d, montant: 0, frais: 0, total: 0, count: 0 };
+      m[d].montant += v; m[d].frais += rowFrais(r); m[d].total += v + rowFrais(r); m[d].count += 1;
     }
-    return Object.values(m).sort((a, b) => b.montant - a.montant);
+    return Object.values(m).sort((a, b) => b.total - a.total);
   }, [filtered]);
 
   const sorted = apply(filtered);
@@ -83,11 +86,15 @@ export default function ReportPage() {
     const data = sorted.map(r => ({
       'N°': r.numero, 'Date création': dateStr(r.created_at), 'Entité': r.entite, 'Business Unit': r.business_unit || '',
       'Objet': r.objet || '', 'Demandeur': r.demandeur || '', 'Fournisseur retenu': r.fournisseur || '',
-      'Statut': STATUS_LABELS[r.statut] || r.statut, 'Montant': rowMontant(r) != null ? rowMontant(r) : '', 'Devise': r.devise || '',
+      'Statut': STATUS_LABELS[r.statut] || r.statut,
+      'Articles': rowMontant(r) != null ? rowMontant(r) : '',
+      'Frais': rowMontant(r) != null ? rowFrais(r) : '',
+      'Total général': rowTotal(r) != null ? rowTotal(r) : '',
+      'Devise': r.devise || '',
       'Bon de commande': r.bon_commande || '', 'Date BC': dateStr(r.date_bon_commande), 'Réceptionnée': r.receptionnee ? 'Oui' : '',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 22 }, { wch: 16 }, { wch: 8 }, { wch: 18 }, { wch: 12 }, { wch: 12 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 18 }, { wch: 12 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rapport achats');
     XLSX.writeFile(wb, `Rapport_achats_${[from, to].filter(Boolean).join('_') || 'tout'}.xlsx`);
@@ -121,7 +128,7 @@ export default function ReportPage() {
             <Kpi label="Demandes" value={nbDA} />
             <Kpi label="Bons de commande" value={nbBC} sub={`${nbRecu} réceptionnée(s)`} />
             {parDevise.length === 0 ? <Kpi label="Montant total" value="—" sub="aucun montant" /> : parDevise.map(d => (
-              <Kpi key={d.devise} label={`Montant total (${d.devise})`} value={money(d.montant)} sub={`${d.count} demande(s) chiffrée(s)`} />
+              <Kpi key={d.devise} label={`Total général (${d.devise})`} value={money(d.total)} sub={`Articles ${money(d.montant)} · Frais ${money(d.frais)}`} />
             ))}
           </div>
 
@@ -157,7 +164,9 @@ export default function ReportPage() {
                   <SortTh label="Objet" colKey="objet" get={r => r.objet} sort={sort} by={by} />
                   <SortTh label="Fournisseur" colKey="fournisseur" get={r => r.fournisseur} sort={sort} by={by} />
                   <SortTh label="Statut" colKey="statut" get={r => r.statut} sort={sort} by={by} />
-                  <SortTh label="Montant" colKey="montant" get={r => rowMontant(r) ?? -1} sort={sort} by={by} />
+                  <SortTh label="Articles" colKey="montant" get={r => rowMontant(r) ?? -1} sort={sort} by={by} className="num" />
+                  <SortTh label="Frais" colKey="frais" get={r => rowFrais(r)} sort={sort} by={by} className="num" />
+                  <SortTh label="Total" colKey="total" get={r => rowTotal(r) ?? -1} sort={sort} by={by} className="num" />
                   <SortTh label="BC" colKey="bc" get={r => r.bon_commande} sort={sort} by={by} />
                 </tr></thead>
                 <tbody>
@@ -171,10 +180,12 @@ export default function ReportPage() {
                       <td>{r.fournisseur || '—'}</td>
                       <td><StatusBadge status={r.statut} /></td>
                       <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rowMontant(r) != null ? `${money(rowMontant(r))} ${r.devise || ''}` : '—'}</td>
+                      <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rowMontant(r) != null && rowFrais(r) > 0 ? `${money(rowFrais(r))} ${r.devise || ''}` : '—'}</td>
+                      <td className="num" style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', fontWeight: 700 }}>{rowTotal(r) != null ? `${money(rowTotal(r))} ${r.devise || ''}` : '—'}</td>
                       <td>{r.bon_commande || '—'}</td>
                     </tr>
                   ))}
-                  {sorted.length === 0 && <tr><td className="empty-row" colSpan={9}>Aucune demande sur la période / les filtres.</td></tr>}
+                  {sorted.length === 0 && <tr><td className="empty-row" colSpan={11}>Aucune demande sur la période / les filtres.</td></tr>}
                 </tbody>
               </table>
             </div>
