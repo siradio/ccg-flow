@@ -920,6 +920,92 @@ a.kpi-tile:hover {
 .login-page--anim-reseau .login-aurora { display: none; }
 .login-page--anim-aurore .login-net { opacity: 0.35; }
 
+/* ─── Animations d'ACCENT optionnelles (super_admin), posées par-dessus le fond par défaut ───────
+   Chacune est indépendante : wave (mot RÉUSSIR), cascade (pastilles), orbit/ring/flow (logo CCG).
+   Tout est gelé sous « animations réduites » : l'état de repos reste parfaitement lisible. */
+
+/* wave — vague lumineuse qui balaie les lettres de RÉUSSIR (elles restent dans leur couleur). */
+@media (prefers-reduced-motion: no-preference) {
+  .reussir-word--wave span { animation: reussirGlow 4.2s ease-in-out infinite; animation-delay: var(--d, 0s); will-change: text-shadow, transform; }
+}
+@keyframes reussirGlow {
+  0%, 68%, 100% { text-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); transform: translateY(0); }
+  34% { text-shadow: 0 0 22px currentColor, 0 6px 18px rgba(0, 0, 0, 0.35); transform: translateY(-2px); }
+}
+
+/* cascade — les pastilles de valeurs entrent une à une au chargement, puis restent en place. */
+@media (prefers-reduced-motion: no-preference) {
+  .reussir-list--cascade li { animation: reussirPop 0.5s ease-out both; animation-delay: var(--d, 0s); }
+}
+@keyframes reussirPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Logo CCG de la carte : socle commun aux accents orbit / ring / flow. */
+.login-cardmark { position: relative; display: inline-flex; flex: none; }
+.login-cardmark--accent { margin-right: 16px; }
+.login-cardmark--accent .brand-mark-logo { width: 38px; height: 38px; }
+.login-cardmark .cardmark-ring,
+.login-cardmark .cardmark-orbit,
+.login-cardmark .cardmark-flow {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  pointer-events: none; z-index: 0;
+}
+.login-cardmark .brand-mark-logo { position: relative; z-index: 1; }
+
+/* orbit — les 7 valeurs tournent autour du logo, avec un halo doux. */
+.login-cardmark .cardmark-orbit { --orbit-r: 27px; width: 70px; height: 70px; }
+.login-cardmark .cardmark-orbit::before {
+  content: ""; position: absolute; inset: 14px; border-radius: 50%; filter: blur(9px);
+  background: radial-gradient(circle, rgba(59, 106, 219, 0.5), transparent 70%);
+}
+.login-cardmark .cardmark-orbit i {
+  position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .login-cardmark .cardmark-orbit { animation: cardmarkSpin 15s linear infinite; }
+}
+@keyframes cardmarkSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+/* ring — un anneau se dessine autour du logo et cycle à travers les 7 couleurs de la charte. */
+.login-cardmark .cardmark-ring { width: 62px; height: 62px; }
+.login-cardmark .cardmark-ring circle {
+  fill: none; stroke-width: 3; stroke-linecap: round; stroke: #3FA34D;
+  transform-origin: 50% 50%; transform: rotate(-90deg);
+  stroke-dasharray: 289; stroke-dashoffset: 289;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .login-cardmark .cardmark-ring circle { animation: cardmarkDraw 5s ease-in-out infinite, cardmarkHue 10s linear infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-cardmark .cardmark-ring circle { stroke-dashoffset: 0; opacity: 0.5; }
+}
+@keyframes cardmarkDraw {
+  0% { stroke-dashoffset: 289; } 45%, 55% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 289; }
+}
+@keyframes cardmarkHue {
+  0%, 100% { stroke: #3FA34D; } 14% { stroke: #2563EB; } 28% { stroke: #F39C12; }
+  42% { stroke: #17A2A0; } 57% { stroke: #8E44AD; } 71% { stroke: #F5B301; } 85% { stroke: #E4442F; }
+}
+
+/* flow — des paquets affluent des bords et se fondent dans le logo (clin d'œil à « Flow »). */
+.login-cardmark .cardmark-flow { width: 108px; height: 108px; }
+.login-cardmark .cardmark-flow i {
+  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%;
+  box-shadow: 0 0 8px currentColor; opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .login-cardmark .cardmark-flow i { animation: cardmarkFlow 2.8s ease-in infinite; }
+}
+@keyframes cardmarkFlow {
+  0% { transform: translate(var(--fx), var(--fy)) scale(1); opacity: 0; }
+  20% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+}
+
 /* La carte et le panneau marque passent au-dessus du fond animé. */
 .login-page .login-shell { position: relative; z-index: 2; }
 .login-page--ticker { padding-bottom: 48px; }

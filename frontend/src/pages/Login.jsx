@@ -19,6 +19,11 @@ const REUSSIR = [
   { letter: 'R', color: '#E4442F', label: 'Résilience & Rigueur' },
 ];
 
+// Angle (deg) de chaque valeur sur l'orbite autour du logo (accent « orbit »).
+const ORBIT_STEP = 360 / REUSSIR.length;
+// Points de départ des paquets convergents (accent « flow »), dans le repère centré sur le logo.
+const FLOW_STARTS = [[-48, -26], [46, -22], [-50, 20], [48, 26], [-26, -44], [30, 42], [-52, 2], [50, -8]];
+
 export default function Login() {
   const { login } = useAuth();
   const { t } = useI18n();
@@ -192,6 +197,11 @@ export default function Login() {
   const showTicker = !!(ticker && ticker.enabled && ticker.messages && ticker.messages.length > 0);
   const animVariant = (ticker && ticker.variant) || 'combine';
 
+  // Animations d'accent optionnelles (super_admin), posées par-dessus le fond par défaut.
+  const accents = (ticker && Array.isArray(ticker.accents)) ? ticker.accents : [];
+  const hasAccent = k => accents.includes(k);
+  const hasMarkAccent = hasAccent('orbit') || hasAccent('ring') || hasAccent('flow');
+
   return (
     <div className={`login-page login-page--anim-${animVariant}${hasCustomBg ? ' login-page--custom-bg' : ''}${showTicker ? ' login-page--ticker' : ''}`}>
       {/* Habillage événementiel (super_admin) : image d'arrière-plan + voile de lisibilité. */}
@@ -212,12 +222,12 @@ export default function Login() {
       <div className="login-shell">
         <div className="login-brand">
           <div className="login-brand-eyebrow">NOS VALEURS</div>
-          <div className="reussir-word" aria-label="RÉUSSIR">
-            {REUSSIR.map((v, i) => <span key={i} style={{ color: v.color }}>{v.letter}</span>)}
+          <div className={`reussir-word${hasAccent('wave') ? ' reussir-word--wave' : ''}`} aria-label="RÉUSSIR">
+            {REUSSIR.map((v, i) => <span key={i} style={{ color: v.color, '--d': `${i * 0.32}s` }}>{v.letter}</span>)}
           </div>
-          <ul className="reussir-list">
+          <ul className={`reussir-list${hasAccent('cascade') ? ' reussir-list--cascade' : ''}`}>
             {REUSSIR.map((v, i) => (
-              <li key={i}>
+              <li key={i} style={{ '--d': `${i * 0.09}s` }}>
                 <span className="reussir-badge" style={{ background: v.color }}>{v.letter}</span>
                 {v.label}
               </li>
@@ -227,7 +237,29 @@ export default function Login() {
         <div className="card login-card" style={{ width: '100%', maxWidth: mode === 'request' ? 420 : 360 }}>
         {bg?.message && <div className="login-event" role="status">{bg.message}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
+          <span className={`login-cardmark${hasMarkAccent ? ' login-cardmark--accent' : ''}`}>
+            {hasAccent('ring') && (
+              <svg className="cardmark-ring" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="46" />
+              </svg>
+            )}
+            {hasAccent('orbit') && (
+              <span className="cardmark-orbit" aria-hidden="true">
+                {REUSSIR.map((v, i) => (
+                  <i key={i} style={{ background: v.color, color: v.color, transform: `rotate(${i * ORBIT_STEP}deg) translateY(calc(var(--orbit-r) * -1))` }} />
+                ))}
+              </span>
+            )}
+            {hasAccent('flow') && (
+              <span className="cardmark-flow" aria-hidden="true">
+                {FLOW_STARTS.map((p, i) => {
+                  const v = REUSSIR[i % REUSSIR.length];
+                  return <i key={i} style={{ background: v.color, color: v.color, '--fx': `${p[0]}px`, '--fy': `${p[1]}px`, animationDelay: `${i * 0.34}s` }} />;
+                })}
+              </span>
+            )}
+            <span className="brand-mark brand-mark-logo"><img src={logo} alt="CCG" /></span>
+          </span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>CCG Flow</div>
             <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', lineHeight: 1.3 }}>{t('login.subtitle')}</div>
