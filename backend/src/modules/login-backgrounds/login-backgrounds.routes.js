@@ -20,8 +20,8 @@ router.get('/ticker', async (req, res, next) => {
 });
 router.put('/ticker', async (req, res, next) => {
   try {
-    const { enabled, messages, speed, from, to, variant } = req.body || {};
-    res.json(await service.setAppearance({ enabled, messages, speed, from, to, variant }));
+    const { enabled, messages, speed, from, to, variant, accents } = req.body || {};
+    res.json(await service.setAppearance({ enabled, messages, speed, from, to, variant, accents }));
   } catch (e) { next(e); }
 });
 

@@ -32,6 +32,9 @@ export default function LoginBackground() {
   const [tkSaved, setTkSaved] = useState(false);
   const [variant, setVariant] = useState('combine');
   const [variantSaved, setVariantSaved] = useState(false);
+  // Animations d'accent optionnelles (liste de clés activées), posées par-dessus le fond par défaut.
+  const [accents, setAccents] = useState([]);
+  const [accentsSaved, setAccentsSaved] = useState(false);
 
   function load() {
     client.get('/login-backgrounds')
@@ -48,6 +51,7 @@ export default function LoginBackground() {
   function applyAppearance(d) {
     setTk({ enabled: !!d.enabled, messages: (d.messages || []).join('\n'), speed: d.speed || 'normal', from: d.from || '', to: d.to || '' });
     setVariant(d.variant || 'combine');
+    setAccents(Array.isArray(d.accents) ? d.accents : []);
   }
 
   async function saveTicker() {
@@ -63,6 +67,17 @@ export default function LoginBackground() {
     const res = await client.put('/login-backgrounds/ticker', { variant });
     applyAppearance(res.data);
     setVariantSaved(true);
+  }
+
+  function toggleAccent(key) {
+    setAccentsSaved(false);
+    setAccents(list => list.includes(key) ? list.filter(k => k !== key) : [...list, key]);
+  }
+  async function saveAccents() {
+    setAccentsSaved(false);
+    const res = await client.put('/login-backgrounds/ticker', { accents });
+    applyAppearance(res.data);
+    setAccentsSaved(true);
   }
 
   async function add(e) {
@@ -170,6 +185,27 @@ export default function LoginBackground() {
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" className="btn btn-primary btn-sm" onClick={saveVariant}>{t('adm.loginBg.save')}</button>
           {variantSaved && <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
+        </div>
+      </section>
+
+      {/* Animations d'accent optionnelles, posées par-dessus le fond par défaut (activables une à une). */}
+      <section className="card" style={{ maxWidth: 680, marginBottom: 18 }}>
+        <h2 style={{ marginTop: 0 }}>{t('adm.loginBg.accent.title')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('adm.loginBg.accent.intro')}</p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {['wave', 'cascade', 'orbit', 'ring', 'flow'].map(key => (
+            <label key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={accents.includes(key)} onChange={() => toggleAccent(key)} style={{ marginTop: 3 }} />
+              <span>
+                <span style={{ fontWeight: 600 }}>{t(`adm.loginBg.accent.${key}`)}</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-text-muted)' }}>{t(`adm.loginBg.accent.${key}Hint`)}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={saveAccents}>{t('adm.loginBg.save')}</button>
+          {accentsSaved && <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span>}
         </div>
       </section>
 
