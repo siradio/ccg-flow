@@ -92,6 +92,23 @@ async function entityCode(entityId) {
   return row ? row.code : 'GRP';
 }
 
+// Modifie l'en-tête d'une demande en brouillon (objet, justification, BU) — réservé à l'auteur.
+// Indispensable lorsqu'une DA est renvoyée pour complément (« demande_complement » → brouillon) :
+// l'auteur doit pouvoir corriger l'objet/la justification, pas seulement les lignes. L'entité et le
+// numéro ne changent jamais (le numéro encode déjà l'entité et le circuit est déjà rattaché).
+async function updateDraft(user, prId, { objet, justification, businessUnitId }) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  assertOwnerAndStatus(pr, user, 'brouillon');
+  if (!objet || !objet.trim()) throw httpError(400, 'objet requis.');
+  // La BU n'a de sens que pour SOGUIPAL (comme à la création) ; ailleurs on la force à NULL.
+  const code = await entityCode(pr.entity_id);
+  const buId = code === 'SOGUIPAL' && businessUnitId ? Number(businessUnitId) : null;
+  await repo.updateDraftHeader(prId, { objet: objet.trim(), justification: justification ?? null, businessUnitId: buId });
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'update', userId: user.id, details: { objet: objet.trim() } });
+  return getFullDetail(prId);
+}
+
 function assertOwnerAndStatus(pr, user, expectedStatus) {
   if (pr.requester_user_id !== user.id && !hasRoleOnEntity(user, 'super_admin', null)) {
     throw httpError(403, "Seul l'auteur de la demande peut la modifier.");
@@ -850,7 +867,7 @@ async function exportRows(user, { from, to }) {
 }
 
 module.exports = {
-  getFullDetail, getFullDetailForUser, createDraft, addLine, updateLine, deleteLine, submit,
+  getFullDetail, getFullDetailForUser, createDraft, updateDraft, addLine, updateLine, deleteLine, submit,
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, updateQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
   validateStep, rejectStep, requestChanges, listForUser, exportRows, markReception,

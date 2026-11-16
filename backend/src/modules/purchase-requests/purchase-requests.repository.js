@@ -135,6 +135,17 @@ async function updateStatusAndStep(id, status, currentStepId, x = DB) {
   );
 }
 
+// Modifie l'en-tête d'une demande en brouillon (objet, justification, BU). L'entité et le numéro ne
+// changent jamais (le numéro encode déjà l'entité). Le gating de statut/propriétaire est fait en amont.
+async function updateDraftHeader(id, { objet, justification, businessUnitId }) {
+  return one(
+    `UPDATE purchase_requests
+        SET objet = $2, justification = $3, business_unit_id = $4, updated_at = now()
+      WHERE id = $1 RETURNING *`,
+    [id, objet, justification || null, businessUnitId || null]
+  );
+}
+
 // Lignes plates pour l'export Excel (analyse hors application). Une ligne par demande d'achat, avec
 // entité, BU, demandeur, statut, montant, et le bon de commande / fournisseur retenus s'ils existent.
 async function exportRows({ from, to, entityIds }) {
@@ -490,7 +501,7 @@ async function clearPurchaseRequestFees(prId, x = DB) {
 }
 
 module.exports = {
-  createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, setMontantFinal, exportRows,
+  createDraft, setNumero, getById, list, listVisibleTo, listPendingAction, updateStatusAndStep, updateDraftHeader, setMontantFinal, exportRows,
   addLine, getLines, getLine, updateLine, deleteLine, setLinesFournisseurRetenu, setLinesPrixUnitaireFinal,
   createQuoteRequest, addQuoteRequestSupplier, getQuoteRequest, getQuoteRequestSuppliers,
   getQuoteRequestSupplier, markQuoteRequestSupplierSent, getQuoteRequestsForPR,
