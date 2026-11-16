@@ -99,6 +99,15 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Modification de l'en-tête d'une demande en brouillon (objet, justification, BU) — réservé à l'auteur.
+// Permet de compléter/corriger une DA renvoyée pour complément, au-delà des seules lignes.
+router.put('/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { objet, justification, businessUnitId } = req.body || {};
+    res.json(await service.updateDraft(req.user, Number(req.params.id), { objet, justification, businessUnitId }));
+  } catch (e) { next(e); }
+});
+
 router.post('/:id/submit', requireAuth, async (req, res, next) => {
   try { res.json(await service.submit(req.user, Number(req.params.id))); }
   catch (e) { next(e); }

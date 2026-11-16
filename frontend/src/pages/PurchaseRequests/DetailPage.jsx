@@ -30,7 +30,11 @@ export default function DetailPage() {
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [entities, setEntities] = useState([]);
+  const [businessUnits, setBusinessUnits] = useState([]);
   const [minSuppliers, setMinSuppliers] = useState(2);
+  // Édition de l'en-tête (objet/justification/BU) par l'auteur tant que la demande est en brouillon.
+  const [editHeader, setEditHeader] = useState(false);
+  const [hdr, setHdr] = useState({ objet: '', justification: '', businessUnitId: '' });
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
   const [toast, setToast] = useState(null);
@@ -50,6 +54,7 @@ export default function DetailPage() {
   useEffect(() => {
     client.get('/settings').then(res => setMinSuppliers(Number(res.data.min_suppliers_devis) || 1));
     client.get('/entities').then(res => setEntities(res.data));
+    client.get('/business-units').then(res => setBusinessUnits(res.data)).catch(() => setBusinessUnits([]));
   }, []);
   useEffect(() => {
     if (!pr) return;
@@ -106,6 +111,20 @@ export default function DetailPage() {
   // Édition des lignes : réservée au demandeur (auteur) tant que la demande est en brouillon.
   // Pour revenir sur un devis déjà retenu, le service achat utilise « Rouvrir la consultation ».
   const canEditLines = pr.status === 'brouillon' && isRequester;
+  const canEditHeader = pr.status === 'brouillon' && isRequester;
+  const isSoguipal = pr.entity_code === 'SOGUIPAL';
+
+  function openHeaderEdit() {
+    setHdr({ objet: pr.objet || '', justification: pr.justification || '', businessUnitId: pr.business_unit_id || '' });
+    setEditHeader(true);
+  }
+  async function saveHeader() {
+    if (!hdr.objet.trim()) return;
+    const payload = { objet: hdr.objet.trim(), justification: hdr.justification };
+    if (isSoguipal) payload.businessUnitId = hdr.businessUnitId ? Number(hdr.businessUnitId) : null;
+    const ok = await guarded(() => client.put(`/purchase-requests/${pr.id}`, payload), t('prd.headerUpdated'));
+    if (ok) setEditHeader(false);
+  }
 
   return (
     <div>
@@ -130,14 +149,47 @@ export default function DetailPage() {
       </section>
 
       <section className="card">
-        <h2>{t('prd.info')}</h2>
-        <p><strong>{t('prc.entity')} :</strong> {pr.entity_nom}</p>
-        {pr.entity_code === 'SOGUIPAL' && (
-          <p><strong>{t('stockreleve.bu')} :</strong> {pr.business_unit_nom || t('cockpit.allBu')}</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <h2 style={{ margin: 0 }}>{t('prd.info')}</h2>
+          {canEditHeader && !editHeader && (
+            <button className="btn btn-secondary btn-sm" onClick={openHeaderEdit}>{t('prd.editRequest')}</button>
+          )}
+        </div>
+        <p style={{ marginTop: 12 }}><strong>{t('prc.entity')} :</strong> {pr.entity_nom}</p>
+        {editHeader ? (
+          <div className="form-grid" style={{ maxWidth: 'none', marginTop: 4 }}>
+            {isSoguipal && (
+              <label className="field">
+                {t('stockreleve.bu')}
+                <select value={hdr.businessUnitId} onChange={e => setHdr({ ...hdr, businessUnitId: e.target.value })}>
+                  <option value="">{t('cockpit.allBu')}</option>
+                  {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="field">
+              {t('prc.subject')}
+              <input value={hdr.objet} onChange={e => setHdr({ ...hdr, objet: e.target.value })} required />
+            </label>
+            <label className="field">
+              {t('prc.justification')}
+              <textarea value={hdr.justification} onChange={e => setHdr({ ...hdr, justification: e.target.value })} style={{ minHeight: 90 }} />
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary btn-sm" disabled={!hdr.objet.trim()} onClick={saveHeader}>{t('common.save')}</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setEditHeader(false)}>{t('common.cancel')}</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {isSoguipal && (
+              <p><strong>{t('stockreleve.bu')} :</strong> {pr.business_unit_nom || t('cockpit.allBu')}</p>
+            )}
+            <p><strong>{t('prd.requester')} :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
+            {pr.justification && <p><strong>{t('prc.justification')} :</strong> {pr.justification}</p>}
+          </>
         )}
-        <p><strong>{t('prd.requester')} :</strong> {pr.requester_prenom} {pr.requester_nom}</p>
-        {pr.justification && <p><strong>{t('prc.justification')} :</strong> {pr.justification}</p>}
-        <p style={{ marginBottom: 0 }}><strong>{t('prd.finalAmount')} :</strong>{' '}
+        <p style={{ marginBottom: 0, marginTop: editHeader ? 14 : undefined }}><strong>{t('prd.finalAmount')} :</strong>{' '}
           {pr.montant_final ? (
             <>
               {pr.montant_final}{' '}
