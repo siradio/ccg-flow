@@ -11,8 +11,9 @@ import { useI18n } from '../../i18n/I18nContext';
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => today().slice(0, 8) + '01';
 const fmt = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 }));
-// Tonnes : 3 décimales (petites quantités). poids unitaire en grammes → t = qté × g ÷ 1 000 000.
-const fmtT = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+// Tonnes : jusqu'à 3 décimales (petites quantités), mais un entier reste un entier (pas de « 3,000 »).
+// poids unitaire en grammes → t = qté × g ÷ 1 000 000.
+const fmtT = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 3 }));
 const tonnes = (qte, pug) => (Number(qte) || 0) * (Number(pug) || 0) / 1e6;
 const d10 = v => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');
 

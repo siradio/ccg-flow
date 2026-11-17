@@ -19,6 +19,10 @@ async function openAuthenticatedFile(path) {
   window.open(url, '_blank');
 }
 
+// Quantité : entier affiché en entier (pas de « 1.00000000 » issu du NUMERIC en base), décimales
+// seulement si la valeur en a réellement. N'a rien à voir avec les décimales des MONTANTS (useAchatFormat).
+const fmtQty = n => (n == null || n === '' ? '' : Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 4 }));
+
 export default function DetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -292,7 +296,7 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
     setEditForm({
       productId: l.product_id ? String(l.product_id) : '',
       descriptionLibre: l.description_libre || '',
-      quantite: String(l.quantite ?? ''), unite: l.unite || '',
+      quantite: l.quantite != null ? String(Number(l.quantite)) : '', unite: l.unite || '',
     });
   }
   async function saveEdit(l) {
@@ -340,7 +344,7 @@ function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {
             ) : (
               <tr key={l.id}>
                 <td>{l.designation || l.description_libre}</td>
-                <td>{l.quantite}</td>
+                <td>{fmtQty(l.quantite)}</td>
                 <td>{l.unite}</td>
                 {showPrices && <>
                   <td className="num" style={{ fontVariantNumeric: 'tabular-nums' }}>{l.prix_unitaire_final != null ? `${money(l.prix_unitaire_final)} ${pr.devise}` : '—'}</td>
@@ -768,7 +772,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                             {lines.map(l => (
                               <tr key={l.id}>
                                 <td>{l.designation || l.description_libre}</td>
-                                <td className="num">{l.quantite} {l.unite || ''}</td>
+                                <td className="num">{fmtQty(l.quantite)} {l.unite || ''}</td>
                                 <td className="num">
                                   <input type="number" min="0" step={step} style={{ width: 140, textAlign: 'right' }}
                                     value={editPrices[l.id] ?? ''} onChange={e => setEditPrices(p => ({ ...p, [l.id]: e.target.value }))} />
@@ -858,7 +862,7 @@ function QuotesSection({ pr, guarded, suppliers = [] }) {
                   {lines.map(l => (
                     <tr key={l.id}>
                       <td>{l.designation || l.description_libre}</td>
-                      <td className="num">{l.quantite} {l.unite || ''}</td>
+                      <td className="num">{fmtQty(l.quantite)} {l.unite || ''}</td>
                       <td className="num">
                         <input type="number" min="0" step={step} style={{ width: 130, textAlign: 'right' }}
                           value={form.prices[l.id] ?? ''} onChange={e => setForm(f => ({ ...f, prices: { ...f.prices, [l.id]: e.target.value } }))} />
