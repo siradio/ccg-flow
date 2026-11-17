@@ -34,6 +34,15 @@ function money(n, decimals = 4) {
   return `${withSpaces},${dec}`;
 }
 
+// Quantité : entier affiché en entier (pas de « 1,00000000 » issu du NUMERIC en base), décimales
+// seulement si la valeur en a réellement (jusqu'à 4). Différent de `money` (qui garde ≥ 2 décimales).
+function qty(n) {
+  const [intPart, decMax = ''] = Number(n || 0).toFixed(4).split('.');
+  const dec = decMax.replace(/0+$/, '');
+  const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return dec ? `${withSpaces},${dec}` : withSpaces;
+}
+
 // `opts.footerNote` : mention affichée au pied de chaque page avant « Page i/N ». Par défaut
 // « Document généré automatiquement » (compat. Achat/Commerce). Passer '' pour n'afficher que la
 // pagination (ex. rapport DSI destiné à la Direction, qui ne doit rien laisser paraître d'auto).
@@ -128,7 +137,7 @@ function linesTable(doc, lines, { showPrices = false, decimals = 4 } = {}) {
 
     const values = {
       designation: line.description_libre || line.designation || '—',
-      quantite: String(line.quantite),
+      quantite: qty(line.quantite),
       unite: line.unite || '',
       prix: money(prixUnitaire, decimals),
       montant: money(montantLigne, decimals),
@@ -442,7 +451,7 @@ async function generateExpenseAuthorizationPdf({ authorization: a, lignes = [], 
       lignes.forEach((l, i) => {
         const rowY = doc.y;
         if (i % 2 === 1) { doc.rect(50, rowY - 3, PAGE_WIDTH, 18).fill('#f3f4f6'); doc.fillColor('black'); }
-        const vals = { designation: l.designation || '—', quantite: String(l.quantite), prix: money(l.prix_unitaire, 2), montant: money(l.montant, 2) };
+        const vals = { designation: l.designation || '—', quantite: qty(l.quantite), prix: money(l.prix_unitaire, 2), montant: money(l.montant, 2) };
         x = 50;
         for (const c of cols) { doc.text(vals[c.key], x + 6, rowY, { width: c.width - 8, align: c.align || 'left' }); x += c.width; }
         doc.y = rowY + 18;
