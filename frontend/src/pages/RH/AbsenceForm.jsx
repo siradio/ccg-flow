@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import RhSubnav from './RhSubnav';
+import SearchableSelect from '../../components/SearchableSelect.jsx';
 import FeriesInfo from './FeriesInfo.jsx';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -11,7 +12,9 @@ export default function AbsenceForm() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [types, setTypes] = useState([]);
-  const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '', remplacement: '' });
+  const [team, setTeam] = useState([]);        // membres de l'équipe (demande pour autrui)
+  const [onBehalf, setOnBehalf] = useState(false);
+  const [form, setForm] = useState({ type_id: '', date_debut: today(), date_fin: today(), motif: '', commentaire: '', remplacement: '', on_behalf_employee_id: '' });
   const [jours, setJours] = useState(null);
   const [feries, setFeries] = useState([]);
   const [file, setFile] = useState(null);
@@ -19,6 +22,7 @@ export default function AbsenceForm() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { client.get('/rh/types?domaine=absence').then(r => setTypes(r.data)).catch(() => {}); }, []);
+  useEffect(() => { client.get('/rh/my-team').then(r => setTeam(r.data)).catch(() => setTeam([])); }, []);
   useEffect(() => {
     if (!form.date_debut || !form.date_fin) { setJours(null); setFeries([]); return; }
     client.get(`/rh/working-days?from=${form.date_debut}&to=${form.date_fin}`)
@@ -30,9 +34,11 @@ export default function AbsenceForm() {
 
   async function submit(e, andSubmit) {
     e.preventDefault();
+    if (onBehalf && !form.on_behalf_employee_id) { setError(t('rh.team.selectMember')); return; }
     setError(''); setSaving(true);
     try {
-      const res = await client.post('/rh/requests/absence', form);
+      const payload = { ...form, on_behalf_employee_id: onBehalf ? form.on_behalf_employee_id : '' };
+      const res = await client.post('/rh/requests/absence', payload);
       const id = res.data.id;
       if (file) { const fd = new FormData(); fd.append('file', file); await client.post(`/rh/requests/${id}/attachments`, fd); }
       if (andSubmit) await client.post(`/rh/requests/${id}/submit`);
@@ -51,6 +57,22 @@ export default function AbsenceForm() {
       {error && <div className="alert alert-danger" style={{ maxWidth: 640 }}>{error}</div>}
       <div className="card" style={{ maxWidth: 640 }}>
         <form onSubmit={e => submit(e, true)} className="form-grid" style={{ maxWidth: 'none' }}>
+          {team.length > 0 && (
+            <div className="field" style={{ background: 'var(--color-hover)', padding: 10, borderRadius: 8 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+                <input type="checkbox" checked={onBehalf} onChange={e => { setOnBehalf(e.target.checked); if (!e.target.checked) set('on_behalf_employee_id', ''); }} />
+                {t('rh.team.forMember')}
+              </label>
+              {onBehalf && (
+                <div style={{ marginTop: 8 }}>
+                  <SearchableSelect value={form.on_behalf_employee_id} onChange={v => set('on_behalf_employee_id', v ?? '')}
+                    options={team} getLabel={m => `${m.prenom} ${m.nom}${m.matricule ? ` (${m.matricule})` : ''}`}
+                    getSearch={m => `${m.prenom} ${m.nom} ${m.matricule || ''}`} placeholder={t('rh.team.selectMember')} />
+                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginTop: 4 }}>{t('rh.team.bypassHint')}</span>
+                </div>
+              )}
+            </div>
+          )}
           <label className="field">{t('rh.absence.type')}
             <select value={form.type_id} onChange={e => set('type_id', e.target.value)} required>
               <option value="" disabled>{t('rh.absence.typeDots')}</option>

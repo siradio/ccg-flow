@@ -88,7 +88,7 @@ export default function CongeForm() {
                   <SearchableSelect value={form.on_behalf_employee_id} onChange={v => set('on_behalf_employee_id', v ?? '')}
                     options={team} getLabel={m => `${m.prenom} ${m.nom}${m.matricule ? ` (${m.matricule})` : ''}`}
                     getSearch={m => `${m.prenom} ${m.nom} ${m.matricule || ''}`} placeholder={t('rh.team.selectMember')} />
-                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginTop: 4 }}>{t('rh.team.bypassHint')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginTop: 4 }}>{t('rh.team.bypassHint')} {t('rh.team.soldeHint')}</span>
                 </div>
               )}
             </div>
