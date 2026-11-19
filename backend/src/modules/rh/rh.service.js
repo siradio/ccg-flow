@@ -136,9 +136,12 @@ async function createRequest(user, type, body) {
   await repo.logHistory(req.id, 'creation', user.id, null);
   return getDetail(req.id);
 }
-async function createAbsence(user, body) { return createRequest(user, 'absence', body); }
+async function createAbsence(user, body) {
+  if (body.on_behalf_employee_id) return createRequestOnBehalf(user, 'absence', body);
+  return createRequest(user, 'absence', body);
+}
 async function createConge(user, body) {
-  if (body.on_behalf_employee_id) return createCongeOnBehalf(user, body);
+  if (body.on_behalf_employee_id) return createRequestOnBehalf(user, 'conge', body);
   return createRequest(user, 'conge', body);
 }
 
@@ -161,10 +164,10 @@ function canCreateForEmployee(user, target) {
   return hasRoleOnEntity(user, 'responsable', target.entity_id);
 }
 
-// Congé initié par le responsable pour un membre de son équipe : la demande concerne l'employé
-// ciblé, l'étape 'responsable' est retirée du circuit (bypass_responsable), le solde contrôlé est
-// celui de l'employé. Trace l'initiateur dans le payload.
-async function createCongeOnBehalf(user, body) {
+// Demande (congé ou absence) initiée par le responsable pour un membre de son équipe : la demande
+// concerne l'employé ciblé, l'étape 'responsable' est retirée du circuit (bypass_responsable), et
+// pour un congé le solde contrôlé est celui de l'employé. Trace l'initiateur dans le payload.
+async function createRequestOnBehalf(user, type, body) {
   const target = await one('SELECT * FROM employees WHERE id = $1', [Number(body.on_behalf_employee_id)]);
   if (!target) throw httpError(400, 'Employé introuvable.');
   if (!canCreateForEmployee(user, target)) throw httpError(403, "Vous n'êtes pas le responsable de cet employé.");
@@ -176,12 +179,12 @@ async function createCongeOnBehalf(user, body) {
   const remplacement = (body.remplacement || '').trim();
   if (remplacement) payload.remplacement = remplacement;
   let req = await repo.create({
-    type: 'conge', employeeId: target.id, createdBy: user.id, entityId: target.entity_id,
+    type, employeeId: target.id, createdBy: user.id, entityId: target.entity_id,
     businessUnitId: target.business_unit_id, typeId: body.type_id || null,
     dateDebut: body.date_debut || null, dateFin: body.date_fin || null, jours,
     motif: body.motif || null, commentaire: body.commentaire || null, payload,
   });
-  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX.conge, target.entity_code || 'CCG', req.id));
+  req = await repo.setNumero(req.id, numbering.formatRhNumber(PREFIX[type] || 'RH', target.entity_code || 'CCG', req.id));
   await repo.logHistory(req.id, 'creation', user.id, null);
   return getDetail(req.id);
 }
