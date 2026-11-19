@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from 'recharts';
 import client from '../../api/client';
 import Loading from '../../components/Loading';
@@ -88,17 +88,18 @@ export default function Statistiques() {
         </div>
         <div style={{ marginTop: 12 }}>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={daily} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+            <ComposedChart data={daily} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="day" tickFormatter={fmtTick} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} interval="preserveStartEnd" minTickGap={16} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
               <Tooltip
                 labelFormatter={fmtTick}
-                formatter={v => [v, t('adm.stats.connections')]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)' }}
               />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="count" name={t('adm.stats.connections')} fill="#2454e0" radius={[3, 3, 0, 0]} maxBarSize={38} />
-            </BarChart>
+              <Line type="monotone" dataKey="actifs" name={t('adm.stats.activeUsers')} stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
