@@ -6,6 +6,12 @@ import ReferentialPage from './ReferentialPage';
 import ReferentialsSubnav from './ReferentialsSubnav';
 import { useI18n } from '../../i18n/I18nContext';
 
+// Code de la catégorie produit sélectionnée dans le formulaire (via la liste chargée). Sert aux
+// `showIf` des champs produit : le « Type d'article » a été retiré (redondant avec la Catégorie),
+// la visibilité conditionnelle s'appuie donc directement sur la catégorie choisie.
+const selectedCategoryCode = (form, lists) =>
+  (lists.categories || []).find(c => String(c.id) === String(form.category_id))?.code;
+
 // Exporté séparément pour être réutilisé tel quel par l'ajout rapide de fournisseur depuis une
 // demande d'achat (DetailPage.jsx) — même structure, mêmes champs, entity_ids inclus, que le
 // référentiel complet (la case de l'entité de la demande en cours est simplement pré-cochée).
@@ -100,14 +106,14 @@ const CONFIGS = {
     // des doublons) — permet de compléter en masse le conditionnement depuis un export rempli.
     importUpsertKey: 'code',
     // Un seul référentiel gère produits finis, matières premières et consommables : la distinction
-    // se fait par « Type d'article ». Les champs propres aux matières premières n'apparaissent que
-    // lorsque ce type est « matière première » (showIf).
-    filters: ['type_article', 'category_id', 'business_unit_id', 'entity_ids'],
+    // se fait par la « Catégorie » (le champ « Type d'article », redondant, a été retiré ; le type
+    // technique est dérivé de la catégorie côté serveur). Les champs propres aux matières premières
+    // n'apparaissent que si la catégorie choisie est « matière première » (showIf).
+    filters: ['category_id', 'business_unit_id', 'entity_ids'],
     // Champs regroupés par section (propriété `group`) pour faciliter la saisie : Identification,
     // Classement, Conditionnement & poids, Matière première, Coûts & valorisation, Seuils & gestion,
     // Disponibilité. L'ordre des champs suit l'ordre d'affichage souhaité à l'intérieur de chaque bloc.
     fields: [
-      { key: 'type_article', group: 'refx.grp.identification', labelKey: 'refx.f.type_article', type: 'select', options: ['produit_fini', 'matiere_premiere', 'consommable', 'autre'], optionNs: 'type', default: 'produit_fini' },
       { key: 'code', group: 'refx.grp.identification', labelKey: 'refx.f.code' },
       { key: 'designation', group: 'refx.grp.identification', labelKey: 'refx.f.designation', required: true },
       { key: 'code_barres', group: 'refx.grp.identification', labelKey: 'refx.f.code_barres' },
@@ -117,18 +123,20 @@ const CONFIGS = {
       { key: 'business_unit_id', group: 'refx.grp.classement', labelKey: 'refx.f.business_unit_id', type: 'fkSelect', listKey: 'businessUnits' },
       { key: 'unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite' },
       { key: 'unite_vente', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite_vente' },
-      // Conditionnement & poids (module Production — harmonisation en tonnes). Poids unitaire (g) =
-      // Format × Unités par colis × (kg→1000, sinon 1). Visible pour les produits finis.
-      { key: 'pds_format', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_format', type: 'number', showIf: { field: 'type_article', equals: 'produit_fini' } },
-      { key: 'pds_unites_par_colis', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unites_par_colis', type: 'number', showIf: { field: 'type_article', equals: 'produit_fini' } },
-      { key: 'pds_unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unite', type: 'select', options: ['g', 'ml', 'kg'], showIf: { field: 'type_article', equals: 'produit_fini' } },
+      // Conditionnement & poids (module Production — harmonisation en tonnes). Poids par colis (g) =
+      // Poids unitaire × Quantité × (kg→1000, sinon 1). Affiché pour tout ce qui n'est pas une
+      // matière première (la catégorie en décide).
+      { key: 'pds_format', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_format', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      { key: 'pds_unites_par_colis', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unites_par_colis', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      { key: 'pds_unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unite', type: 'select', options: ['g', 'ml', 'kg'], showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
       { key: 'poids_unitaire_g', group: 'refx.grp.conditionnement', labelKey: 'refx.f.poids_unitaire_g', type: 'computed', suffix: ' g',
         compute: (f) => { const fmt = Number(f.pds_format); const u = Number(f.pds_unites_par_colis); if (!fmt || !u) return null; return fmt * u * (f.pds_unite === 'kg' ? 1000 : 1); },
-        showIf: { field: 'type_article', equals: 'produit_fini' } },
-      // Champs spécifiques matières premières (production / consommation).
-      { key: 'unite_conso', group: 'refx.grp.matiere', labelKey: 'refx.f.unite_conso', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
-      { key: 'coef_conversion', group: 'refx.grp.matiere', labelKey: 'refx.f.coef_conversion', type: 'number', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
-      { key: 'fournisseur_principal_id', group: 'refx.grp.matiere', labelKey: 'refx.f.fournisseur_principal_id', type: 'fkSelect', listKey: 'suppliers', showIf: { field: 'type_article', equals: 'matiere_premiere' } },
+        showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      // Champs spécifiques matières premières (production / consommation) : visibles si la catégorie
+      // choisie est « matière première ».
+      { key: 'unite_conso', group: 'refx.grp.matiere', labelKey: 'refx.f.unite_conso', showIf: (f, l) => selectedCategoryCode(f, l) === 'matiere_premiere' },
+      { key: 'coef_conversion', group: 'refx.grp.matiere', labelKey: 'refx.f.coef_conversion', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) === 'matiere_premiere' },
+      { key: 'fournisseur_principal_id', group: 'refx.grp.matiere', labelKey: 'refx.f.fournisseur_principal_id', type: 'fkSelect', listKey: 'suppliers', showIf: (f, l) => selectedCategoryCode(f, l) === 'matiere_premiere' },
       // Coûts & valorisation.
       { key: 'cout_standard', group: 'refx.grp.valorisation', labelKey: 'refx.f.cout_standard', type: 'number' },
       { key: 'prix_vente_ht', group: 'refx.grp.valorisation', labelKey: 'refx.f.prix_vente_ht', type: 'number' },
