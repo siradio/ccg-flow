@@ -1,0 +1,35 @@
+/* Générateur de signature e-mail — styles scoppés (CSS module). Les sélecteurs d'éléments
+   sont volontairement descendants de .wrap pour ne pas fuiter dans le reste de l'app. */
+.wrap { max-width: 900px; }
+.wrap h2 { font-size: 17px; margin: 28px 0 12px; color: var(--color-primary, #1F5FBF); }
+.chapo { margin-top: 2px; color: var(--color-text-muted); max-width: 62ch; }
+
+.carte { background: var(--color-surface, #fff); border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; }
+.grille { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 680px) { .grille { grid-template-columns: 1fr; } }
+
+.wrap label { display: block; font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.wrap label .doux { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-text-faint); }
+.wrap input, .wrap select { width: 100%; padding: 9px 11px; border: 1px solid var(--color-border);
+  border-radius: 8px; font: inherit; font-size: 15px; color: var(--color-text); background: var(--color-bg, #fff); }
+.wrap input:focus, .wrap select:focus { outline: 2px solid var(--color-primary, #1F5FBF); outline-offset: 1px; border-color: var(--color-primary, #1F5FBF); }
+.plein { grid-column: 1 / -1; }
+.case { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 13.5px;
+  font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-text-muted); cursor: pointer; }
+.case input { width: auto; margin: 0; accent-color: var(--color-primary, #1F5FBF); cursor: pointer; }
+
+.apercu { background: #fff; color: #1a1a1a; border: 1px dashed var(--color-border); border-radius: 12px;
+  padding: 24px; margin-top: 14px; overflow-x: auto; }
+.actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.etat { font-size: 14px; color: #1B6B4A; font-weight: 600; }
+
+.wrap ol { padding-left: 20px; color: var(--color-text-muted); }
+.wrap ol li { margin-bottom: 9px; }
+.wrap code { background: var(--color-hover); border: 1px solid var(--color-border); border-radius: 5px;
+  padding: 1px 6px; font-family: ui-monospace, Consolas, monospace; font-size: .88em; color: var(--color-text); }
+.note { border-left: 3px solid #F5C518; background: #FEFAEC; border-radius: 0 10px 10px 0;
+  padding: 14px 18px; margin-top: 16px; color: #4C5768; font-size: 14.5px; }
+.note strong { color: #13294B; }
+.note p { margin: 0 0 8px; }
+.note p:last-child { margin-bottom: 0; }

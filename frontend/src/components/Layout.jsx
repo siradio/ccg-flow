@@ -13,7 +13,7 @@ import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconEmployees, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi, IconTools,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -65,6 +65,7 @@ export default function Layout() {
   const location = useLocation();
   const [paramsOpen, setParamsOpen] = useState(location.pathname.startsWith('/admin'));
   const [liensOpen, setLiensOpen] = useState(location.pathname.startsWith('/liens'));
+  const [toolsOpen, setToolsOpen] = useState(location.pathname.startsWith('/outils'));
   const [liensCategories, setLiensCategories] = useState([]);
   // Tiroir de navigation mobile : masqué par défaut, ouvert par le bouton hamburger de la topbar.
   const [navOpen, setNavOpen] = useState(false);
@@ -109,6 +110,21 @@ export default function Layout() {
           {/* RH : self-service ouvert à tout salarié (compte relié à une fiche employé) pour faire SES
               demandes ; les onglets de validation restent réservés aux rôles RH (gardés dans les pages). */}
           {hasRhSelfService(user) && <NavLink to="/rh/mes-demandes" className={navClass} onClick={closeNav}><IconEmployees /> {t('nav.hr')}</NavLink>}
+          {/* Outils — générateurs autonomes, ouverts à TOUT utilisateur authentifié (pas de gating
+              par sous-module). D'autres outils viendront s'ajouter ici. */}
+          <div className="sidebar-group">
+            <button type="button" className="sidebar-group-toggle" onClick={() => setToolsOpen(o => !o)}>
+              <IconTools /> {t('nav.tools')}
+              <span className={`sidebar-chevron${toolsOpen ? ' sidebar-chevron-open' : ''}`}><IconChevron /></span>
+            </button>
+            {toolsOpen && (
+              <div className="sidebar-subnav">
+                <NavLink to="/outils/carte-visite" className={navClass} onClick={closeNav}>{t('nav.tools.card')}</NavLink>
+                <NavLink to="/outils/signature" className={navClass} onClick={closeNav}>{t('nav.tools.signature')}</NavLink>
+              </div>
+            )}
+          </div>
+
           {hasLiens && (
             <div className="sidebar-group">
               <button type="button" className="sidebar-group-toggle" onClick={() => setLiensOpen(o => !o)}>

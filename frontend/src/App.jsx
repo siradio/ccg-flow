@@ -105,6 +105,8 @@ import DsiDashboard from './pages/DSI/DsiDashboard';
 import RapportsList from './pages/DSI/RapportsList';
 import RapportDetail from './pages/DSI/RapportDetail';
 import RequireRh from './components/RequireRh';
+import CarteVisite from './pages/Outils/CarteVisite';
+import Signature from './pages/Outils/Signature';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 
@@ -213,6 +215,10 @@ export default function App() {
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
+        {/* Outils — générateurs natifs (carte de visite, signature e-mail), pré-remplis depuis le
+            compte connecté. Ouverts à tout utilisateur authentifié : pas de gating par sous-module. */}
+        <Route path="outils/carte-visite" element={<CarteVisite />} />
+        <Route path="outils/signature" element={<Signature />} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
