@@ -44,14 +44,18 @@ async function getLoginStats() {
   return { totals, perUser };
 }
 
-// Connexions jour par jour sur une fenêtre glissante, jours creux inclus (generate_series +
+// Activité jour par jour sur une fenêtre glissante, jours creux inclus (generate_series +
 // LEFT JOIN, même approche que dashboard.getDailyCounts) pour un graphe sans trous.
+// count  = nombre de connexions (volume), actifs = utilisateurs DISTINCTS connectés ce jour-là
+// (reflète combien de personnes ont réellement utilisé l'application, pas juste le nombre de logins).
 async function getDailyLogins(days = 30) {
   return all(
     `WITH days AS (
        SELECT generate_series(CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day', CURRENT_DATE, INTERVAL '1 day')::date AS day
      )
-     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, COALESCE(COUNT(le.id), 0)::int AS count
+     SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+            COALESCE(COUNT(le.id), 0)::int AS count,
+            COUNT(DISTINCT le.user_id)::int AS actifs
      FROM days d
      LEFT JOIN login_events le ON le.created_at::date = d.day
      GROUP BY d.day
