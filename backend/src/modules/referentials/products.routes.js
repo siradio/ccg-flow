@@ -7,11 +7,13 @@ const router = express.Router();
 const { create: requireCreate, edit: requireEdit } = requireSubModuleWrite('referentiels.products');
 
 // Colonnes optionnelles éditables du produit (au-delà de designation + category_id obligatoires).
-// Inclut les attributs stock / matière première ajoutés par la migration 047 : un seul référentiel
-// produit gère produits finis, matières premières et consommables (distinction via type_article).
+// Inclut les attributs stock / matière première ajoutés par la migration 047.
+// NB : `type_article` n'est plus saisi : il est DÉRIVÉ de la catégorie (voir typeFromCategory),
+// qui porte déjà la distinction produit fini / matière première / consommable. Il reste utilisé par
+// Commerce / Stock / Production (filtres), d'où l'importance de le garder correctement renseigné.
 const OPTIONAL_COLS = [
   'code', 'business_unit_id', 'unite', 'actif', 'seuil_alerte_stock',
-  'type_article', 'code_barres', 'sous_categorie', 'marque',
+  'code_barres', 'sous_categorie', 'marque',
   'unite_vente', 'unite_conso', 'coef_conversion',
   // Conditionnement/poids (module Production — harmonisation tonnes). poids_unitaire_g est GÉNÉRÉE → non éditable.
   'pds_format', 'pds_unites_par_colis', 'pds_unite',
@@ -20,6 +22,15 @@ const OPTIONAL_COLS = [
   'methode_valorisation', 'fournisseur_principal_id',
 ];
 const emptyToNull = v => (v === '' || v === undefined ? null : v);
+
+// type_article dérivé du code de la catégorie (même logique que la migration 047). Les catégories
+// « métier » (produit_fini / matiere_premiere / consommable) donnent le type ; tout le reste → 'autre'.
+const CAT_CODE_TO_TYPE = { produit_fini: 'produit_fini', matiere_premiere: 'matiere_premiere', consommable: 'consommable' };
+async function typeFromCategory(categoryId) {
+  if (!categoryId) return 'autre';
+  const cat = await one('SELECT code FROM product_categories WHERE id = $1', [categoryId]);
+  return (cat && CAT_CODE_TO_TYPE[cat.code]) || 'autre';
+}
 
 async function withEntityIds(product) {
   const rows = await all('SELECT entity_id FROM product_entities WHERE product_id = $1', [product.id]);
@@ -61,8 +72,9 @@ router.post('/', requireAuth, requireCreate, async (req, res, next) => {
     if (!b.designation || !b.category_id) return res.status(400).json({ error: 'designation et category_id obligatoires.' });
     // N'insère que les colonnes réellement fournies → les défauts SQL (actif, methode_valorisation…) s'appliquent.
     const provided = OPTIONAL_COLS.filter(c => b[c] !== undefined);
-    const cols = ['designation', 'category_id', ...provided];
-    const vals = [b.designation, b.category_id, ...provided.map(c => emptyToNull(b[c]))];
+    const typeArticle = await typeFromCategory(b.category_id);
+    const cols = ['designation', 'category_id', 'type_article', ...provided];
+    const vals = [b.designation, b.category_id, typeArticle, ...provided.map(c => emptyToNull(b[c]))];
     const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
     const product = await one(`INSERT INTO products (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`, vals);
     await setEntities(product.id, b.entity_ids);
@@ -77,11 +89,13 @@ router.put('/:id', requireAuth, requireEdit, async (req, res, next) => {
     const b = req.body || {};
     // Clé absente du body → on garde l'existant ; clé présente (même vide) → mise à jour (vide = NULL).
     const editable = ['designation', 'category_id', ...OPTIONAL_COLS].filter(c => b[c] !== undefined);
-    if (editable.length) {
-      const setClause = editable.map((c, i) => `${c} = $${i + 1}`).join(', ');
-      const vals = editable.map(c => emptyToNull(b[c]));
-      await one(`UPDATE products SET ${setClause} WHERE id = $${editable.length + 1} RETURNING *`, [...vals, req.params.id]);
-    }
+    // type_article toujours re-dérivé de la catégorie effective (nouvelle si fournie, sinon existante),
+    // pour rester cohérent avec les filtres Commerce / Stock / Production.
+    const effectiveCategory = b.category_id !== undefined ? b.category_id : existing.category_id;
+    const cols = [...editable, 'type_article'];
+    const vals = [...editable.map(c => emptyToNull(b[c])), await typeFromCategory(effectiveCategory)];
+    const setClause = cols.map((c, i) => `${c} = $${i + 1}`).join(', ');
+    await one(`UPDATE products SET ${setClause} WHERE id = $${cols.length + 1} RETURNING *`, [...vals, req.params.id]);
     if (b.entity_ids) await setEntities(req.params.id, b.entity_ids);
     res.json(await withEntityIds(await one('SELECT * FROM products WHERE id = $1', [req.params.id])));
   } catch (e) { next(e); }

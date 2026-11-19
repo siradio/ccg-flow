@@ -280,7 +280,7 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
         <Modal title={editingId ? t('ref.modify') : t('common.add')} onClose={closeForm} wide>
           <form onSubmit={onSubmit} className="form-inline" style={{ maxWidth: 'none' }}>
             {(() => {
-              const vis = fields.filter(f => fieldVisible(f, form));
+              const vis = fields.filter(f => fieldVisible(f, form, lists));
               return vis.map((f, idx) => {
                 // En-tête de section : affiché dès qu'un champ ouvre un nouveau `group` (opt-in —
                 // les référentiels sans `group` sur leurs champs n'affichent aucun en-tête). Le div
@@ -329,10 +329,12 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
 
 // Affichage conditionnel d'un champ du formulaire : `showIf { field, equals }` ou `{ field, in:[…] }`
 // n'affiche le champ que si la valeur d'un autre champ correspond (ex. « Société » seulement pour un
-// conducteur de type Prestataire). Sans showIf, toujours visible.
-function fieldVisible(field, form) {
+// conducteur de type Prestataire). `showIf` peut aussi être une FONCTION `(form, lists) => bool`
+// pour des conditions plus riches (ex. selon le code de la catégorie choisie). Sans showIf, toujours visible.
+function fieldVisible(field, form, lists = {}) {
   const c = field.showIf;
   if (!c) return true;
+  if (typeof c === 'function') return c(form, lists);
   const v = form[c.field];
   if (Array.isArray(c.in)) return c.in.includes(v);
   return v === c.equals;
