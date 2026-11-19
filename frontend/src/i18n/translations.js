@@ -6,6 +6,9 @@ export const translations = {
   fr: {
     // Navigation principale
     'nav.dashboard': 'Tableau de bord',
+    'nav.tools': 'Outils',
+    'nav.tools.card': 'Générateur de carte de visite',
+    'nav.tools.signature': 'Générateur de signature',
     'nav.cockpit': 'Cockpit',
     'nav.purchases': "Demandes d'achat",
     'nav.stock': 'Stock',
@@ -2438,6 +2441,9 @@ export const translations = {
   },
   en: {
     'nav.dashboard': 'Dashboard',
+    'nav.tools': 'Tools',
+    'nav.tools.card': 'Business card generator',
+    'nav.tools.signature': 'Signature generator',
     'nav.cockpit': 'Cockpit',
     'nav.purchases': 'Purchase requests',
     'nav.stock': 'Stock',

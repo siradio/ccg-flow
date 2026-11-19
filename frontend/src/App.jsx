@@ -105,6 +105,7 @@ import DsiDashboard from './pages/DSI/DsiDashboard';
 import RapportsList from './pages/DSI/RapportsList';
 import RapportDetail from './pages/DSI/RapportDetail';
 import RequireRh from './components/RequireRh';
+import OutilFrame from './pages/Outils/OutilFrame';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 
@@ -213,6 +214,10 @@ export default function App() {
         <Route path="production/suivi" element={<RequireModule subModule="production.suivi"><ProductionReleve /></RequireModule>} />
         <Route path="prices/historique" element={<RequireModule subModule="referentiels.prix"><PricesHistoryPage /></RequireModule>} />
         <Route path="prices/graphique" element={<RequireModule subModule="referentiels.prix"><PricesChartPage /></RequireModule>} />
+        {/* Outils — générateurs autonomes (carte de visite, signature e-mail). Ouverts à tout
+            utilisateur authentifié : pas de gating par sous-module (l'accès à CCG Flow suffit). */}
+        <Route path="outils/carte-visite" element={<OutilFrame src="outils/carte-visite.html" titleKey="nav.tools.card" />} />
+        <Route path="outils/signature" element={<OutilFrame src="outils/signature.html" titleKey="nav.tools.signature" />} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
