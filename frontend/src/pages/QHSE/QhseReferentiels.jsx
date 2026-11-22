@@ -64,12 +64,22 @@ export default function QhseReferentiels() {
       title: 'Germes', endpoint: '/qhse/referentials/germs',
       fields: lookupFields,
     },
+    lines: { title: 'Lignes de conditionnement', endpoint: '/qhse/referentials/conditioning-lines', fields: lookupFields },
+    flavors: { title: 'Saveurs', endpoint: '/qhse/referentials/flavors', fields: lookupFields },
+    formats: { title: 'Formats', endpoint: '/qhse/referentials/formats', fields: lookupFields },
+    samplingTypes: { title: 'Types de prélèvement', endpoint: '/qhse/referentials/sampling-types', fields: lookupFields },
+    ncSeverities: { title: 'Gravités de non-conformité', endpoint: '/qhse/referentials/nc-severities', fields: lookupFields },
   }), []);
 
   if (!hasSubModuleLevel(user, 'qhse.referentiels')) return <Navigate to="/" replace />;
 
   const current = TABS[tab];
-  const TAB_ORDER = [['analysisTypes', 'Types d’analyses'], ['parameters', 'Paramètres'], ['cultureMedia', 'Milieux de culture'], ['germs', 'Germes']];
+  const TAB_ORDER = [
+    ['analysisTypes', 'Types d’analyses'], ['parameters', 'Paramètres'],
+    ['cultureMedia', 'Milieux de culture'], ['germs', 'Germes'],
+    ['lines', 'Lignes'], ['flavors', 'Saveurs'], ['formats', 'Formats'],
+    ['samplingTypes', 'Types de prélèvement'], ['ncSeverities', 'Gravités NC'],
+  ];
 
   return (
     <div>
