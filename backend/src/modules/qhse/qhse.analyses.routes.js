@@ -4,6 +4,7 @@ const express = require('express');
 const { requireAuth } = require('../../middleware/auth');
 const { requireSubModule, requireSubModuleWrite } = require('../../middleware/permissions');
 const service = require('./qhse.analyses.service');
+const { generateAnalysisBulletinPdf } = require('./qhse.pdf');
 
 const router = express.Router();
 const SUB = 'qhse.labo';
@@ -44,6 +45,16 @@ router.put('/analyses/:id/results', requireCreate, async (req, res, next) => {
 });
 router.post('/analyses/:id/validate', requireEdit, async (req, res, next) => {
   try { res.json(await service.validateAnalysis(req.user, Number(req.params.id))); } catch (e) { next(e); }
+});
+router.get('/analyses/:id/pdf', requireRead, async (req, res, next) => {
+  try {
+    const data = await service.getAnalysisForPdf(Number(req.params.id));
+    if (!data) return res.status(404).json({ error: 'Introuvable.' });
+    const buf = await generateAnalysisBulletinPdf(data);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="bulletin-${data.analysis.id}.pdf"`);
+    res.send(buf);
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

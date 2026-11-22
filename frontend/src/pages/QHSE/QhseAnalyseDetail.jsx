@@ -8,6 +8,13 @@ import { ConfBadge } from './qhseConformite';
 
 const FLAGS = ['numerique', 'non_detecte', 'inf_ld', 'inf_lq', 'invalide', 'en_attente'];
 
+async function openAuthenticatedFile(path) {
+  const res = await client.get(path, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 // Grille de saisie des résultats d'une analyse + verdict de conformité + validation.
 // Séparation saisie / validation : la validation requiert l'habilitation (niveau édition).
 export default function QhseAnalyseDetail() {
@@ -78,12 +85,11 @@ export default function QhseAnalyseDetail() {
       </div>
 
       {msg && <div className="alert" style={{ marginTop: 10, maxWidth: 680 }}>{msg}</div>}
-      {!locked && (
-        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          <button className="btn btn-primary" onClick={save}>{t('qhse.ana.save')}</button>
-          {canValidate && <button className="btn btn-secondary" onClick={validate}>{t('qhse.ana.validate')}</button>}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+        {!locked && <button className="btn btn-primary" onClick={save}>{t('qhse.ana.save')}</button>}
+        {!locked && canValidate && <button className="btn btn-secondary" onClick={validate}>{t('qhse.ana.validate')}</button>}
+        <button className="btn btn-secondary" onClick={() => openAuthenticatedFile(`/qhse/analyses/${id}/pdf`)}>{t('qhse.ana.pdf')}</button>
+      </div>
       <p style={{ marginTop: 14 }}><Link to={`/qhse/analyses/echantillon/${a.sample_id}`}>← {t('qhse.ana.backSample')}</Link></p>
     </div>
   );

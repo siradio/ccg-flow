@@ -165,9 +165,38 @@ async function validateAnalysis(user, analysisId) {
   return getAnalysisDetail(analysisId);
 }
 
+// Données complètes d'une analyse pour le bulletin PDF (noms résolus).
+async function getAnalysisForPdf(id) {
+  const a = await one(
+    `SELECT a.*, t.libelle AS type_libelle,
+            e.prenom AS tech_prenom, e.nom AS tech_nom,
+            vu.prenom AS val_prenom, vu.nom AS val_nom
+       FROM qhse_analyses a
+       JOIN qhse_analysis_types t ON t.id = a.analysis_type_id
+       LEFT JOIN employees e ON e.id = a.technicien_id
+       LEFT JOIN users vu ON vu.id = a.validated_by
+      WHERE a.id = $1`, [id]);
+  if (!a) return null;
+  const sample = await one(
+    `SELECT s.*, p.designation AS product_nom, f.libelle AS format_libelle
+       FROM qhse_samples s
+       LEFT JOIN products p ON p.id = s.product_id
+       LEFT JOIN qhse_formats f ON f.id = s.format_id
+      WHERE s.id = $1`, [a.sample_id]);
+  const results = await all(
+    `SELECT r.*, p.libelle AS param_libelle, p.unite, p.ordre
+       FROM qhse_results r JOIN qhse_parameters p ON p.id = r.parameter_id
+      WHERE r.analysis_id = $1 ORDER BY p.ordre, p.libelle`, [id]);
+  return {
+    analysis: a, sample, results,
+    techNom: a.tech_prenom ? `${a.tech_prenom} ${a.tech_nom}` : null,
+    validatorNom: a.val_prenom ? `${a.val_prenom} ${a.val_nom}` : null,
+  };
+}
+
 function httpError(status, message) { const e = new Error(message); e.status = status; return e; }
 
 module.exports = {
   listSamples, createSample, getSampleDetail,
-  createAnalysis, getAnalysisDetail, saveResults, validateAnalysis,
+  createAnalysis, getAnalysisDetail, saveResults, validateAnalysis, getAnalysisForPdf,
 };
