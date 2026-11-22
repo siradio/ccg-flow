@@ -44,4 +44,12 @@ router.use('/formats', simpleCrudRouter({ table: 'qhse_formats', columns: lookup
 router.use('/sampling-types', simpleCrudRouter({ table: 'qhse_sampling_types', columns: lookupCols, orderBy: 'ordre, libelle', subModuleKey: SUB }));
 router.use('/nc-severities', simpleCrudRouter({ table: 'qhse_nc_severities', columns: lookupCols, orderBy: 'ordre, libelle', subModuleKey: SUB }));
 
+// Spécifications / seuils de conformité (Lot 1) — migration 115.
+router.use('/specifications', simpleCrudRouter({
+  table: 'qhse_specifications',
+  columns: ['parameter_id', 'product_id', 'category_id', 'format_id', 'seuil_min', 'seuil_max', 'critere', 'version', 'date_effet', 'actif'],
+  orderBy: 'parameter_id, version DESC, id DESC',
+  subModuleKey: SUB,
+}));
+
 module.exports = router;
