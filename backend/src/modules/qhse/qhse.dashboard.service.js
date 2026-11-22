@@ -52,7 +52,24 @@ async function getDashboard() {
   // Lots sous statut qualité (répartition actuelle, lots statués uniquement).
   const lots = await countBy('stock_lots', 'statut_qualite');
 
-  return { analyses, production, expeditions, nc, capaRetard, ncOuvertes, lots };
+  // Tendance sur 6 mois (mois vides inclus) : volume d'analyses, dont non conformes, et NC ouvertes.
+  const tendance = await all(
+    `SELECT to_char(m, 'YYYY-MM') AS mois,
+       (SELECT COUNT(*)::int FROM qhse_analyses a
+          WHERE date_trunc('month', a.created_at)::date = m::date) AS analyses,
+       (SELECT COUNT(*)::int FROM qhse_analyses a
+          WHERE date_trunc('month', a.created_at)::date = m::date AND a.conformite = 'non_conforme') AS analyses_nc,
+       (SELECT COUNT(*)::int FROM qhse_nonconformities n
+          WHERE date_trunc('month', n.created_at)::date = m::date) AS nc,
+       (SELECT COUNT(*)::int FROM qhse_production_controls c
+          WHERE date_trunc('month', c.created_at)::date = m::date) AS production,
+       (SELECT COUNT(*)::int FROM qhse_shipment_controls c
+          WHERE date_trunc('month', c.created_at)::date = m::date) AS expeditions
+     FROM generate_series(date_trunc('month', CURRENT_DATE) - interval '5 months',
+                          date_trunc('month', CURRENT_DATE), interval '1 month') AS m
+     ORDER BY m`);
+
+  return { analyses, production, expeditions, nc, capaRetard, ncOuvertes, lots, tendance };
 }
 
 module.exports = { getDashboard };
