@@ -109,10 +109,13 @@ import CarteVisite from './pages/Outils/CarteVisite';
 import Signature from './pages/Outils/Signature';
 import QhseHome from './pages/QHSE/QhseHome';
 import QhseReferentiels from './pages/QHSE/QhseReferentiels';
+import QhseAnalyses from './pages/QHSE/QhseAnalyses';
+import QhseSampleDetail from './pages/QHSE/QhseSampleDetail';
+import QhseAnalyseDetail from './pages/QHSE/QhseAnalyseDetail';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -226,6 +229,9 @@ export default function App() {
         {/* Module QHSE — Lot 0 : socle & référentiels du laboratoire. */}
         <Route path="qhse" element={<RequireModule subModule={QHSE_ANY}><QhseHome /></RequireModule>} />
         <Route path="qhse/referentiels" element={<RequireModule subModule="qhse.referentiels"><QhseReferentiels /></RequireModule>} />
+        <Route path="qhse/analyses" element={<RequireModule subModule="qhse.labo"><QhseAnalyses /></RequireModule>} />
+        <Route path="qhse/analyses/echantillon/:id" element={<RequireModule subModule="qhse.labo"><QhseSampleDetail /></RequireModule>} />
+        <Route path="qhse/analyses/:id" element={<RequireModule subModule="qhse.labo"><QhseAnalyseDetail /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />

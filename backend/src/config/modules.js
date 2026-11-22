@@ -112,6 +112,7 @@ const MODULES = [
   {
     key: 'qhse', label: 'QHSE',
     subModules: [
+      { key: 'qhse.labo', label: 'Analyses de laboratoire' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },
