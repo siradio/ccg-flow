@@ -129,6 +129,9 @@ app.use('/api/qhse/referentials', require('./modules/qhse/qhse.referentials.rout
 app.use('/api/qhse/analyses', require('./modules/qhse/qhse.analyses.routes'));
 app.use('/api/qhse/production', require('./modules/qhse/qhse.production.routes'));
 app.use('/api/qhse/samplings', require('./modules/qhse/qhse.sampling.routes'));
+// Lot 3 : non-conformités / CAPA + libération des lots.
+app.use('/api/qhse/nonconformities', require('./modules/qhse/qhse.nc.routes'));
+app.use('/api/qhse/liberation', require('./modules/qhse/qhse.liberation.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

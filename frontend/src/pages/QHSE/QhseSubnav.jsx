@@ -8,6 +8,8 @@ const TABS = [
   { to: '/qhse/analyses', sub: 'qhse.labo', key: 'qhse.nav.analyses' },
   { to: '/qhse/production', sub: 'qhse.production', key: 'qhse.nav.production' },
   { to: '/qhse/echantillonnage', sub: 'qhse.sampling', key: 'qhse.nav.sampling' },
+  { to: '/qhse/non-conformites', sub: 'qhse.nc', key: 'qhse.nav.nc' },
+  { to: '/qhse/liberation', sub: 'qhse.liberation', key: 'qhse.nav.liberation' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 

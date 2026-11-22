@@ -116,10 +116,13 @@ import QhseProduction from './pages/QHSE/QhseProduction';
 import QhseProductionDetail from './pages/QHSE/QhseProductionDetail';
 import QhseSampling from './pages/QHSE/QhseSampling';
 import QhseSamplingDetail from './pages/QHSE/QhseSamplingDetail';
+import QhseNC from './pages/QHSE/QhseNC';
+import QhseNCDetail from './pages/QHSE/QhseNCDetail';
+import QhseLiberation from './pages/QHSE/QhseLiberation';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -241,6 +244,10 @@ export default function App() {
         <Route path="qhse/production/:id" element={<RequireModule subModule="qhse.production"><QhseProductionDetail /></RequireModule>} />
         <Route path="qhse/echantillonnage" element={<RequireModule subModule="qhse.sampling"><QhseSampling /></RequireModule>} />
         <Route path="qhse/echantillonnage/:id" element={<RequireModule subModule="qhse.sampling"><QhseSamplingDetail /></RequireModule>} />
+        {/* Module QHSE — Lot 3 : non-conformités / CAPA + libération des lots. */}
+        <Route path="qhse/non-conformites" element={<RequireModule subModule="qhse.nc"><QhseNC /></RequireModule>} />
+        <Route path="qhse/non-conformites/:id" element={<RequireModule subModule="qhse.nc"><QhseNCDetail /></RequireModule>} />
+        <Route path="qhse/liberation" element={<RequireModule subModule="qhse.liberation"><QhseLiberation /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />

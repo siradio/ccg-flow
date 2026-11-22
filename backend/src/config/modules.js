@@ -115,6 +115,8 @@ const MODULES = [
       { key: 'qhse.labo', label: 'Analyses de laboratoire' },
       { key: 'qhse.production', label: 'Contrôles de production' },
       { key: 'qhse.sampling', label: 'Échantillonnage en ligne' },
+      { key: 'qhse.nc', label: 'Non-conformités / CAPA' },
+      { key: 'qhse.liberation', label: 'Libération des lots' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },
