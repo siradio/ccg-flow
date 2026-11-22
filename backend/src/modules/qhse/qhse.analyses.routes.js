@@ -46,6 +46,14 @@ router.put('/analyses/:id/results', requireCreate, async (req, res, next) => {
 router.post('/analyses/:id/validate', requireEdit, async (req, res, next) => {
   try { res.json(await service.validateAnalysis(req.user, Number(req.params.id))); } catch (e) { next(e); }
 });
+// Sections opératoires microbiologie (suspension mère, milieux, incubation).
+router.get('/analyses/:id/micro', requireRead, async (req, res, next) => {
+  try { res.json(await service.getMicroOps(Number(req.params.id))); } catch (e) { next(e); }
+});
+router.put('/analyses/:id/micro', requireCreate, async (req, res, next) => {
+  try { res.json(await service.saveMicroOps(req.user, Number(req.params.id), req.body || {})); } catch (e) { next(e); }
+});
+
 router.get('/analyses/:id/pdf', requireRead, async (req, res, next) => {
   try {
     const data = await service.getAnalysisForPdf(Number(req.params.id));

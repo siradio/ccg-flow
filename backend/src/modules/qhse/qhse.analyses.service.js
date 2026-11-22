@@ -165,6 +165,52 @@ async function validateAnalysis(user, analysisId) {
   return getAnalysisDetail(analysisId);
 }
 
+// ---- Sections opératoires microbiologie (suspension mère, milieux, incubation) ---------------
+const boolOrNull = v => (v === '' || v == null ? null : (v === true || v === 'true'));
+
+async function getMicroOps(analysisId) {
+  const operations = await one('SELECT * FROM qhse_micro_operations WHERE analysis_id = $1', [analysisId]);
+  const media = await all('SELECT * FROM qhse_micro_media WHERE analysis_id = $1 ORDER BY ordre, id', [analysisId]);
+  const incubations = await all('SELECT * FROM qhse_micro_incubations WHERE analysis_id = $1 ORDER BY ordre, id', [analysisId]);
+  return { operations: operations || null, media, incubations };
+}
+
+async function saveMicroOps(user, analysisId, b) {
+  const a = await one('SELECT statut FROM qhse_analyses WHERE id = $1', [analysisId]);
+  if (!a) throw httpError(404, 'Analyse introuvable.');
+  if (a.statut === 'valide') throw httpError(409, 'Analyse déjà validée : non modifiable.');
+  const o = b.operations || {};
+  await run(
+    `INSERT INTO qhse_micro_operations (analysis_id, facteur_dilution, type_diluant, suspension_tech, suspension_date, notes)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (analysis_id) DO UPDATE SET facteur_dilution=$2, type_diluant=$3, suspension_tech=$4, suspension_date=$5, notes=$6`,
+    [analysisId, o.facteur_dilution || null, o.type_diluant || null, o.suspension_tech || null, o.suspension_date || null, o.notes || null]
+  );
+  await run('DELETE FROM qhse_micro_media WHERE analysis_id = $1', [analysisId]);
+  let i = 0;
+  for (const m of (b.media || [])) {
+    await run(
+      `INSERT INTO qhse_micro_media (analysis_id, culture_media_id, pesee, ph_ok, repartition, chauffage_ok, autoclavage_ok, controle_ok, date_prep, preparateur, lot_milieu, ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [analysisId, m.culture_media_id || null, m.pesee || null, boolOrNull(m.ph_ok), m.repartition || null,
+        boolOrNull(m.chauffage_ok), boolOrNull(m.autoclavage_ok), boolOrNull(m.controle_ok), m.date_prep || null,
+        m.preparateur || null, m.lot_milieu || null, i++]
+    );
+  }
+  await run('DELETE FROM qhse_micro_incubations WHERE analysis_id = $1', [analysisId]);
+  i = 0;
+  for (const inc of (b.incubations || [])) {
+    await run(
+      `INSERT INTO qhse_micro_incubations (analysis_id, germ_id, germ_libre, temperature, duree, oxygenation, equipement, debut, fin, lot_bp, technicien, ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [analysisId, inc.germ_id || null, inc.germ_libre || null, inc.temperature || null, inc.duree || null,
+        inc.oxygenation || null, inc.equipement || null, inc.debut || null, inc.fin || null, inc.lot_bp || null,
+        inc.technicien || null, i++]
+    );
+  }
+  return getMicroOps(analysisId);
+}
+
 // Données complètes d'une analyse pour le bulletin PDF (noms résolus).
 async function getAnalysisForPdf(id) {
   const a = await one(
@@ -199,4 +245,5 @@ function httpError(status, message) { const e = new Error(message); e.status = s
 module.exports = {
   listSamples, createSample, getSampleDetail,
   createAnalysis, getAnalysisDetail, saveResults, validateAnalysis, getAnalysisForPdf,
+  getMicroOps, saveMicroOps,
 };

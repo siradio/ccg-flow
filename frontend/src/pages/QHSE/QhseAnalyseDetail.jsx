@@ -5,6 +5,7 @@ import QhseSubnav from './QhseSubnav';
 import { useAuth, hasSubModuleLevel } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { ConfBadge } from './qhseConformite';
+import QhseMicroForm from './QhseMicroForm';
 
 const FLAGS = ['numerique', 'non_detecte', 'inf_ld', 'inf_lq', 'invalide', 'en_attente'];
 
@@ -83,6 +84,8 @@ export default function QhseAnalyseDetail() {
           </tbody>
         </table>
       </div>
+
+      {a.type_code === 'microbiologique' && <QhseMicroForm analysisId={id} locked={locked} />}
 
       {msg && <div className="alert" style={{ marginTop: 10, maxWidth: 680 }}>{msg}</div>}
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
