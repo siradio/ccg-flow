@@ -52,4 +52,18 @@ router.use('/specifications', simpleCrudRouter({
   subModuleKey: SUB,
 }));
 
+// Lot 2 — critères de contrôle production + plans d'échantillonnage (migration 118).
+router.use('/production-criteria', simpleCrudRouter({
+  table: 'qhse_production_criteria',
+  columns: ['code', 'libelle', 'type_critere', 'unite', 'seuil_min', 'seuil_max', 'ordre', 'actif'],
+  orderBy: 'ordre, libelle',
+  subModuleKey: SUB,
+}));
+router.use('/sampling-plans', simpleCrudRouter({
+  table: 'qhse_sampling_plans',
+  columns: ['code', 'libelle', 'parameter_id', 'product_id', 'category_id', 'format_id', 'taille_n', 'acceptation_c', 'seuil_m', 'seuil_grand_m', 'ordre', 'actif'],
+  orderBy: 'ordre, libelle',
+  subModuleKey: SUB,
+}));
+
 module.exports = router;

@@ -93,6 +93,38 @@ export default function QhseReferentiels() {
         boolActif,
       ],
     },
+    // Lot 2 — critères de contrôle production (type booléen / numérique + seuils facultatifs).
+    productionCriteria: {
+      title: 'Critères de contrôle production', endpoint: '/qhse/referentials/production-criteria',
+      fields: [
+        { key: 'libelle', label: 'Libellé', required: true },
+        { key: 'code', label: 'Code' },
+        { key: 'type_critere', label: 'Type', type: 'select', options: ['booleen', 'numerique'], optionLabels: { booleen: 'Booléen (OUI/NON)', numerique: 'Numérique' }, default: 'booleen' },
+        { key: 'unite', label: 'Unité', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_min', label: 'Seuil min', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_max', label: 'Seuil max', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        ordre,
+        boolActif,
+      ],
+    },
+    // Lot 2 — plans d'échantillonnage (n/c/m/M, ICMSF).
+    samplingPlans: {
+      title: 'Plans d’échantillonnage', endpoint: '/qhse/referentials/sampling-plans',
+      fields: [
+        { key: 'libelle', label: 'Libellé', required: true },
+        { key: 'code', label: 'Code' },
+        { key: 'parameter_id', label: 'Paramètre (facultatif)', type: 'fkSelect', listKey: 'parameters' },
+        { key: 'product_id', label: 'Produit (facultatif)', type: 'fkSelect', listKey: 'products' },
+        { key: 'category_id', label: 'Famille / catégorie (facultatif)', type: 'fkSelect', listKey: 'categories' },
+        { key: 'format_id', label: 'Format (facultatif)', type: 'fkSelect', listKey: 'qhseFormats' },
+        { key: 'taille_n', label: 'n (taille)', type: 'number' },
+        { key: 'acceptation_c', label: 'c (acceptation)', type: 'number' },
+        { key: 'seuil_m', label: 'm (seuil)', type: 'number' },
+        { key: 'seuil_grand_m', label: 'M (seuil max)', type: 'number' },
+        ordre,
+        boolActif,
+      ],
+    },
   }), []);
 
   if (!hasSubModuleLevel(user, 'qhse.referentiels')) return <Navigate to="/" replace />;
@@ -104,6 +136,7 @@ export default function QhseReferentiels() {
     ['lines', 'Lignes'], ['flavors', 'Saveurs'], ['formats', 'Formats'],
     ['samplingTypes', 'Types de prélèvement'], ['ncSeverities', 'Gravités NC'],
     ['specifications', 'Spécifications / seuils'],
+    ['productionCriteria', 'Critères production'], ['samplingPlans', 'Plans d’échantillonnage'],
   ];
 
   return (

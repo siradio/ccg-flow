@@ -123,9 +123,12 @@ app.use('/api/dsi/reports', require('./modules/dsi/dsi.reports.routes'));
 app.use('/api/dsi/my', require('./modules/dsi/dsi.self.routes'));
 app.use('/api/dsi/settings', require('./modules/dsi/dsi.settings.routes'));
 app.use('/api/direction', require('./modules/direction/direction.routes'));
-// Module QHSE — Lot 0 : référentiels du laboratoire ; Lot 1 : analyses.
+// Module QHSE — Lot 0 : référentiels du laboratoire ; Lot 1 : analyses ; Lot 2 : contrôles
+// production + échantillonnage en ligne.
 app.use('/api/qhse/referentials', require('./modules/qhse/qhse.referentials.routes'));
 app.use('/api/qhse/analyses', require('./modules/qhse/qhse.analyses.routes'));
+app.use('/api/qhse/production', require('./modules/qhse/qhse.production.routes'));
+app.use('/api/qhse/samplings', require('./modules/qhse/qhse.sampling.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

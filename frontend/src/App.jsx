@@ -112,10 +112,14 @@ import QhseReferentiels from './pages/QHSE/QhseReferentiels';
 import QhseAnalyses from './pages/QHSE/QhseAnalyses';
 import QhseSampleDetail from './pages/QHSE/QhseSampleDetail';
 import QhseAnalyseDetail from './pages/QHSE/QhseAnalyseDetail';
+import QhseProduction from './pages/QHSE/QhseProduction';
+import QhseProductionDetail from './pages/QHSE/QhseProductionDetail';
+import QhseSampling from './pages/QHSE/QhseSampling';
+import QhseSamplingDetail from './pages/QHSE/QhseSamplingDetail';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.labo', 'qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -232,6 +236,11 @@ export default function App() {
         <Route path="qhse/analyses" element={<RequireModule subModule="qhse.labo"><QhseAnalyses /></RequireModule>} />
         <Route path="qhse/analyses/echantillon/:id" element={<RequireModule subModule="qhse.labo"><QhseSampleDetail /></RequireModule>} />
         <Route path="qhse/analyses/:id" element={<RequireModule subModule="qhse.labo"><QhseAnalyseDetail /></RequireModule>} />
+        {/* Module QHSE — Lot 2 : contrôles production + échantillonnage en ligne. */}
+        <Route path="qhse/production" element={<RequireModule subModule="qhse.production"><QhseProduction /></RequireModule>} />
+        <Route path="qhse/production/:id" element={<RequireModule subModule="qhse.production"><QhseProductionDetail /></RequireModule>} />
+        <Route path="qhse/echantillonnage" element={<RequireModule subModule="qhse.sampling"><QhseSampling /></RequireModule>} />
+        <Route path="qhse/echantillonnage/:id" element={<RequireModule subModule="qhse.sampling"><QhseSamplingDetail /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
