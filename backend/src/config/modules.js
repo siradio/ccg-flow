@@ -117,6 +117,8 @@ const MODULES = [
       { key: 'qhse.sampling', label: 'Échantillonnage en ligne' },
       { key: 'qhse.nc', label: 'Non-conformités / CAPA' },
       { key: 'qhse.liberation', label: 'Libération des lots' },
+      { key: 'qhse.expeditions', label: 'Contrôle des expéditions' },
+      { key: 'qhse.dashboard', label: 'Tableau de bord QHSE' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },

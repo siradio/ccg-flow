@@ -107,6 +107,20 @@ export default function QhseReferentiels() {
         boolActif,
       ],
     },
+    // Lot 4 — critères de contrôle expédition (même logique que les critères production).
+    shipmentCriteria: {
+      title: 'Critères de contrôle expédition', endpoint: '/qhse/referentials/shipment-criteria',
+      fields: [
+        { key: 'libelle', label: 'Libellé', required: true },
+        { key: 'code', label: 'Code' },
+        { key: 'type_critere', label: 'Type', type: 'select', options: ['booleen', 'numerique'], optionLabels: { booleen: 'Booléen (OUI/NON)', numerique: 'Numérique' }, default: 'booleen' },
+        { key: 'unite', label: 'Unité', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_min', label: 'Seuil min', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_max', label: 'Seuil max', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        ordre,
+        boolActif,
+      ],
+    },
     // Lot 2 — plans d'échantillonnage (n/c/m/M, ICMSF).
     samplingPlans: {
       title: 'Plans d’échantillonnage', endpoint: '/qhse/referentials/sampling-plans',
@@ -137,6 +151,7 @@ export default function QhseReferentiels() {
     ['samplingTypes', 'Types de prélèvement'], ['ncSeverities', 'Gravités NC'],
     ['specifications', 'Spécifications / seuils'],
     ['productionCriteria', 'Critères production'], ['samplingPlans', 'Plans d’échantillonnage'],
+    ['shipmentCriteria', 'Critères expédition'],
   ];
 
   return (

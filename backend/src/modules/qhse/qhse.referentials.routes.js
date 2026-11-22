@@ -66,4 +66,12 @@ router.use('/sampling-plans', simpleCrudRouter({
   subModuleKey: SUB,
 }));
 
+// Lot 4 — critères de contrôle expédition (migration 120).
+router.use('/shipment-criteria', simpleCrudRouter({
+  table: 'qhse_shipment_criteria',
+  columns: ['code', 'libelle', 'type_critere', 'unite', 'seuil_min', 'seuil_max', 'ordre', 'actif'],
+  orderBy: 'ordre, libelle',
+  subModuleKey: SUB,
+}));
+
 module.exports = router;

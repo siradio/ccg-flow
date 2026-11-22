@@ -5,9 +5,11 @@ import { useI18n } from '../../i18n/I18nContext';
 // Sous-navigation QHSE. Lot 0 = Référentiels du laboratoire. Les sections (Analyses, Échantillonnage,
 // Contrôles, Non-conformités, Libération, Expédition, Tableau de bord) s'ajoutent au fil des lots.
 const TABS = [
+  { to: '/qhse/tableau-de-bord', sub: 'qhse.dashboard', key: 'qhse.nav.dashboard' },
   { to: '/qhse/analyses', sub: 'qhse.labo', key: 'qhse.nav.analyses' },
   { to: '/qhse/production', sub: 'qhse.production', key: 'qhse.nav.production' },
   { to: '/qhse/echantillonnage', sub: 'qhse.sampling', key: 'qhse.nav.sampling' },
+  { to: '/qhse/expeditions', sub: 'qhse.expeditions', key: 'qhse.nav.expeditions' },
   { to: '/qhse/non-conformites', sub: 'qhse.nc', key: 'qhse.nav.nc' },
   { to: '/qhse/liberation', sub: 'qhse.liberation', key: 'qhse.nav.liberation' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
