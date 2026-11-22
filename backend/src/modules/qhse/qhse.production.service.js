@@ -3,35 +3,11 @@
 // découle du type du critère : booléen → OUI = conforme ; numérique → dans [min, max] si des seuils
 // sont renseignés sur le critère, sinon « sans_spec » (on n'invente pas de seuil).
 const { all, one, run } = require('../../db');
+const { boolOrNull, criteriaConformite, conformiteGlobale } = require('./qhse.conformite');
 
 function httpError(status, message) { const e = new Error(message); e.status = status; return e; }
 
-const boolOrNull = v => (v === '' || v == null ? null : (v === true || v === 'true'));
 const numOrNull = v => (v === '' || v == null ? null : v);
-
-function readingConformite(reading, criteria) {
-  if (!criteria) return 'en_attente';
-  if (criteria.type_critere === 'booleen') {
-    const b = boolOrNull(reading.valeur_bool);
-    if (b == null) return 'en_attente';
-    return b ? 'conforme' : 'non_conforme';
-  }
-  // numérique
-  if (reading.valeur_num == null || reading.valeur_num === '') return 'en_attente';
-  const min = criteria.seuil_min != null ? Number(criteria.seuil_min) : null;
-  const max = criteria.seuil_max != null ? Number(criteria.seuil_max) : null;
-  if (min == null && max == null) return 'sans_spec';
-  const v = Number(reading.valeur_num);
-  const ok = (min == null || v >= min) && (max == null || v <= max);
-  return ok ? 'conforme' : 'non_conforme';
-}
-
-function conformiteGlobale(list) {
-  if (list.includes('non_conforme')) return 'non_conforme';
-  if (list.includes('en_attente')) return 'en_attente';
-  if (list.includes('conforme')) return 'conforme';
-  return 'sans_spec';
-}
 
 async function listControls() {
   return all(
@@ -91,7 +67,7 @@ async function saveReadings(user, controlId, rows) {
   let i = 0;
   for (const row of rows || []) {
     const crit = byId.get(Number(row.criteria_id));
-    const conf = readingConformite(row, crit);
+    const conf = criteriaConformite(row, crit);
     conformites.push(conf);
     await run(
       `INSERT INTO qhse_production_readings

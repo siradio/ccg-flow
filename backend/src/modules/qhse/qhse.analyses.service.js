@@ -1,6 +1,7 @@
 const { all, one, run } = require('../../db');
+const { mostSpecific, conformiteResultat, conformiteGlobale } = require('./qhse.conformite');
 
-// ---- Moteur de conformité -------------------------------------------------------------------
+// ---- Moteur de conformité (logique pure dans qhse.conformite.js) ----------------------------
 // Résout la spécification en vigueur pour un paramètre donné et un échantillon (produit / famille /
 // format). La plus spécifique l'emporte : produit+format > produit > famille+format > famille > générique.
 async function resolveSpec(parameterId, sample) {
@@ -13,36 +14,7 @@ async function resolveSpec(parameterId, sample) {
       ORDER BY version DESC, id DESC`,
     [parameterId, sample.product_id || null, sample.category_id || null, sample.format_id || null]
   );
-  if (!specs.length) return null;
-  const score = s => (s.product_id ? 4 : 0) + (s.category_id ? 2 : 0) + (s.format_id ? 1 : 0);
-  return specs.slice().sort((a, b) => score(b) - score(a))[0];
-}
-
-// Conformité d'un résultat vs sa spécification. « non détecté / < LD / < LQ » ne valent jamais 0 ;
-// un résultat n'est conforme que si une spécification applicable existe (sinon « sans_spec »).
-function conformiteResultat(result, spec) {
-  const flag = result.result_flag || 'numerique';
-  if (flag === 'en_attente' || flag === 'invalide') return 'en_attente';
-  if (!spec) return 'sans_spec';
-  const min = spec.seuil_min != null ? Number(spec.seuil_min) : null;
-  const max = spec.seuil_max != null ? Number(spec.seuil_max) : null;
-  if (flag === 'non_detecte' || flag === 'inf_ld' || flag === 'inf_lq') {
-    if (max != null && min == null) return 'conforme';   // clairement sous le seuil max
-    return 'en_attente';                                  // on ne peut pas confirmer un minimum
-  }
-  // numérique
-  if (result.valeur_num == null || result.valeur_num === '') return 'en_attente';
-  if (min == null && max == null) return 'sans_spec';
-  const v = Number(result.valeur_num);
-  const ok = (min == null || v >= min) && (max == null || v <= max);
-  return ok ? 'conforme' : 'non_conforme';
-}
-
-function conformiteGlobale(conformites) {
-  if (conformites.includes('non_conforme')) return 'non_conforme';
-  if (conformites.includes('en_attente')) return 'en_attente';
-  if (conformites.includes('conforme')) return 'conforme';
-  return 'sans_spec';
+  return mostSpecific(specs);
 }
 
 // ---- Échantillons ---------------------------------------------------------------------------
