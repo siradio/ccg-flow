@@ -13,7 +13,7 @@ import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconEmployees, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi, IconTools,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi, IconTools, IconQhse,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -106,6 +106,7 @@ export default function Layout() {
           {/* DSI : visible seulement aux comptes ayant un accès DSI (self-service dsi.support ou une
               section de gestion). L'accès s'attribue dans Admin → Utilisateurs (sous-modules dsi.*). */}
           {hasModuleAccess(user, 'dsi') && <NavLink to="/dsi" className={navClass} onClick={closeNav}><IconDsi /> {t('nav.dsi')}</NavLink>}
+          {hasModuleAccess(user, 'qhse') && <NavLink to="/qhse" className={navClass} onClick={closeNav}><IconQhse /> {t('nav.qhse')}</NavLink>}
           {(hasModuleAccess(user, 'referentiels') || hasModuleAccess(user, 'rh')) && <NavLink to="/referentials/sites" className={navClass} onClick={closeNav}><IconBook /> {t('nav.referentials')}</NavLink>}
           {/* RH : self-service ouvert à tout salarié (compte relié à une fiche employé) pour faire SES
               demandes ; les onglets de validation restent réservés aux rôles RH (gardés dans les pages). */}

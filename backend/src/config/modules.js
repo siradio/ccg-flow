@@ -105,6 +105,16 @@ const MODULES = [
       { key: 'dsi.referentiels', label: 'Référentiels DSI' },
     ],
   },
+  // Module QHSE — Qualité, Hygiène, Sécurité, Environnement + laboratoire (LIMS). Démarre par le
+  // socle Lot 0 (référentiels labo) ; les sous-modules (analyses, échantillonnage, contrôles,
+  // non-conformités, libération, expédition, dashboard) s'ajoutent au fil des lots — on ne déclare
+  // ici que ceux qui ont réellement un écran, pour ne pas exposer de cases vides dans l'admin.
+  {
+    key: 'qhse', label: 'QHSE',
+    subModules: [
+      { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
+    ],
+  },
   { key: 'liens', label: 'Liens utiles', subModules: [] },
   {
     key: 'referentiels', label: 'Référentiels',

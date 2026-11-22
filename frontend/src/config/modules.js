@@ -26,6 +26,8 @@ export const MODULE_SUB_KEYS = {
     'dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets',
     'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels',
   ],
+  // Module QHSE — s'étoffe au fil des lots (Lot 0 : référentiels du laboratoire).
+  qhse: ['qhse.referentiels'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
     'referentiels.products', 'referentiels.product_categories', 'referentiels.business_units', 'referentiels.suppliers',
