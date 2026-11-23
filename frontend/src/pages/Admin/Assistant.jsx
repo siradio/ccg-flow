@@ -146,6 +146,7 @@ export default function AdminAssistant() {
                     <option value="nouveau">{t('assistant.type.nouveau')}</option>
                     <option value="amelioration">{t('assistant.type.amelioration')}</option>
                     <option value="correctif">{t('assistant.type.correctif')}</option>
+                    <option value="bientot">{t('assistant.type.bientot')}</option>
                   </select>
                 </label>
               </div>

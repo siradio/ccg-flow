@@ -36,7 +36,7 @@ async function setPersona(fields = {}) {
 }
 
 // ─── Nouveautés ───────────────────────────────────────────────────────────────────────────────────
-const NEWS_TYPES = ['nouveau', 'amelioration', 'correctif'];
+const NEWS_TYPES = ['nouveau', 'amelioration', 'correctif', 'bientot'];
 function cleanNewsType(v) { return NEWS_TYPES.includes(v) ? v : 'nouveau'; }
 // Une date vide ('') venant du formulaire casserait le cast ::date — on la ramène à null (le SQL
 // retombe alors sur CURRENT_DATE à la création, ou garde la valeur existante à la mise à jour).
