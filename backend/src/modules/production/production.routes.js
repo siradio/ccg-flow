@@ -28,7 +28,7 @@ router.get('/grid', requireSubModule('production.releve'), async (req, res, next
        FROM products p
        LEFT JOIN production_entries pe ON pe.product_id = p.id AND pe.date_production = $2
        LEFT JOIN users u ON u.id = pe.updated_by
-       WHERE p.business_unit_id = $1 AND p.actif = true AND p.type_article IS DISTINCT FROM 'matiere_premiere'
+       WHERE p.business_unit_id = $1 AND p.actif = true AND p.type_article = 'produit_fini'
        ORDER BY p.designation`, [buId, date]));
   } catch (e) { next(e); }
 });
@@ -47,7 +47,7 @@ router.get('/last-entry', requireSubModule('production.releve'), async (req, res
        FROM production_entries pe
        JOIN products p ON p.id = pe.product_id
        LEFT JOIN users u ON u.id = pe.updated_by
-       WHERE p.business_unit_id = $1
+       WHERE p.business_unit_id = $1 AND p.type_article = 'produit_fini'
        ORDER BY pe.date_production DESC, pe.updated_at DESC NULLS LAST
        LIMIT 1`, [buId]);
     res.json(row || null);
@@ -86,7 +86,7 @@ router.get('/dashboard', requireSubModule('production.suivi'), async (req, res, 
   try {
     const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : new Date().toISOString().slice(0, 8) + '01';
     const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'"];
+    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article = 'produit_fini'"];
     const params = [from, to];
     if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
     const visible = visibleBusinessUnitIds(req.user);
@@ -120,7 +120,7 @@ router.get('/detail', requireSubModule('production.suivi'), async (req, res, nex
   try {
     const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : new Date().toISOString().slice(0, 8) + '01';
     const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'"];
+    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article = 'produit_fini'"];
     const params = [from, to];
     if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
     const visible = visibleBusinessUnitIds(req.user);
@@ -154,7 +154,7 @@ router.get('/evolution', requireSubModule('production.suivi'), async (req, res, 
     const to = isDate(req.query.date_to) ? String(req.query.date_to).slice(0, 10) : new Date().toISOString().slice(0, 10);
     const from = isDate(req.query.date_from) ? String(req.query.date_from).slice(0, 10) : null;
     if (!from) return res.status(400).json({ error: 'date_from requis.' });
-    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article IS DISTINCT FROM 'matiere_premiere'", 'p.actif = true'];
+    const where = ['pe.date_production BETWEEN $1 AND $2', "p.type_article = 'produit_fini'", 'p.actif = true'];
     const params = [from, to];
     if (req.query.product_id) { params.push(Number(req.query.product_id)); where.push(`pe.product_id = $${params.length}`); }
     if (req.query.business_unit_id) { params.push(Number(req.query.business_unit_id)); where.push(`p.business_unit_id = $${params.length}`); }
