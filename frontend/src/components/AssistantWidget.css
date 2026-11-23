@@ -148,6 +148,18 @@
 }
 .assistant-link:hover { text-decoration: underline; }
 
+/* Mention « Bientôt disponible » affichée à la place du lien d'ouverture. */
+.assistant-soon-note {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6d28d9;
+}
+:root[data-theme="dark"] .assistant-soon-note { color: #c4b5fd; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .assistant-soon-note { color: #c4b5fd; }
+}
+
 .assistant-thread { display: flex; flex-direction: column; gap: 10px; }
 .assistant-bubble { max-width: 90%; padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
 .assistant-bubble.user { align-self: flex-end; background: var(--color-primary, #1f6feb); color: #fff; border-bottom-right-radius: 4px; }

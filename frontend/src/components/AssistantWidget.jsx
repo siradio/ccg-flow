@@ -175,7 +175,13 @@ export default function AssistantWidget() {
                   </div>
                   <div className="assistant-news-title">{n.titre}</div>
                   {n.contenu && <div className="assistant-news-body">{n.contenu}</div>}
-                  {n.lien && <button type="button" className="assistant-link" onClick={() => go(n.lien)}>{t('assistant.news.open')} →</button>}
+                  {n.type === 'bientot' ? (
+                    // Module pas encore ouvert : on n'affiche pas de lien d'ouverture (il ne mènerait
+                    // nulle part), mais une mention claire « sera bientôt disponible ».
+                    <div className="assistant-soon-note">⏳ {t('assistant.news.comingSoon')}</div>
+                  ) : (
+                    n.lien && <button type="button" className="assistant-link" onClick={() => go(n.lien)}>{t('assistant.news.open')} →</button>
+                  )}
                 </div>
               ))}
             </div>
