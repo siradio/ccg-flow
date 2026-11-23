@@ -501,6 +501,7 @@ export const translations = {
     'assistant.type.nouveau': 'Nouveau',
     'assistant.type.amelioration': 'Amélioration',
     'assistant.type.correctif': 'Correctif',
+    'assistant.type.bientot': 'Bientôt disponible',
     // Administration de l'assistant (super_admin).
     'adm.assistant.title': 'Assistant',
     'adm.assistant.intro': 'Personnalisez le compagnon de l’application (nom, genre, avatar), publiez les nouveautés et alimentez la FAQ. L’assistant fonctionne entièrement sans intelligence artificielle : il recherche dans la FAQ par mots-clés.',
@@ -3256,6 +3257,7 @@ export const translations = {
     'assistant.type.nouveau': 'New',
     'assistant.type.amelioration': 'Improvement',
     'assistant.type.correctif': 'Fix',
+    'assistant.type.bientot': 'Coming soon',
     // Assistant administration (super_admin).
     'adm.assistant.title': 'Assistant',
     'adm.assistant.intro': 'Customize the app’s companion (name, gender, avatar), publish news and fill in the FAQ. The assistant runs entirely without artificial intelligence: it searches the FAQ by keywords.',
