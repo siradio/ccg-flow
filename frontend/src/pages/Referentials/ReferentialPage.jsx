@@ -18,6 +18,13 @@ const fieldLabel = (f, t) => (f.labelKey ? t(f.labelKey) : f.label);
 // Libellé affiché d'une option de select : `optionLabels` mappe valeur→libellé traduit ; la valeur
 // stockée reste inchangée (français), seul l'affichage change.
 const optLabel = (f, o) => (f.optionLabels && f.optionLabels[o] != null ? f.optionLabels[o] : o);
+// Nettoie une valeur numérique issue d'un NUMERIC pg (texte "20.0000") pour l'affichage : retire les
+// zéros de fin inutiles ("20.0000"→"20", "2.5000"→"2.5"), conserve 0, laisse vide si absente.
+function cleanNumberValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return '';
+  const n = Number(raw);
+  return Number.isNaN(n) ? String(raw) : String(n);
+}
 
 // Page CRUD générique pour un référentiel "simple" (une table, champs plats + éventuels entity_ids).
 // Évite de dupliquer 7 fois la même page pour sites/entrepôts/machines/produits/fournisseurs/entités.
@@ -64,6 +71,9 @@ export default function ReferentialPage({ title, endpoint, fields, filters = [],
       // Une DATE revient en ISO ("2020-01-15T00:00:00.000Z") ; on la ramène à YYYY-MM-DD, format
       // attendu par <input type="date"> et par la colonne PG (évite tout décalage de fuseau).
       else if (f.type === 'date') next[f.key] = item[f.key] ? String(item[f.key]).slice(0, 10) : '';
+      // Un NUMERIC pg revient en texte avec des zéros de fin ("20.0000") ; on les retire pour
+      // réafficher proprement "20" dans le champ (sinon confusion "20,0000" signalée en édition).
+      else if (f.type === 'number') next[f.key] = cleanNumberValue(item[f.key]);
       else next[f.key] = item[f.key] ?? '';
     }
     return next;
@@ -430,6 +440,8 @@ function renderValue(field, item, entities, sites, lists = {}, endpoint = '', t 
       ? <AuthImage src={`${endpoint}/${item.id}/photo`} alt="Photo" style={{ height: 34, borderRadius: 4, border: '1px solid var(--color-border)', display: 'block' }} />
       : <span style={{ color: 'var(--color-text-faint)' }}>—</span>;
   }
+  // Nombre : on retire les zéros de fin du NUMERIC pg pour un affichage propre ("20" et non "20.0000").
+  if (field.type === 'number') return cleanNumberValue(value) || '—';
   return value;
 }
 
