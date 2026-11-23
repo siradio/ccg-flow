@@ -10,7 +10,12 @@ import { MODULE_SUB_KEYS } from '../../config/modules';
 
 const MODULE_OPTIONS = ['', ...Object.keys(MODULE_SUB_KEYS), 'achats', 'rh', 'liens']
   .filter((v, i, a) => a.indexOf(v) === i);
-const AVATARS = ['🤖', '🧑‍💼', '👩‍💼', '👨‍💼', '🦉', '🐧', '🦊', '🌟', '💡', '🛟', '🧭', '🐥'];
+const AVATARS = [
+  // Personnages de type africain — fille / garçon (teintes foncée et mate), employé(e)s de bureau
+  '👧🏿', '👦🏿', '👩🏿', '👨🏿', '👩🏿‍💼', '👨🏿‍💼', '👧🏾', '👦🏾', '👩🏾‍💼', '👨🏾‍💼',
+  // Autres avatars neutres / symboliques
+  '🤖', '🧑‍💼', '👩‍💼', '👨‍💼', '🦉', '🦊', '🌟', '💡', '🛟', '🧭',
+];
 
 function Saved({ show, t }) {
   return show ? <span style={{ color: 'var(--color-success-fg, #128a54)', fontSize: 13 }}>{t('adm.common.savedShort')}</span> : null;

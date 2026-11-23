@@ -26,6 +26,14 @@ function roleWord(gender, t) {
   return t('assistant.role.neutre');
 }
 
+// Message d'accueil : celui saisi par l'admin s'il existe, sinon un message dérivé du nom/genre
+// qui mentionne « CCG Flow » (ex. « Bonjour ! Je suis Flo, votre assistant CCG Flow. … »).
+function defaultGreeting(persona, t) {
+  if (persona?.greeting && persona.greeting.trim()) return persona.greeting.trim();
+  const name = persona?.name || 'Flo';
+  return `${t('assistant.ask.hello')} ${name}, ${roleWord(persona?.gender, t)} CCG Flow. ${t('assistant.ask.intro')}`;
+}
+
 export default function AssistantWidget() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -38,6 +46,7 @@ export default function AssistantWidget() {
   const [thread, setThread] = useState([]); // [{ from:'user'|'bot', text?, items?, suggests? }]
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  const [greetBubble, setGreetBubble] = useState(false); // bulle d'accueil à la connexion
   const bodyRef = useRef(null);
 
   // Charge le personnage ; si l'assistant est désactivé par l'admin, on ne monte rien.
@@ -50,6 +59,21 @@ export default function AssistantWidget() {
     if (!persona?.enabled) return;
     client.get('/assistant/news').then(r => setNews(r.data || [])).catch(() => {});
     client.get('/assistant/faq/suggestions').then(r => setSuggestions(r.data || [])).catch(() => {});
+  }, [persona?.enabled]);
+
+  // Présentation à la connexion : si une connexion fraîche a été signalée (voir AuthContext.login),
+  // l'assistant se présente d'une bulle d'accueil, une seule fois. Auto-masquée après ~11 s.
+  useEffect(() => {
+    if (!persona?.enabled) return;
+    let shouldGreet = false;
+    try {
+      shouldGreet = sessionStorage.getItem('ccg-flow-assistant-greet') === '1';
+      if (shouldGreet) sessionStorage.removeItem('ccg-flow-assistant-greet');
+    } catch { /* stockage indispo */ }
+    if (!shouldGreet) return;
+    setGreetBubble(true);
+    const id = setTimeout(() => setGreetBubble(false), 11000);
+    return () => clearTimeout(id);
   }, [persona?.enabled]);
 
   const maxNewsId = news.length ? Math.max(...news.map(n => n.id)) : 0;
@@ -69,8 +93,7 @@ export default function AssistantWidget() {
   // Auto-scroll du fil de discussion.
   useEffect(() => { if (bodyRef.current && tab === 'ask') bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [thread, tab]);
 
-  const greeting = (persona?.greeting && persona.greeting.trim())
-    || `${t('assistant.ask.hello')} ${persona?.name || 'Flo'}, ${roleWord(persona?.gender, t)}. ${t('assistant.ask.intro')}`;
+  const greeting = defaultGreeting(persona, t);
 
   async function ask(text) {
     const q = String(text ?? query).trim();
@@ -100,6 +123,18 @@ export default function AssistantWidget() {
 
   return (
     <>
+      {!open && greetBubble && (
+        <div className="assistant-greet" role="status">
+          <button type="button" className="assistant-greet-close" aria-label={t('assistant.close')}
+            onClick={e => { e.stopPropagation(); setGreetBubble(false); }}>×</button>
+          <button type="button" className="assistant-greet-body"
+            onClick={() => { setGreetBubble(false); setTab('ask'); setOpen(true); }}>
+            <span className="assistant-greet-avatar" aria-hidden="true">{avatar}</span>
+            <span className="assistant-greet-text">{greeting}</span>
+          </button>
+        </div>
+      )}
+
       {!open && (
         <button type="button" className="assistant-fab" onClick={() => setOpen(true)}
           aria-label={t('assistant.open')} title={name}>

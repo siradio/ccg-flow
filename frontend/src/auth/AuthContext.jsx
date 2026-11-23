@@ -20,6 +20,9 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const res = await client.post('/auth/login', { email, password });
     localStorage.setItem('erp_token', res.data.token);
+    // Signale une connexion fraîche : l'assistant se présente alors d'un bulle d'accueil (une seule
+    // fois par connexion). Consommé puis effacé par AssistantWidget.
+    try { sessionStorage.setItem('ccg-flow-assistant-greet', '1'); } catch { /* stockage indispo */ }
     setUser(res.data.user);
     return res.data.user;
   }, []);

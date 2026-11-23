@@ -191,7 +191,61 @@
 
 .assistant-empty { color: var(--color-text-muted, #656d76); font-size: 13px; text-align: center; margin-top: 24px; }
 
+/* Bulle d'accueil affichée à la connexion, au-dessus du bouton flottant. */
+.assistant-greet {
+  position: fixed;
+  right: 20px;
+  bottom: 88px;
+  width: min(300px, calc(100vw - 32px));
+  background: var(--color-surface, var(--color-bg, #fff));
+  color: var(--color-text, #111);
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  z-index: 1200;
+  animation: assistant-pop 0.2s ease-out;
+}
+.assistant-greet::after {
+  content: '';
+  position: absolute;
+  right: 22px;
+  bottom: -8px;
+  width: 16px; height: 16px;
+  background: var(--color-surface, var(--color-bg, #fff));
+  border-right: 1px solid var(--color-border, #d0d7de);
+  border-bottom: 1px solid var(--color-border, #d0d7de);
+  transform: rotate(45deg);
+}
+.assistant-greet-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+}
+.assistant-greet-avatar { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.assistant-greet-text { font-size: 13px; line-height: 1.45; }
+.assistant-greet-close {
+  position: absolute;
+  top: 4px; right: 6px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted, #656d76);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  z-index: 1;
+}
+.assistant-greet-close:hover { color: var(--color-text, #111); }
+
 @media (prefers-reduced-motion: reduce) {
   .assistant-panel { animation: none; }
+  .assistant-greet { animation: none; }
   .assistant-fab { transition: none; }
 }
