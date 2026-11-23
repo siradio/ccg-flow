@@ -7,13 +7,14 @@ import ThemeSwitcher from './ThemeSwitcher';
 import InstallPWA from './InstallPWA';
 import LanguageSwitcher from './LanguageSwitcher';
 import IdleTimeout from './IdleTimeout';
+import AssistantWidget from './AssistantWidget';
 import { useI18n } from '../i18n/I18nContext';
 import { hasRhSelfService } from './RequireRh';
 import { firstCommerceTarget } from '../pages/Commerce/CommerceSubnav';
 import {
   IconDashboard, IconCart, IconBox, IconBook,
   IconUsers, IconEmployees, IconWorkflow, IconDatabase, IconSettings, IconChevron, IconLogout, IconMail,
-  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi, IconTools, IconQhse,
+  IconMenu, IconClose, IconImage, IconTruck, IconLink, IconChart, IconTag, IconAccounting, IconDsi, IconTools, IconQhse, IconMegaphone,
 } from './icons';
 import logo from '../assets/logo-web-darklogo.png';
 
@@ -54,6 +55,7 @@ const PARAMS_ITEMS = [
   { to: '/admin/email', labelKey: 'nav.email', Icon: IconMail, superOnly: true },
   { to: '/admin/documents', labelKey: 'nav.branding', Icon: IconImage, superOnly: true },
   { to: '/admin/login-background', labelKey: 'nav.loginBg', Icon: IconImage, superOnly: true },
+  { to: '/admin/assistant', labelKey: 'nav.assistant', Icon: IconMegaphone, superOnly: true },
   { to: '/admin/scheduled-reports', labelKey: 'nav.scheduledReports', Icon: IconChart, superOnly: true },
   { to: '/admin/test-data', labelKey: 'nav.testData', Icon: IconDatabase, superOnly: true },
 ];
@@ -183,6 +185,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      {/* Assistant « CCG Flow » — compagnon flottant (nouveautés + FAQ), visible pour tout
+          utilisateur connecté, sans octroi de sous-module (comme l'onglet Outils). */}
+      <AssistantWidget />
     </div>
   );
 }
