@@ -107,8 +107,25 @@ import RapportDetail from './pages/DSI/RapportDetail';
 import RequireRh from './components/RequireRh';
 import CarteVisite from './pages/Outils/CarteVisite';
 import Signature from './pages/Outils/Signature';
+import QhseHome from './pages/QHSE/QhseHome';
+import QhseReferentiels from './pages/QHSE/QhseReferentiels';
+import QhseAnalyses from './pages/QHSE/QhseAnalyses';
+import QhseSampleDetail from './pages/QHSE/QhseSampleDetail';
+import QhseAnalyseDetail from './pages/QHSE/QhseAnalyseDetail';
+import QhseProduction from './pages/QHSE/QhseProduction';
+import QhseProductionDetail from './pages/QHSE/QhseProductionDetail';
+import QhseSampling from './pages/QHSE/QhseSampling';
+import QhseSamplingDetail from './pages/QHSE/QhseSamplingDetail';
+import QhseNC from './pages/QHSE/QhseNC';
+import QhseNCDetail from './pages/QHSE/QhseNCDetail';
+import QhseLiberation from './pages/QHSE/QhseLiberation';
+import QhseShipments from './pages/QHSE/QhseShipments';
+import QhseShipmentDetail from './pages/QHSE/QhseShipmentDetail';
+import QhseDashboard from './pages/QHSE/QhseDashboard';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
+// Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -219,6 +236,25 @@ export default function App() {
             compte connecté. Ouverts à tout utilisateur authentifié : pas de gating par sous-module. */}
         <Route path="outils/carte-visite" element={<CarteVisite />} />
         <Route path="outils/signature" element={<Signature />} />
+        {/* Module QHSE — Lot 0 : socle & référentiels du laboratoire. */}
+        <Route path="qhse" element={<RequireModule subModule={QHSE_ANY}><QhseHome /></RequireModule>} />
+        <Route path="qhse/referentiels" element={<RequireModule subModule="qhse.referentiels"><QhseReferentiels /></RequireModule>} />
+        <Route path="qhse/analyses" element={<RequireModule subModule="qhse.labo"><QhseAnalyses /></RequireModule>} />
+        <Route path="qhse/analyses/echantillon/:id" element={<RequireModule subModule="qhse.labo"><QhseSampleDetail /></RequireModule>} />
+        <Route path="qhse/analyses/:id" element={<RequireModule subModule="qhse.labo"><QhseAnalyseDetail /></RequireModule>} />
+        {/* Module QHSE — Lot 2 : contrôles production + échantillonnage en ligne. */}
+        <Route path="qhse/production" element={<RequireModule subModule="qhse.production"><QhseProduction /></RequireModule>} />
+        <Route path="qhse/production/:id" element={<RequireModule subModule="qhse.production"><QhseProductionDetail /></RequireModule>} />
+        <Route path="qhse/echantillonnage" element={<RequireModule subModule="qhse.sampling"><QhseSampling /></RequireModule>} />
+        <Route path="qhse/echantillonnage/:id" element={<RequireModule subModule="qhse.sampling"><QhseSamplingDetail /></RequireModule>} />
+        {/* Module QHSE — Lot 3 : non-conformités / CAPA + libération des lots. */}
+        <Route path="qhse/non-conformites" element={<RequireModule subModule="qhse.nc"><QhseNC /></RequireModule>} />
+        <Route path="qhse/non-conformites/:id" element={<RequireModule subModule="qhse.nc"><QhseNCDetail /></RequireModule>} />
+        <Route path="qhse/liberation" element={<RequireModule subModule="qhse.liberation"><QhseLiberation /></RequireModule>} />
+        {/* Module QHSE — Lot 4 : contrôle des expéditions + tableau de bord. */}
+        <Route path="qhse/expeditions" element={<RequireModule subModule="qhse.expeditions"><QhseShipments /></RequireModule>} />
+        <Route path="qhse/expeditions/:id" element={<RequireModule subModule="qhse.expeditions"><QhseShipmentDetail /></RequireModule>} />
+        <Route path="qhse/tableau-de-bord" element={<RequireModule subModule="qhse.dashboard"><QhseDashboard /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
