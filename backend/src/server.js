@@ -136,6 +136,9 @@ app.use('/api/qhse/liberation', require('./modules/qhse/qhse.liberation.routes')
 app.use('/api/qhse/shipments', require('./modules/qhse/qhse.shipment.routes'));
 app.use('/api/qhse/dashboard', require('./modules/qhse/qhse.dashboard.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
+// Assistant « CCG Flow » — compagnon à base de règles (nouveautés + FAQ), sans clé IA. Lecture
+// ouverte à tout utilisateur authentifié ; administration (personnage, contenus) réservée au super_admin.
+app.use('/api/assistant', require('./modules/assistant/assistant.routes'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

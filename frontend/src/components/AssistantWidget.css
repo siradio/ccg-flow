@@ -1,0 +1,197 @@
+/* Assistant « CCG Flow » — widget flottant (bouton + panneau). Respecte le thème via les variables
+   CSS globales (clair/sombre) et « animations réduites ». */
+
+.assistant-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary, #1f6feb);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.assistant-fab:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3); }
+.assistant-fab:focus-visible { outline: 3px solid var(--color-primary, #1f6feb); outline-offset: 3px; }
+
+.assistant-fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-bg, #fff);
+}
+
+.assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 88px;
+  width: min(380px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 120px));
+  background: var(--color-surface, var(--color-bg, #fff));
+  color: var(--color-text, #111);
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1200;
+  animation: assistant-pop 0.16s ease-out;
+}
+@keyframes assistant-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.assistant-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--color-primary, #1f6feb);
+  color: #fff;
+}
+.assistant-head-avatar { font-size: 26px; line-height: 1; }
+.assistant-head-title { font-weight: 700; font-size: 15px; }
+.assistant-head-sub { font-size: 12px; opacity: 0.85; }
+.assistant-head-close {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.18);
+  border: none;
+  color: #fff;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.assistant-head-close:hover { background: rgba(255, 255, 255, 0.3); }
+
+.assistant-tabs { display: flex; border-bottom: 1px solid var(--color-border, #d0d7de); }
+.assistant-tab {
+  flex: 1;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted, #656d76);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.assistant-tab.active { color: var(--color-primary, #1f6feb); border-bottom-color: var(--color-primary, #1f6feb); }
+.assistant-tab-badge {
+  display: inline-block;
+  margin-left: 5px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.assistant-body { flex: 1; overflow-y: auto; padding: 14px; }
+
+.assistant-news-item {
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--color-bg, #fff);
+}
+.assistant-news-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.assistant-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.assistant-chip.nouveau { background: #dcfce7; color: #166534; }
+.assistant-chip.amelioration { background: #dbeafe; color: #1e40af; }
+.assistant-chip.correctif { background: #fef3c7; color: #92400e; }
+.assistant-news-date { font-size: 11px; color: var(--color-text-muted, #656d76); margin-left: auto; }
+.assistant-news-title { font-weight: 700; font-size: 14px; margin: 2px 0; }
+.assistant-news-body { font-size: 13px; color: var(--color-text, #111); white-space: pre-wrap; line-height: 1.4; }
+.assistant-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary, #1f6feb);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.assistant-link:hover { text-decoration: underline; }
+
+.assistant-thread { display: flex; flex-direction: column; gap: 10px; }
+.assistant-bubble { max-width: 90%; padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
+.assistant-bubble.user { align-self: flex-end; background: var(--color-primary, #1f6feb); color: #fff; border-bottom-right-radius: 4px; }
+.assistant-bubble.bot { align-self: flex-start; background: var(--color-bg-subtle, #f3f4f6); color: var(--color-text, #111); border-bottom-left-radius: 4px; }
+.assistant-bubble .qa-q { font-weight: 700; margin-bottom: 3px; }
+
+.assistant-suggests { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.assistant-suggest {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border, #d0d7de);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #111);
+  cursor: pointer;
+  text-align: left;
+}
+.assistant-suggest:hover { border-color: var(--color-primary, #1f6feb); color: var(--color-primary, #1f6feb); }
+
+.assistant-ask-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--color-border, #d0d7de); }
+.assistant-ask-form input {
+  flex: 1;
+  padding: 9px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border, #d0d7de);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #111);
+  font-size: 13px;
+}
+.assistant-ask-form input:focus { outline: none; border-color: var(--color-primary, #1f6feb); }
+.assistant-ask-send {
+  border: none;
+  background: var(--color-primary, #1f6feb);
+  color: #fff;
+  border-radius: 50%;
+  width: 38px; height: 38px;
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.assistant-ask-send:disabled { opacity: 0.5; cursor: default; }
+
+.assistant-empty { color: var(--color-text-muted, #656d76); font-size: 13px; text-align: center; margin-top: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-panel { animation: none; }
+  .assistant-fab { transition: none; }
+}
