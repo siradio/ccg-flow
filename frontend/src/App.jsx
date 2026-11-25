@@ -45,6 +45,7 @@ import CdiForm from './pages/RH/CdiForm';
 import RhDashboard from './pages/RH/RhDashboard';
 import RecrutementDashboard from './pages/RH/Recrutement/RecrutementDashboard';
 import RecrutementCategories from './pages/RH/Recrutement/RecrutementCategories';
+import RecrutementQuestions from './pages/RH/Recrutement/RecrutementQuestions';
 import RhParametres, { RhConfigTypes, RhConfigJournaliers, RhConfigFeries } from './pages/RH/RhParametres';
 import Competences from './pages/RH/Competences';
 import Modeles from './pages/RH/Modeles';
@@ -178,6 +179,7 @@ export default function App() {
 
         <Route path="rh/dashboard" element={<RequireRh><RhDashboard /></RequireRh>} />
         <Route path="rh/recrutement" element={<RequireRh><RecrutementDashboard /></RequireRh>} />
+        <Route path="rh/recrutement/questions" element={<RequireRh><RecrutementQuestions /></RequireRh>} />
         <Route path="rh/recrutement/categories" element={<RequireRh><RecrutementCategories /></RequireRh>} />
         <Route path="rh/mes-demandes" element={<RequireRh><MesDemandes /></RequireRh>} />
         <Route path="rh/a-valider" element={<RequireRh><AValider /></RequireRh>} />
