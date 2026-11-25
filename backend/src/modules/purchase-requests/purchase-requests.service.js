@@ -856,6 +856,102 @@ async function markReception(user, prId, { receptionnee, commentaire }) {
   return getFullDetail(prId);
 }
 
+// ─── Annulation d'une demande d'achat ────────────────────────────────────
+// Statuts « dans le circuit » depuis lesquels l'auteur peut DEMANDER l'annulation (la DA n'est plus
+// un brouillon modifiable, mais pas encore terminale). 'bon_commande_genere' en est exclu : à ce
+// stade le service achat dispose déjà de « Rouvrir la consultation » (reopenConsultation).
+const CANCELLABLE_IN_CIRCUIT = [
+  'en_attente_validation_besoin', 'soumise', 'en_analyse_achat',
+  'devis_en_cours', 'devis_selectionne', 'en_validation', 'en_validation_dga',
+];
+
+// Rôle du validateur qui « a la DA à son niveau » selon le statut (même mapping que requestChanges /
+// la page de détail). Sert à notifier et à autoriser la décision sur une demande d'annulation.
+async function currentApproverRole(pr) {
+  if (pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga') return 'validateur_besoin';
+  if (['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'].includes(pr.status)) return 'service_achat';
+  if (pr.status === 'en_validation' && pr.current_step_id) {
+    const template = await workflowEngine.getTemplate(MODULE_CODE);
+    const steps = await workflowEngine.getSteps(template.id);
+    const cur = steps.find(s => s.id === pr.current_step_id);
+    return cur ? cur.role_code_requis : null;
+  }
+  return null;
+}
+
+// Brouillon : l'auteur (ou un super_admin) annule directement → statut terminal 'annulee'.
+async function cancelDraft(user, prId) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  assertOwnerAndStatus(pr, user, 'brouillon'); // auteur (ou super_admin) + statut brouillon
+  await repo.updateStatusAndStep(prId, 'annulee', null);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'annulation', userId: user.id, details: { depuis: 'brouillon' } });
+  return getFullDetail(prId);
+}
+
+// DA déjà dans le circuit : l'auteur dépose une demande d'annulation (motif obligatoire). Le circuit
+// n'est PAS interrompu ; le validateur courant est notifié et tranchera.
+async function requestCancellation(user, prId, motif) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (pr.requester_user_id !== user.id && !isSuperAdmin(user)) {
+    throw httpError(403, "Seul l'auteur de la demande peut demander son annulation.");
+  }
+  if (!CANCELLABLE_IN_CIRCUIT.includes(pr.status)) {
+    throw httpError(400, `Aucune demande d'annulation possible depuis le statut "${pr.status}".`);
+  }
+  if (pr.annulation_demandee) throw httpError(400, "Une demande d'annulation est déjà en attente.");
+  if (!motif || !motif.trim()) throw httpError(400, "Un motif est obligatoire pour demander l'annulation.");
+
+  await repo.setCancellationRequest(prId, { motif: motif.trim(), byUserId: user.id });
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'demande_annulation', userId: user.id, details: { motif: motif.trim(), statut: pr.status } });
+  const role = await currentApproverRole(pr);
+  const link = `/purchase-requests/${prId}`;
+  const message = `L'auteur demande l'annulation de la demande ${pr.numero} (${pr.objet}) : ${motif.trim()}`;
+  if (role) await notifications.notifyRoleOnEntity(pr.entity_id, role, "Demande d'annulation", message, link);
+  return getFullDetail(prId);
+}
+
+// L'auteur retire sa demande d'annulation tant qu'elle n'a pas été tranchée.
+async function withdrawCancellation(user, prId) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (pr.requester_user_id !== user.id && !isSuperAdmin(user)) {
+    throw httpError(403, "Seul l'auteur peut retirer sa demande d'annulation.");
+  }
+  if (!pr.annulation_demandee) throw httpError(400, "Aucune demande d'annulation en attente.");
+  await repo.clearCancellationRequest(prId);
+  await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'retrait_demande_annulation', userId: user.id });
+  return getFullDetail(prId);
+}
+
+// Le validateur courant (ou un super_admin) tranche la demande d'annulation : accepte (→ terminal
+// 'annulee', un bon de commande éventuel est annulé et les validations en attente retirées) ou refuse
+// (le drapeau est levé, le circuit se poursuit). L'auteur est notifié de la décision.
+async function decideCancellation(user, prId, approve, commentaire) {
+  const pr = await repo.getById(prId);
+  if (!pr) throw httpError(404, 'Demande introuvable.');
+  if (!pr.annulation_demandee) throw httpError(400, "Aucune demande d'annulation en attente.");
+  const role = await currentApproverRole(pr);
+  if (!isSuperAdmin(user) && !(role && hasRoleOnEntity(user, role, pr.entity_id))) {
+    throw httpError(403, "Seul le validateur qui a la demande à son niveau peut statuer sur l'annulation.");
+  }
+  const link = `/purchase-requests/${prId}`;
+  if (approve) {
+    await poRepo.deleteByPurchaseRequestId(prId); // annule un bon de commande éventuel (no-op sinon)
+    await repo.deletePendingApprovals(prId);
+    await repo.clearCancellationRequest(prId);
+    await repo.updateStatusAndStep(prId, 'annulee', null);
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'annulation_acceptee', userId: user.id, details: { depuis: pr.status, commentaire: commentaire || null } });
+    await notifications.notify(pr.requester_user_id, 'Annulation acceptée', `Votre demande ${pr.numero} a été annulée.`, link);
+  } else {
+    await repo.clearCancellationRequest(prId);
+    await audit.logAction({ tableName: 'purchase_requests', recordId: prId, purchaseRequestId: prId, action: 'annulation_refusee', userId: user.id, details: { commentaire: commentaire || null } });
+    await notifications.notify(pr.requester_user_id, "Demande d'annulation refusée", `Votre demande d'annulation pour ${pr.numero} a été refusée${commentaire ? ` : ${commentaire}` : ''}. Le traitement se poursuit.`, link);
+  }
+  return getFullDetail(prId);
+}
+
 // Export analytique : toutes les demandes des entités où l'utilisateur détient un rôle (toutes pour
 // un super_admin), filtrées par plage de dates de création. Réservé aux valideurs (contrôle en route).
 async function exportRows(user, { from, to }) {
@@ -871,4 +967,5 @@ module.exports = {
   quickAddSupplier, createQuoteRequest, sendQuoteRequest, sendQuoteRequestToSupplier, getQuoteRequestSupplierPdf, addQuote, updateQuote, selectQuote,
   markSupplierConsulted, reopenConsultation, updateDevise,
   validateStep, rejectStep, requestChanges, listForUser, exportRows, markReception,
+  cancelDraft, requestCancellation, withdrawCancellation, decideCancellation,
 };

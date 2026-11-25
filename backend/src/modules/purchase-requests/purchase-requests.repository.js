@@ -457,6 +457,28 @@ async function deletePendingApprovals(prId) {
   await run("DELETE FROM approvals WHERE purchase_request_id = $1 AND statut = 'en_attente'", [prId]);
 }
 
+// Pose le drapeau « demande d'annulation en attente » (DA déjà dans le circuit) : le statut ne change
+// pas, le circuit reste intact tant que le validateur courant n'a pas tranché.
+async function setCancellationRequest(id, { motif, byUserId }) {
+  await run(
+    `UPDATE purchase_requests
+        SET annulation_demandee = true, annulation_motif = $2, annulation_by = $3,
+            annulation_at = now(), updated_at = now()
+      WHERE id = $1`,
+    [id, motif, byUserId]
+  );
+}
+// Retire le drapeau (annulation retirée par l'auteur, ou tranchée accept/refus).
+async function clearCancellationRequest(id, x = DB) {
+  await x.run(
+    `UPDATE purchase_requests
+        SET annulation_demandee = false, annulation_motif = NULL, annulation_by = NULL,
+            annulation_at = NULL, updated_at = now()
+      WHERE id = $1`,
+    [id]
+  );
+}
+
 // ─── Frais annexes des devis (TVA, freight, FOB, transport, autres) ──────────
 // Référentiel paramétrable.
 async function listFeeTypes(activeOnly = false) {
@@ -509,5 +531,6 @@ module.exports = {
   createQuoteLines, updateQuoteAmount, getQuoteLines, applyQuoteLinesToPrLines,
   createApproval, getPendingApproval, decideApproval, getApprovalsForPR,
   unselectAllQuotes, clearLinesSelection, clearMontantFinal, deletePendingApprovals,
+  setCancellationRequest, clearCancellationRequest,
   listFeeTypes, setQuoteFees, getQuoteFees, setPurchaseRequestFees, getPurchaseRequestFees, clearPurchaseRequestFees,
 };
