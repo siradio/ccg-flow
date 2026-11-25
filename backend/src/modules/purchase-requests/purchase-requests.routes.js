@@ -240,6 +240,28 @@ router.post('/:id/reopen-consultation', requireAuth, async (req, res, next) => {
   catch (e) { next(e); }
 });
 
+// Annulation d'une demande d'achat.
+//  • /cancel : brouillon → l'auteur annule directement (statut 'annulee').
+//  • /request-cancellation : DA dans le circuit → l'auteur dépose une demande d'annulation (motif).
+//  • /withdraw-cancellation : l'auteur retire sa demande d'annulation en attente.
+//  • /decide-cancellation : le validateur courant (ou super_admin) accepte/refuse l'annulation.
+router.post('/:id/cancel', requireAuth, async (req, res, next) => {
+  try { res.json(await service.cancelDraft(req.user, Number(req.params.id))); }
+  catch (e) { next(e); }
+});
+router.post('/:id/request-cancellation', requireAuth, async (req, res, next) => {
+  try { res.json(await service.requestCancellation(req.user, Number(req.params.id), (req.body || {}).motif)); }
+  catch (e) { next(e); }
+});
+router.post('/:id/withdraw-cancellation', requireAuth, async (req, res, next) => {
+  try { res.json(await service.withdrawCancellation(req.user, Number(req.params.id))); }
+  catch (e) { next(e); }
+});
+router.post('/:id/decide-cancellation', requireAuth, async (req, res, next) => {
+  try { res.json(await service.decideCancellation(req.user, Number(req.params.id), !!(req.body || {}).approve, (req.body || {}).comment)); }
+  catch (e) { next(e); }
+});
+
 router.get('/:id/history', requireAuth, async (req, res, next) => {
   try { res.json(await auditService.getHistory(Number(req.params.id))); }
   catch (e) { next(e); }

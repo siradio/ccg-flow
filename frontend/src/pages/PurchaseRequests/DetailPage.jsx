@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import client from '../../api/client';
-import { useAuth, hasRoleOnEntity } from '../../auth/AuthContext';
+import { useAuth, hasRoleOnEntity, isSuperAdmin } from '../../auth/AuthContext';
 import WorkflowTimeline from '../../components/WorkflowTimeline';
 import { StatusBadge } from './statusLabels.jsx';
 import { SUPPLIER_FIELDS } from '../Referentials/ReferentialsIndex.jsx';
@@ -240,6 +240,8 @@ export default function DetailPage() {
         </section>
       )}
 
+      <CancellationSection pr={pr} user={user} guarded={guarded} confirm={confirm} />
+
       <QuoteRequestSection pr={pr} suppliers={suppliers} guarded={guarded} minSuppliers={minSuppliers} addSupplier={addSupplier} entities={entities} />
       <QuotesSection pr={pr} guarded={guarded} suppliers={suppliers} />
       <ValidationSection pr={pr} refresh={refresh} showToast={showToast} steps={steps} />
@@ -270,6 +272,98 @@ export default function DetailPage() {
       <HistorySection key={version} prId={pr.id} />
     </div>
   );
+}
+
+// Statuts « dans le circuit » depuis lesquels l'auteur peut demander l'annulation (miroir du backend).
+const CANCELLABLE_IN_CIRCUIT = [
+  'en_attente_validation_besoin', 'soumise', 'en_analyse_achat',
+  'devis_en_cours', 'devis_selectionne', 'en_validation', 'en_validation_dga',
+];
+
+// Rôle du validateur qui « a la DA à son niveau » selon le statut (miroir du backend) — sert à savoir
+// si l'utilisateur courant peut trancher une demande d'annulation.
+function approverRoleForStatus(pr) {
+  if (pr.status === 'en_attente_validation_besoin' || pr.status === 'en_validation_dga') return 'validateur_besoin';
+  if (['soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne'].includes(pr.status)) return 'service_achat';
+  if (pr.status === 'en_validation') return pr.current_step_role || null;
+  return null;
+}
+
+// Annulation d'une demande d'achat : brouillon (annulation directe par l'auteur), circuit (demande
+// d'annulation + décision du validateur courant), et bannière de demande en attente.
+function CancellationSection({ pr, user, guarded, confirm }) {
+  const { t } = useI18n();
+  const [motif, setMotif] = useState('');
+  const [refuseComment, setRefuseComment] = useState('');
+  const isRequester = pr.requester_user_id === user.id;
+
+  // 1) Brouillon : l'auteur annule directement.
+  if (pr.status === 'brouillon' && isRequester) {
+    return (
+      <section className="card">
+        <h2>{t('prd.cancel.title')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('prd.cancel.draftHint')}</p>
+        <button className="btn btn-danger" onClick={async () => {
+          if (await confirm(t('prd.cancel.draftConfirm'), { danger: true, confirmLabel: t('prd.cancel.action') })) {
+            await guarded(() => client.post(`/purchase-requests/${pr.id}/cancel`), t('prd.cancel.doneToast'));
+          }
+        }}>{t('prd.cancel.action')}</button>
+      </section>
+    );
+  }
+
+  // 2) Demande d'annulation en attente : bannière + décision (validateur courant / super_admin) ou retrait (auteur).
+  if (pr.annulation_demandee) {
+    const role = approverRoleForStatus(pr);
+    const canDecide = isSuperAdmin(user) || (role && hasRoleOnEntity(user, role, pr.entity_id));
+    return (
+      <section className="card" style={{ borderLeft: '4px solid var(--status-red-fg, #b42318)' }}>
+        <h2>{t('prd.cancel.pendingTitle')}</h2>
+        <p style={{ marginTop: 0 }}>{t('prd.cancel.motifLabel')} : <strong>{pr.annulation_motif}</strong></p>
+        {canDecide && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0 }}>{t('prd.cancel.decideHint')}</p>
+            <input value={refuseComment} onChange={e => setRefuseComment(e.target.value)}
+              placeholder={t('prd.cancel.refuseCommentPlaceholder')} style={{ maxWidth: 440 }} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-danger" onClick={async () => {
+                if (await confirm(t('prd.cancel.acceptConfirm'), { danger: true, confirmLabel: t('prd.cancel.accept') })) {
+                  await guarded(() => client.post(`/purchase-requests/${pr.id}/decide-cancellation`, { approve: true }), t('prd.cancel.acceptedToast'));
+                }
+              }}>{t('prd.cancel.accept')}</button>
+              <button className="btn btn-secondary" onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/decide-cancellation`, { approve: false, comment: refuseComment.trim() || undefined }), t('prd.cancel.refusedToast'))}>
+                {t('prd.cancel.refuse')}
+              </button>
+            </div>
+          </div>
+        )}
+        {isRequester && (
+          <button className="btn btn-secondary" style={{ marginTop: canDecide ? 12 : 0 }}
+            onClick={() => guarded(() => client.post(`/purchase-requests/${pr.id}/withdraw-cancellation`), t('prd.cancel.withdrawnToast'))}>
+            {t('prd.cancel.withdraw')}
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  // 3) Dans le circuit, aucune demande en attente : l'auteur peut demander l'annulation (motif obligatoire).
+  if (CANCELLABLE_IN_CIRCUIT.includes(pr.status) && isRequester) {
+    return (
+      <section className="card">
+        <h2>{t('prd.cancel.requestTitle')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('prd.cancel.requestHint')}</p>
+        <textarea value={motif} onChange={e => setMotif(e.target.value)} placeholder={t('prd.cancel.motifPlaceholder')}
+          style={{ display: 'block', width: '100%', marginBottom: 10, minHeight: 60 }} />
+        <button className="btn btn-secondary" disabled={!motif.trim()} onClick={async () => {
+          const ok = await guarded(() => client.post(`/purchase-requests/${pr.id}/request-cancellation`, { motif: motif.trim() }), t('prd.cancel.requestedToast'));
+          if (ok) setMotif('');
+        }}>{t('prd.cancel.requestAction')}</button>
+      </section>
+    );
+  }
+
+  return null;
 }
 
 function LinesSection({ pr, products, isRequester, canEditLines, guarded }) {

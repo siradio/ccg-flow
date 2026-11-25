@@ -10,11 +10,12 @@ export const STATUS_LABELS = {
   validee: 'Validée',
   rejetee: 'Refusée',
   bon_commande_genere: 'Bon de commande généré',
+  annulee: 'Annulée',
 };
 
 export const STATUS_ORDER = [
   'brouillon', 'en_attente_validation_besoin', 'soumise', 'en_analyse_achat', 'devis_en_cours', 'devis_selectionne',
-  'en_validation', 'en_validation_dga', 'validee', 'bon_commande_genere', 'rejetee',
+  'en_validation', 'en_validation_dga', 'validee', 'bon_commande_genere', 'rejetee', 'annulee',
 ];
 
 // Renvoie vers les tokens --status-* (index.css), theme-aware (clair/sombre) — plutôt que des
@@ -31,6 +32,7 @@ export const STATUS_COLORS = {
   validee: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
   rejetee: { bg: 'var(--status-red-bg)', fg: 'var(--status-red-fg)' },
   bon_commande_genere: { bg: 'var(--status-green-bg)', fg: 'var(--status-green-fg)' },
+  annulee: { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' },
 };
 
 import { useI18n } from '../../i18n/I18nContext';
