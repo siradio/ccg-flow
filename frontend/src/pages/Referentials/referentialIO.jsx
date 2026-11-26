@@ -21,7 +21,9 @@ export function exportReferential(title, items, fields, ctx, t) {
 }
 
 export function downloadTemplate(title, fields, ctx, t) {
-  const cols = columnsFor(importableFields(fields), t);
+  // Les colonnes obligatoires sont suffixées « * » dans le modèle (le réimport tolère ce marqueur).
+  const impf = importableFields(fields);
+  const cols = columnsFor(impf, t).map((c, i) => (impf[i].required ? { ...c, label: `${c.label} *` } : c));
   const help = acceptedValuesRows(fields, ctx, t);
   const sheets = [{ name: t('ref.io.sheetTemplate'), columns: cols, rows: [] }];
   if (help.length) {
