@@ -114,22 +114,22 @@ const CONFIGS = {
     // Classement, Conditionnement & poids, Matière première, Coûts & valorisation, Seuils & gestion,
     // Disponibilité. L'ordre des champs suit l'ordre d'affichage souhaité à l'intérieur de chaque bloc.
     fields: [
-      { key: 'code', group: 'refx.grp.identification', labelKey: 'refx.f.code' },
+      { key: 'code', group: 'refx.grp.identification', labelKey: 'refx.f.code', required: true },
       { key: 'designation', group: 'refx.grp.identification', labelKey: 'refx.f.designation', required: true },
       { key: 'code_barres', group: 'refx.grp.identification', labelKey: 'refx.f.code_barres' },
       { key: 'category_id', group: 'refx.grp.classement', labelKey: 'refx.f.category_id', type: 'fkSelect', listKey: 'categories', required: true },
       { key: 'sous_categorie', group: 'refx.grp.classement', labelKey: 'refx.f.sous_categorie' },
       { key: 'marque', group: 'refx.grp.classement', labelKey: 'refx.f.marque' },
-      { key: 'business_unit_id', group: 'refx.grp.classement', labelKey: 'refx.f.business_unit_id', type: 'fkSelect', listKey: 'businessUnits' },
-      { key: 'unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite' },
-      { key: 'unite_vente', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite_vente' },
+      { key: 'business_unit_id', group: 'refx.grp.classement', labelKey: 'refx.f.business_unit_id', type: 'fkSelect', listKey: 'businessUnits', required: true },
+      { key: 'unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite', required: true },
+      { key: 'unite_vente', group: 'refx.grp.conditionnement', labelKey: 'refx.f.unite_vente', required: true },
       // Conditionnement & poids (module Production — harmonisation en tonnes). Poids par colis (g) =
       // Poids unitaire × Quantité × (kg→1000, sinon 1). Affiché pour tout ce qui n'est pas une
       // matière première (la catégorie en décide).
-      { key: 'pds_format', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_format', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
-      { key: 'pds_unites_par_colis', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unites_par_colis', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
-      { key: 'pds_unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unite', type: 'select', options: ['g', 'ml', 'kg'], showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
-      { key: 'poids_unitaire_g', group: 'refx.grp.conditionnement', labelKey: 'refx.f.poids_unitaire_g', type: 'computed', suffix: ' g',
+      { key: 'pds_format', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_format', type: 'number', required: true, showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      { key: 'pds_unites_par_colis', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unites_par_colis', type: 'number', required: true, showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      { key: 'pds_unite', group: 'refx.grp.conditionnement', labelKey: 'refx.f.pds_unite', type: 'select', options: ['g', 'ml', 'kg'], required: true, showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
+      { key: 'poids_unitaire_g', group: 'refx.grp.conditionnement', labelKey: 'refx.f.poids_unitaire_g', type: 'computed', suffix: ' g', required: true,
         compute: (f) => { const fmt = Number(f.pds_format); const u = Number(f.pds_unites_par_colis); if (!fmt || !u) return null; return fmt * u * (f.pds_unite === 'kg' ? 1000 : 1); },
         showIf: (f, l) => selectedCategoryCode(f, l) !== 'matiere_premiere' },
       // Champs spécifiques matières premières (production / consommation) : visibles si la catégorie
@@ -138,9 +138,9 @@ const CONFIGS = {
       { key: 'coef_conversion', group: 'refx.grp.matiere', labelKey: 'refx.f.coef_conversion', type: 'number', showIf: (f, l) => selectedCategoryCode(f, l) === 'matiere_premiere' },
       { key: 'fournisseur_principal_id', group: 'refx.grp.matiere', labelKey: 'refx.f.fournisseur_principal_id', type: 'fkSelect', listKey: 'suppliers', showIf: (f, l) => selectedCategoryCode(f, l) === 'matiere_premiere' },
       // Coûts & valorisation.
-      { key: 'cout_standard', group: 'refx.grp.valorisation', labelKey: 'refx.f.cout_standard', type: 'number' },
+      { key: 'cout_standard', group: 'refx.grp.valorisation', labelKey: 'refx.f.cout_standard', type: 'number', required: true },
       { key: 'prix_vente_ht', group: 'refx.grp.valorisation', labelKey: 'refx.f.prix_vente_ht', type: 'number' },
-      { key: 'methode_valorisation', group: 'refx.grp.valorisation', labelKey: 'refx.f.methode_valorisation', type: 'select', options: ['cmp', 'cout_standard', 'dernier_achat', 'fifo'], optionNs: 'refx.valo', default: 'cmp' },
+      { key: 'methode_valorisation', group: 'refx.grp.valorisation', labelKey: 'refx.f.methode_valorisation', type: 'select', options: ['cmp', 'cout_standard', 'dernier_achat'], optionNs: 'refx.valo', default: 'cmp' },
       // Seuils & gestion.
       { key: 'seuil_alerte_stock', group: 'refx.grp.stocks', labelKey: 'refx.f.seuil_alerte_stock', type: 'number' },
       { key: 'stock_securite', group: 'refx.grp.stocks', labelKey: 'refx.f.stock_securite', type: 'number' },
@@ -148,7 +148,7 @@ const CONFIGS = {
       { key: 'delai_reappro_jours', group: 'refx.grp.stocks', labelKey: 'refx.f.delai_reappro_jours', type: 'number' },
       { key: 'gere_par_lot', group: 'refx.grp.stocks', labelKey: 'refx.f.gere_par_lot', type: 'checkbox' },
       { key: 'gere_peremption', group: 'refx.grp.stocks', labelKey: 'refx.f.gere_peremption', type: 'checkbox' },
-      { key: 'duree_conservation_jours', group: 'refx.grp.stocks', labelKey: 'refx.f.duree_conservation_jours', type: 'number', showIf: { field: 'gere_peremption', equals: true } },
+      { key: 'duree_conservation_jours', group: 'refx.grp.stocks', labelKey: 'refx.f.duree_conservation_jours', type: 'number', required: true, showIf: { field: 'gere_peremption', equals: true } },
       { key: 'entity_ids', group: 'refx.grp.disponibilite', labelKey: 'refx.f.entity_ids', type: 'multiEntity' },
     ],
   },
