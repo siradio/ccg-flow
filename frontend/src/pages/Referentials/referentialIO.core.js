@@ -121,8 +121,12 @@ export function rowToPayload(rowObj, fields, headerByField, ctx, t) {
 }
 
 // Associe chaque champ importable à l'en-tête du fichier (par libellé traduit, repli sur clé).
+// Retire un éventuel marqueur « * » (colonne obligatoire) en fin d'en-tête, pour que le fichier
+// rempli à partir du modèle (dont les colonnes requises sont suffixées « * ») se réimporte sans erreur.
+const stripStar = (s) => String(s ?? '').replace(/\s*\*\s*$/, '');
+
 export function mapHeaders(fields, headers, t) {
-  const byNorm = new Map(headers.map(h => [norm(h), h]));
+  const byNorm = new Map(headers.map(h => [norm(stripStar(h)), h]));
   const headerByField = {};
   const missing = [];
   for (const f of importableFields(fields)) {
