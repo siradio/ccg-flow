@@ -146,6 +146,7 @@ app.use('/api/qhse/inspections', require('./modules/qhse/qhse.hygiene.routes'));
 app.use('/api/qhse/sst/risks', require('./modules/qhse/qhse.sst_risks.routes'));
 app.use('/api/qhse/sst/accidents', require('./modules/qhse/qhse.sst_accidents.routes'));
 app.use('/api/qhse/documents', require('./modules/qhse/qhse.documents.routes'));
+app.use('/api/qhse/actions', require('./modules/qhse/qhse.actions.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 // Assistant « CCG Flow » — compagnon à base de règles (nouveautés + FAQ), sans clé IA. Lecture
 // ouverte à tout utilisateur authentifié ; administration (personnage, contenus) réservée au super_admin.

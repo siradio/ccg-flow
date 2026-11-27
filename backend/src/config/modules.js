@@ -127,6 +127,7 @@ const MODULES = [
       { key: 'qhse.sst_risks', label: 'SST — risques professionnels' },
       { key: 'qhse.sst_accidents', label: 'SST — accidents / incidents' },
       { key: 'qhse.documents', label: 'Maîtrise documentaire (GED)' },
+      { key: 'qhse.actions', label: "Plan d'actions QHSE (registre transverse)" },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },

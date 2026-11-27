@@ -136,10 +136,11 @@ import QhseSstRisks from './pages/QHSE/QhseSstRisks';
 import QhseSstAccidents from './pages/QHSE/QhseSstAccidents';
 import QhseSstAccidentDetail from './pages/QHSE/QhseSstAccidentDetail';
 import QhseDocuments from './pages/QHSE/QhseDocuments';
+import QhseActions from './pages/QHSE/QhseActions';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.supplier_eval', 'qhse.equipment', 'qhse.audits', 'qhse.hygiene', 'qhse.sst_risks', 'qhse.sst_accidents', 'qhse.documents', 'qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.supplier_eval', 'qhse.equipment', 'qhse.audits', 'qhse.hygiene', 'qhse.sst_risks', 'qhse.sst_accidents', 'qhse.documents', 'qhse.actions', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -283,6 +284,7 @@ export default function App() {
         <Route path="qhse/sst/accidents" element={<RequireModule subModule="qhse.sst_accidents"><QhseSstAccidents /></RequireModule>} />
         <Route path="qhse/sst/accidents/:id" element={<RequireModule subModule="qhse.sst_accidents"><QhseSstAccidentDetail /></RequireModule>} />
         <Route path="qhse/documents" element={<RequireModule subModule="qhse.documents"><QhseDocuments /></RequireModule>} />
+        <Route path="qhse/actions" element={<RequireModule subModule="qhse.actions"><QhseActions /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />

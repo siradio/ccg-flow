@@ -20,6 +20,7 @@ const TABS = [
   { to: '/qhse/sst/risques', sub: 'qhse.sst_risks', key: 'qhse.nav.sstRisks' },
   { to: '/qhse/sst/accidents', sub: 'qhse.sst_accidents', key: 'qhse.nav.sstAccidents' },
   { to: '/qhse/documents', sub: 'qhse.documents', key: 'qhse.nav.documents' },
+  { to: '/qhse/actions', sub: 'qhse.actions', key: 'qhse.nav.actions' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 
