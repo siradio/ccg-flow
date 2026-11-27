@@ -43,8 +43,6 @@ import CongeForm from './pages/RH/CongeForm';
 import RecrutementForm from './pages/RH/RecrutementForm';
 import CdiForm from './pages/RH/CdiForm';
 import RhDashboard from './pages/RH/RhDashboard';
-import RecrutementDashboard from './pages/RH/Recrutement/RecrutementDashboard';
-import RecrutementCategories from './pages/RH/Recrutement/RecrutementCategories';
 import RhParametres, { RhConfigTypes, RhConfigJournaliers, RhConfigFeries } from './pages/RH/RhParametres';
 import Competences from './pages/RH/Competences';
 import Modeles from './pages/RH/Modeles';
@@ -177,8 +175,6 @@ export default function App() {
         <Route path="dsi/referentiels" element={<RequireModule subModule="dsi.referentiels"><DsiReferentiels /></RequireModule>} />
 
         <Route path="rh/dashboard" element={<RequireRh><RhDashboard /></RequireRh>} />
-        <Route path="rh/recrutement" element={<RequireRh><RecrutementDashboard /></RequireRh>} />
-        <Route path="rh/recrutement/categories" element={<RequireRh><RecrutementCategories /></RequireRh>} />
         <Route path="rh/mes-demandes" element={<RequireRh><MesDemandes /></RequireRh>} />
         <Route path="rh/a-valider" element={<RequireRh><AValider /></RequireRh>} />
         <Route path="rh/toutes" element={<RequireRh><ToutesDemandes /></RequireRh>} />

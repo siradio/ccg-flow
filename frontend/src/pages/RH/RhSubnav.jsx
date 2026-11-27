@@ -30,10 +30,6 @@ export default function RhSubnav() {
       { to: '/rh/evaluation/modeles', label: t('rh.nav.modeles'), visible: canValidateRh(user) },
       { to: '/rh/competences', label: t('rh.nav.competences'), visible: canManageRhTypes(user) },
     ] },
-    { key: 'recrutement', label: t('rh.grp.recrutement'), items: [
-      { to: '/rh/recrutement', label: t('rh.nav.recrDashboard'), visible: canValidateRh(user) },
-      { to: '/rh/recrutement/categories', label: t('rh.nav.recrCategories'), visible: canManageRhTypes(user) },
-    ] },
     { key: 'config', label: t('rh.grp.config'), items: [
       { to: '/rh/config/types', label: t('rh.nav.cfgTypes'), visible: canManageRhTypes(user) },
       { to: '/rh/config/journaliers', label: t('rh.nav.cfgJournaliers'), visible: canManageRhTypes(user) },
