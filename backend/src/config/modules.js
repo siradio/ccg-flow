@@ -119,6 +119,7 @@ const MODULES = [
       { key: 'qhse.liberation', label: 'Libération des lots' },
       { key: 'qhse.expeditions', label: 'Contrôle des expéditions' },
       { key: 'qhse.dashboard', label: 'Tableau de bord QHSE' },
+      { key: 'qhse.complaints', label: 'Réclamations clients' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },

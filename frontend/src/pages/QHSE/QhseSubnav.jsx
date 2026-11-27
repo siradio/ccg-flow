@@ -12,6 +12,7 @@ const TABS = [
   { to: '/qhse/expeditions', sub: 'qhse.expeditions', key: 'qhse.nav.expeditions' },
   { to: '/qhse/non-conformites', sub: 'qhse.nc', key: 'qhse.nav.nc' },
   { to: '/qhse/liberation', sub: 'qhse.liberation', key: 'qhse.nav.liberation' },
+  { to: '/qhse/reclamations', sub: 'qhse.complaints', key: 'qhse.nav.complaints' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 

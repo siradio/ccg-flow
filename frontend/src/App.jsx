@@ -123,10 +123,12 @@ import QhseLiberation from './pages/QHSE/QhseLiberation';
 import QhseShipments from './pages/QHSE/QhseShipments';
 import QhseShipmentDetail from './pages/QHSE/QhseShipmentDetail';
 import QhseDashboard from './pages/QHSE/QhseDashboard';
+import QhseComplaints from './pages/QHSE/QhseComplaints';
+import QhseComplaintDetail from './pages/QHSE/QhseComplaintDetail';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -256,6 +258,9 @@ export default function App() {
         <Route path="qhse/expeditions" element={<RequireModule subModule="qhse.expeditions"><QhseShipments /></RequireModule>} />
         <Route path="qhse/expeditions/:id" element={<RequireModule subModule="qhse.expeditions"><QhseShipmentDetail /></RequireModule>} />
         <Route path="qhse/tableau-de-bord" element={<RequireModule subModule="qhse.dashboard"><QhseDashboard /></RequireModule>} />
+        {/* Extension Qualité : réclamations clients (QUA-08). */}
+        <Route path="qhse/reclamations" element={<RequireModule subModule="qhse.complaints"><QhseComplaints /></RequireModule>} />
+        <Route path="qhse/reclamations/:id" element={<RequireModule subModule="qhse.complaints"><QhseComplaintDetail /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
