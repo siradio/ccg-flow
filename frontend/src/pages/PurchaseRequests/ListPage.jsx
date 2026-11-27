@@ -48,6 +48,15 @@ export default function ListPage() {
   const [pendingOnly, setPendingOnly] = useState(searchParams.get('pending') === 'true');
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  // Filtres Entité / BU (côté client — toutes les demandes visibles sont déjà chargées).
+  const [entities, setEntities] = useState([]);
+  const [businessUnits, setBusinessUnits] = useState([]);
+  const [entityFilter, setEntityFilter] = useState('');
+  const [buFilter, setBuFilter] = useState('');
+  useEffect(() => {
+    client.get('/entities').then(r => setEntities(r.data)).catch(() => {});
+    client.get('/business-units').then(r => setBusinessUnits(r.data)).catch(() => setBusinessUnits([]));
+  }, []);
   const canAddSupplier = hasSubModuleLevel(user, 'referentiels.suppliers', 'ajout');
   const canManageFees = isSuperAdmin(user) || hasSubModuleLevel(user, 'achats', 'edition');
   function showToast(m) { setToast(m); setTimeout(() => setToast(c => (c === m ? null : c)), 3200); }
@@ -128,17 +137,23 @@ export default function ListPage() {
       .finally(() => setLoading(false));
   }, [effectiveMineOnly, pendingOnly, canSeeEntityWide]);
 
+  // La BU n'a de sens que pour SOGUIPAL → le filtre BU n'apparaît que si cette entité est sélectionnée.
+  const soguipalEntity = entities.find(e => e.code === 'SOGUIPAL');
+  const isSoguipalSelected = soguipalEntity && Number(entityFilter) === Number(soguipalEntity.id);
+
   // Recherche libre : numéro, entité, objet, demandeur, ou date (JJ/MM/AAAA).
   const dateStr = (d) => new Date(d).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR');
   const term = q.trim().toLowerCase();
-  const filtered = !term ? prs : prs.filter(pr =>
+  const byEntity = entityFilter ? prs.filter(pr => Number(pr.entity_id) === Number(entityFilter)) : prs;
+  const byBu = (isSoguipalSelected && buFilter) ? byEntity.filter(pr => Number(pr.business_unit_id) === Number(buFilter)) : byEntity;
+  const filtered = !term ? byBu : byBu.filter(pr =>
     [pr.numero, pr.entity_code, pr.objet, `${pr.requester_prenom || ''} ${pr.requester_nom || ''}`, dateStr(pr.created_at)]
       .some(v => String(v || '').toLowerCase().includes(term))
   );
   const rows = apply(filtered);
   // Pagination client : 20 par page ; retour page 1 quand la recherche/les filtres changent le total.
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [q, effectiveMineOnly, pendingOnly]);
+  useEffect(() => { setPage(1); }, [q, effectiveMineOnly, pendingOnly, entityFilter, buFilter]);
   const pageRows = rows.slice((page - 1) * UI_PAGE_SIZE, page * UI_PAGE_SIZE);
 
   return (
@@ -192,6 +207,18 @@ export default function ListPage() {
       <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="search" value={q} onChange={e => setQ(e.target.value)}
           placeholder={t('pr.searchPlaceholder')} style={{ minWidth: 280, flex: '0 1 340px' }} />
+        <select value={entityFilter} aria-label={t('prc.entity')} style={{ minWidth: 150 }}
+          onChange={e => { const v = e.target.value; setEntityFilter(v); if (!(soguipalEntity && Number(v) === Number(soguipalEntity.id))) setBuFilter(''); }}>
+          <option value="">{t('pr.allEntities')}</option>
+          {entities.map(en => <option key={en.id} value={en.id}>{en.code}</option>)}
+        </select>
+        {isSoguipalSelected && (
+          <select value={buFilter} aria-label={t('stockreleve.bu')} style={{ minWidth: 150 }}
+            onChange={e => setBuFilter(e.target.value)}>
+            <option value="">{t('cockpit.allBu')}</option>
+            {businessUnits.map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
+          </select>
+        )}
         {canSeeEntityWide && (
           <>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
