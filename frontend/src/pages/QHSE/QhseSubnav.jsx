@@ -18,6 +18,7 @@ const TABS = [
   { to: '/qhse/audits', sub: 'qhse.audits', key: 'qhse.nav.audits' },
   { to: '/qhse/inspections', sub: 'qhse.hygiene', key: 'qhse.nav.hygiene' },
   { to: '/qhse/sst/risques', sub: 'qhse.sst_risks', key: 'qhse.nav.sstRisks' },
+  { to: '/qhse/sst/accidents', sub: 'qhse.sst_accidents', key: 'qhse.nav.sstAccidents' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 
