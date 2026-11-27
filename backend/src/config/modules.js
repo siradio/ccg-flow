@@ -122,6 +122,7 @@ const MODULES = [
       { key: 'qhse.complaints', label: 'Réclamations clients' },
       { key: 'qhse.supplier_eval', label: 'Évaluation des fournisseurs' },
       { key: 'qhse.equipment', label: 'Équipements de mesure (métrologie)' },
+      { key: 'qhse.audits', label: 'Audits' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },
