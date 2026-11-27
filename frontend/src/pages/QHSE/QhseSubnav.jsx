@@ -16,6 +16,7 @@ const TABS = [
   { to: '/qhse/fournisseurs', sub: 'qhse.supplier_eval', key: 'qhse.nav.supplierEval' },
   { to: '/qhse/equipements', sub: 'qhse.equipment', key: 'qhse.nav.equipment' },
   { to: '/qhse/audits', sub: 'qhse.audits', key: 'qhse.nav.audits' },
+  { to: '/qhse/inspections', sub: 'qhse.hygiene', key: 'qhse.nav.hygiene' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 

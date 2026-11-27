@@ -130,6 +130,8 @@ import QhseEquipment from './pages/QHSE/QhseEquipment';
 import QhseEquipmentDetail from './pages/QHSE/QhseEquipmentDetail';
 import QhseAudits from './pages/QHSE/QhseAudits';
 import QhseAuditDetail from './pages/QHSE/QhseAuditDetail';
+import QhseInspections from './pages/QHSE/QhseInspections';
+import QhseInspectionDetail from './pages/QHSE/QhseInspectionDetail';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
@@ -271,6 +273,8 @@ export default function App() {
         <Route path="qhse/equipements/:id" element={<RequireModule subModule="qhse.equipment"><QhseEquipmentDetail /></RequireModule>} />
         <Route path="qhse/audits" element={<RequireModule subModule="qhse.audits"><QhseAudits /></RequireModule>} />
         <Route path="qhse/audits/:id" element={<RequireModule subModule="qhse.audits"><QhseAuditDetail /></RequireModule>} />
+        <Route path="qhse/inspections" element={<RequireModule subModule="qhse.hygiene"><QhseInspections /></RequireModule>} />
+        <Route path="qhse/inspections/:id" element={<RequireModule subModule="qhse.hygiene"><QhseInspectionDetail /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />
