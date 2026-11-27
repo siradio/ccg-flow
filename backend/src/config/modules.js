@@ -120,6 +120,7 @@ const MODULES = [
       { key: 'qhse.expeditions', label: 'Contrôle des expéditions' },
       { key: 'qhse.dashboard', label: 'Tableau de bord QHSE' },
       { key: 'qhse.complaints', label: 'Réclamations clients' },
+      { key: 'qhse.supplier_eval', label: 'Évaluation des fournisseurs' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },

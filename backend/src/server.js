@@ -135,8 +135,9 @@ app.use('/api/qhse/liberation', require('./modules/qhse/qhse.liberation.routes')
 // Lot 4 : contrôle des expéditions + tableau de bord.
 app.use('/api/qhse/shipments', require('./modules/qhse/qhse.shipment.routes'));
 app.use('/api/qhse/dashboard', require('./modules/qhse/qhse.dashboard.routes'));
-// Extension Qualité : réclamations clients (QUA-08).
+// Extension Qualité : réclamations clients (QUA-08) + évaluation fournisseurs (QUA-09).
 app.use('/api/qhse/complaints', require('./modules/qhse/qhse.complaints.routes'));
+app.use('/api/qhse/supplier-evaluations', require('./modules/qhse/qhse.supplier_eval.routes'));
 app.use('/api/test-data', require('./modules/test-data/test-data.routes'));
 // Assistant « CCG Flow » — compagnon à base de règles (nouveautés + FAQ), sans clé IA. Lecture
 // ouverte à tout utilisateur authentifié ; administration (personnage, contenus) réservée au super_admin.
