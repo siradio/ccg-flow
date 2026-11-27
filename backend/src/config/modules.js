@@ -124,6 +124,7 @@ const MODULES = [
       { key: 'qhse.equipment', label: 'Équipements de mesure (métrologie)' },
       { key: 'qhse.audits', label: 'Audits' },
       { key: 'qhse.hygiene', label: 'Hygiène — inspections' },
+      { key: 'qhse.sst_risks', label: 'SST — risques professionnels' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },
