@@ -425,6 +425,72 @@ async function cancel(user, id, commentaire) {
   return getDetail(id);
 }
 
+// ─── Demande d'annulation d'une demande VALIDÉE (ex. congé déjà validé) ───────────────────────────
+// Le demandeur ne peut pas annuler seul une demande validée : il dépose une demande d'annulation
+// (motif obligatoire, à tout moment), que la RH valide ou refuse ; le manager est notifié. À
+// l'acceptation → statut 'annulee' (le solde de congé se recrédite automatiquement, car il ne compte
+// que les congés 'validee').
+function isRhFor(user, req) {
+  return isSuperAdmin(user) || (user.roles || []).some(r => r.role_code === 'rh' && (!r.entity_id || Number(r.entity_id) === Number(req.entity_id)));
+}
+function canRequestCancellation(user, req) {
+  return (req.created_by === user.id || isSuperAdmin(user)) && req.statut === 'validee' && !req.annulation_demandee;
+}
+function canWithdrawCancellation(user, req) {
+  return (req.created_by === user.id || isSuperAdmin(user)) && !!req.annulation_demandee;
+}
+function canDecideCancellation(user, req) {
+  return !!req.annulation_demandee && isRhFor(user, req);
+}
+
+async function requestCancellation(user, id, motif) {
+  const req = await repo.getById(id);
+  if (!req) throw httpError(404, 'Demande introuvable.');
+  assertOwner(user, req);
+  if (req.statut !== 'validee') throw httpError(400, "Seule une demande validée peut faire l'objet d'une demande d'annulation.");
+  if (req.annulation_demandee) throw httpError(400, "Une demande d'annulation est déjà en attente.");
+  if (!motif || !motif.trim()) throw httpError(400, "Un motif est obligatoire.");
+  await repo.update(id, { annulation_demandee: true, annulation_motif: motif.trim(), annulation_by: user.id, annulation_at: new Date() });
+  await repo.logHistory(id, 'demande_annulation', user.id, motif.trim());
+  const link = `/rh/demandes/${id}`;
+  const msg = `${req.created_by_prenom || ''} ${req.created_by_nom || ''} demande l'annulation de la demande ${req.numero} (${req.type_libelle || req.type}) : ${motif.trim()}`;
+  await notifications.notifyRoleOnEntity(req.entity_id, 'rh', "Demande d'annulation à valider", msg, link);
+  const mgr = await resolveManagerUserId(req);
+  if (mgr) await notifications.notify(mgr, "Demande d'annulation (information)", msg, link);
+  return getDetail(id);
+}
+
+async function withdrawCancellation(user, id) {
+  const req = await repo.getById(id);
+  if (!req) throw httpError(404, 'Demande introuvable.');
+  assertOwner(user, req);
+  if (!req.annulation_demandee) throw httpError(400, "Aucune demande d'annulation en attente.");
+  await repo.update(id, { annulation_demandee: false, annulation_motif: null, annulation_by: null, annulation_at: null });
+  await repo.logHistory(id, 'retrait_demande_annulation', user.id, null);
+  return getDetail(id);
+}
+
+async function decideCancellation(user, id, approve, commentaire) {
+  const req = await repo.getById(id);
+  if (!req) throw httpError(404, 'Demande introuvable.');
+  if (!req.annulation_demandee) throw httpError(400, "Aucune demande d'annulation en attente.");
+  if (!canDecideCancellation(user, req)) throw httpError(403, 'Validation réservée au service RH.');
+  const link = `/rh/demandes/${id}`;
+  const clear = { annulation_demandee: false, annulation_motif: null, annulation_by: null, annulation_at: null };
+  if (approve) {
+    await repo.update(id, { ...clear, statut: 'annulee', role_courant: null });
+    await repo.logHistory(id, 'annulation_acceptee', user.id, commentaire);
+    await notifyRequester(req, 'Annulation acceptée', `Votre demande ${req.numero} a été annulée.`);
+    const mgr = await resolveManagerUserId(req);
+    if (mgr) await notifications.notify(mgr, 'Demande annulée', `La demande ${req.numero} a été annulée par la RH.`, link);
+  } else {
+    await repo.update(id, clear);
+    await repo.logHistory(id, 'annulation_refusee', user.id, commentaire);
+    await notifyRequester(req, "Demande d'annulation refusée", `Votre demande d'annulation pour ${req.numero} a été refusée${commentaire ? ` : ${commentaire}` : ''}.`);
+  }
+  return getDetail(id);
+}
+
 // Suppression définitive : réservée aux RH (rôle `rh`, global ou sur l'entité de la demande) et aux
 // administrateurs (super_admin). Contrairement à l'annulation (réservée au demandeur, conserve la
 // trace), la suppression retire la demande, son historique et ses pièces jointes.
@@ -777,6 +843,8 @@ async function prefillFeries(user, annee) {
 
 module.exports = {
   createAbsence, createConge, createRecrutement, createCdi, getDetail, submit, validate, reject, cancel, remove,
+  requestCancellation, withdrawCancellation, decideCancellation,
+  canRequestCancellation, canWithdrawCancellation, canDecideCancellation,
   listFeries, createFerie, updateFerie, deleteFerie, prefillFeries,
   listMine, listPending, listAll, canSeeAll, canDelete, workingDays, workingDaysDetail, listMyTeam, getTeamMemberCongeSolde,
   getCongeSolde, getMyCongeSolde, getDashboard, getCongesDashboard, canSeeDashboard,

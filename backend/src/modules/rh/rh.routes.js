@@ -242,8 +242,25 @@ router.get('/requests/:id', async (req, res, next) => {
     const detail = await service.getDetail(Number(req.params.id));
     if (!detail) return res.status(404).json({ error: 'Demande introuvable.' });
     if (!canView(req.user, detail)) return res.status(403).json({ error: 'Accès refusé.' });
-    res.json({ ...detail, can_delete: service.canDelete(req.user, detail) });
+    res.json({
+      ...detail,
+      can_delete: service.canDelete(req.user, detail),
+      can_request_cancellation: service.canRequestCancellation(req.user, detail),
+      can_withdraw_cancellation: service.canWithdrawCancellation(req.user, detail),
+      can_decide_cancellation: service.canDecideCancellation(req.user, detail),
+    });
   } catch (e) { next(e); }
+});
+
+// Demande d'annulation d'une demande VALIDÉE : dépôt (demandeur), retrait (demandeur), décision (RH).
+router.post('/requests/:id/request-cancellation', async (req, res, next) => {
+  try { res.json(await service.requestCancellation(req.user, Number(req.params.id), (req.body || {}).motif)); } catch (e) { next(e); }
+});
+router.post('/requests/:id/withdraw-cancellation', async (req, res, next) => {
+  try { res.json(await service.withdrawCancellation(req.user, Number(req.params.id))); } catch (e) { next(e); }
+});
+router.post('/requests/:id/decide-cancellation', async (req, res, next) => {
+  try { res.json(await service.decideCancellation(req.user, Number(req.params.id), !!(req.body || {}).approve, (req.body || {}).comment)); } catch (e) { next(e); }
 });
 
 router.post('/requests/:id/submit', async (req, res, next) => {

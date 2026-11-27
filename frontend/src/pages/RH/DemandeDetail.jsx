@@ -18,6 +18,7 @@ export default function DemandeDetail() {
   const [r, setR] = useState(null);
   const [error, setError] = useState('');
   const [comment, setComment] = useState('');
+  const [cancelMotif, setCancelMotif] = useState('');
   const [busy, setBusy] = useState(false);
 
   function load() { return client.get(`/rh/requests/${id}`).then(res => setR(res.data)).catch(e => setError(e.response?.data?.error || t('rh.loadError'))); }
@@ -151,6 +152,36 @@ export default function DemandeDetail() {
           </label>
         )}
       </section>
+
+      {(r.annulation_demandee || r.can_request_cancellation) && (
+        <section className="card" style={{ maxWidth: 720, marginTop: 14, ...(r.annulation_demandee ? { borderLeft: '4px solid var(--status-red-fg,#b42318)' } : {}) }}>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>{t('rh.cancelReq.title')}</h2>
+          {r.annulation_demandee ? (
+            <>
+              <p style={{ marginTop: 0 }}>{t('rh.cancelReq.pendingTitle')} — {t('rh.cancelReq.motifLabel')} : <strong>{r.annulation_motif}</strong></p>
+              {r.can_decide_cancellation && (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{t('rh.cancelReq.decideHint')}</p>
+                  <textarea placeholder={t('rh.commentPlaceholder')} value={comment} onChange={e => setComment(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-danger" disabled={busy} onClick={() => act('decide-cancellation', { approve: true, comment })}>{t('rh.cancelReq.accept')}</button>
+                    <button className="btn btn-secondary" disabled={busy} onClick={() => act('decide-cancellation', { approve: false, comment })}>{t('rh.cancelReq.refuse')}</button>
+                  </div>
+                </>
+              )}
+              {r.can_withdraw_cancellation && (
+                <button className="btn btn-secondary" style={{ marginTop: r.can_decide_cancellation ? 10 : 0 }} disabled={busy} onClick={() => act('withdraw-cancellation')}>{t('rh.cancelReq.withdraw')}</button>
+              )}
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 0 }}>{t('rh.cancelReq.requestHint')}</p>
+              <textarea placeholder={t('rh.cancelReq.motifPlaceholder')} value={cancelMotif} onChange={e => setCancelMotif(e.target.value)} style={{ width: '100%', marginBottom: 10 }} />
+              <button className="btn btn-danger-ghost" disabled={busy || !cancelMotif.trim()} onClick={async () => { await act('request-cancellation', { motif: cancelMotif }); setCancelMotif(''); }}>{t('rh.cancelReq.request')}</button>
+            </>
+          )}
+        </section>
+      )}
 
       {(canValidate || isOwner || r.can_delete) && (
         <section className="card" style={{ maxWidth: 720, marginTop: 14 }}>
