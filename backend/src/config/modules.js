@@ -121,6 +121,7 @@ const MODULES = [
       { key: 'qhse.dashboard', label: 'Tableau de bord QHSE' },
       { key: 'qhse.complaints', label: 'Réclamations clients' },
       { key: 'qhse.supplier_eval', label: 'Évaluation des fournisseurs' },
+      { key: 'qhse.equipment', label: 'Équipements de mesure (métrologie)' },
       { key: 'qhse.referentiels', label: 'Référentiels QHSE (analyses, paramètres, milieux, germes)' },
     ],
   },

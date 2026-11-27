@@ -29,7 +29,7 @@ export const MODULE_SUB_KEYS = {
   // Module QHSE — s'étoffe au fil des lots (Lot 0 : référentiels ; Lot 1 : analyses labo ;
   // Lot 2 : contrôles production + échantillonnage ; Lot 3 : non-conformités + libération ;
   // Lot 4 : contrôle expéditions + tableau de bord).
-  qhse: ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.supplier_eval', 'qhse.referentiels'],
+  qhse: ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.supplier_eval', 'qhse.equipment', 'qhse.referentiels'],
   referentiels: [
     'referentiels.entities', 'referentiels.sites', 'referentiels.warehouses', 'referentiels.machines',
     'referentiels.products', 'referentiels.product_categories', 'referentiels.business_units', 'referentiels.suppliers',

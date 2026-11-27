@@ -14,6 +14,7 @@ const TABS = [
   { to: '/qhse/liberation', sub: 'qhse.liberation', key: 'qhse.nav.liberation' },
   { to: '/qhse/reclamations', sub: 'qhse.complaints', key: 'qhse.nav.complaints' },
   { to: '/qhse/fournisseurs', sub: 'qhse.supplier_eval', key: 'qhse.nav.supplierEval' },
+  { to: '/qhse/equipements', sub: 'qhse.equipment', key: 'qhse.nav.equipment' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 
