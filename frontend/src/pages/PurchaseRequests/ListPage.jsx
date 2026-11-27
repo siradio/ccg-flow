@@ -210,7 +210,7 @@ export default function ListPage() {
         <select value={entityFilter} aria-label={t('prc.entity')} style={{ minWidth: 150 }}
           onChange={e => { const v = e.target.value; setEntityFilter(v); if (!(soguipalEntity && Number(v) === Number(soguipalEntity.id))) setBuFilter(''); }}>
           <option value="">{t('pr.allEntities')}</option>
-          {entities.map(en => <option key={en.id} value={en.id}>{en.nom}</option>)}
+          {entities.map(en => <option key={en.id} value={en.id}>{en.code}</option>)}
         </select>
         {isSoguipalSelected && (
           <select value={buFilter} aria-label={t('stockreleve.bu')} style={{ minWidth: 150 }}
