@@ -39,7 +39,6 @@ app.use(express.json({ limit: '15mb' }));
 app.use('/api/auth', require('./modules/auth/auth.routes'));
 app.use('/api/access-requests', require('./modules/access-requests/access-requests.routes'));
 app.use('/api/public', require('./modules/login-backgrounds/public.routes'));
-app.use('/api/public/recrutement', require('./modules/rh/recrutement/recrutement.public.routes'));
 app.use('/api/login-backgrounds', require('./modules/login-backgrounds/login-backgrounds.routes'));
 app.use('/api/users', require('./modules/users/users.routes'));
 app.use('/api/access-profiles', require('./modules/access-profiles/access-profiles.routes'));
@@ -191,8 +190,6 @@ async function start() {
     require('./modules/reporting/scheduler').startReportScheduler();
     // Rappel hebdomadaire (vendredi) aux directeurs de BU : demande de journaliers pour S+1.
     require('./modules/rh/journaliers-reminder').startJournaliersReminder();
-    // Clôture serveur des tentatives de test de recrutement expirées (indépendant du navigateur candidat).
-    require('./modules/rh/recrutement/recrutement.scheduler').startRecrutementExpiry();
   });
 }
 

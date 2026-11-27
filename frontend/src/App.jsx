@@ -50,7 +50,6 @@ import RecrutementTemplates from './pages/RH/Recrutement/RecrutementTemplates';
 import RecrutementTemplateDetail from './pages/RH/Recrutement/RecrutementTemplateDetail';
 import RecrutementCampaigns from './pages/RH/Recrutement/RecrutementCampaigns';
 import RecrutementCampaignDetail from './pages/RH/Recrutement/RecrutementCampaignDetail';
-import PortailCandidat from './pages/Recrutement/PortailCandidat';
 import RhParametres, { RhConfigTypes, RhConfigJournaliers, RhConfigFeries } from './pages/RH/RhParametres';
 import Competences from './pages/RH/Competences';
 import Modeles from './pages/RH/Modeles';
@@ -140,8 +139,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      {/* Portail externe candidat (test de recrutement) — hors layout authentifié, sans nav interne. */}
-      <Route path="/recrutement/test/:token" element={<PortailCandidat />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="direction" element={<RequireModule subModule="direction"><DirectionDashboard /></RequireModule>} />
