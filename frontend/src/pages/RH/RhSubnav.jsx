@@ -32,7 +32,6 @@ export default function RhSubnav() {
     ] },
     { key: 'recrutement', label: t('rh.grp.recrutement'), items: [
       { to: '/rh/recrutement', label: t('rh.nav.recrDashboard'), visible: canValidateRh(user) },
-      { to: '/rh/recrutement/campagnes', label: t('rh.nav.recrCampaigns'), visible: canManageRhTypes(user) },
       { to: '/rh/recrutement/questions', label: t('rh.nav.recrQuestions'), visible: canManageRhTypes(user) },
       { to: '/rh/recrutement/modeles', label: t('rh.nav.recrTemplates'), visible: canManageRhTypes(user) },
       { to: '/rh/recrutement/categories', label: t('rh.nav.recrCategories'), visible: canManageRhTypes(user) },
