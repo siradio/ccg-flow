@@ -123,10 +123,24 @@ import QhseLiberation from './pages/QHSE/QhseLiberation';
 import QhseShipments from './pages/QHSE/QhseShipments';
 import QhseShipmentDetail from './pages/QHSE/QhseShipmentDetail';
 import QhseDashboard from './pages/QHSE/QhseDashboard';
+import QhseComplaints from './pages/QHSE/QhseComplaints';
+import QhseComplaintDetail from './pages/QHSE/QhseComplaintDetail';
+import QhseSupplierEval from './pages/QHSE/QhseSupplierEval';
+import QhseEquipment from './pages/QHSE/QhseEquipment';
+import QhseEquipmentDetail from './pages/QHSE/QhseEquipmentDetail';
+import QhseAudits from './pages/QHSE/QhseAudits';
+import QhseAuditDetail from './pages/QHSE/QhseAuditDetail';
+import QhseInspections from './pages/QHSE/QhseInspections';
+import QhseInspectionDetail from './pages/QHSE/QhseInspectionDetail';
+import QhseSstRisks from './pages/QHSE/QhseSstRisks';
+import QhseSstAccidents from './pages/QHSE/QhseSstAccidents';
+import QhseSstAccidentDetail from './pages/QHSE/QhseSstAccidentDetail';
+import QhseDocuments from './pages/QHSE/QhseDocuments';
+import QhseActions from './pages/QHSE/QhseActions';
 
 const DSI_ANY = ['dsi.support', 'dsi.dashboard', 'dsi.parc', 'dsi.affectations', 'dsi.maintenance', 'dsi.tickets', 'dsi.activites', 'dsi.projets', 'dsi.risques', 'dsi.rapports', 'dsi.referentiels'];
 // Module QHSE — sous-modules accessibles (s'étoffe au fil des lots).
-const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.referentiels'];
+const QHSE_ANY = ['qhse.labo', 'qhse.production', 'qhse.sampling', 'qhse.nc', 'qhse.liberation', 'qhse.expeditions', 'qhse.dashboard', 'qhse.complaints', 'qhse.supplier_eval', 'qhse.equipment', 'qhse.audits', 'qhse.hygiene', 'qhse.sst_risks', 'qhse.sst_accidents', 'qhse.documents', 'qhse.actions', 'qhse.referentiels'];
 
 export default function App() {
   return (
@@ -256,6 +270,21 @@ export default function App() {
         <Route path="qhse/expeditions" element={<RequireModule subModule="qhse.expeditions"><QhseShipments /></RequireModule>} />
         <Route path="qhse/expeditions/:id" element={<RequireModule subModule="qhse.expeditions"><QhseShipmentDetail /></RequireModule>} />
         <Route path="qhse/tableau-de-bord" element={<RequireModule subModule="qhse.dashboard"><QhseDashboard /></RequireModule>} />
+        {/* Extension Qualité : réclamations clients (QUA-08). */}
+        <Route path="qhse/reclamations" element={<RequireModule subModule="qhse.complaints"><QhseComplaints /></RequireModule>} />
+        <Route path="qhse/reclamations/:id" element={<RequireModule subModule="qhse.complaints"><QhseComplaintDetail /></RequireModule>} />
+        <Route path="qhse/fournisseurs" element={<RequireModule subModule="qhse.supplier_eval"><QhseSupplierEval /></RequireModule>} />
+        <Route path="qhse/equipements" element={<RequireModule subModule="qhse.equipment"><QhseEquipment /></RequireModule>} />
+        <Route path="qhse/equipements/:id" element={<RequireModule subModule="qhse.equipment"><QhseEquipmentDetail /></RequireModule>} />
+        <Route path="qhse/audits" element={<RequireModule subModule="qhse.audits"><QhseAudits /></RequireModule>} />
+        <Route path="qhse/audits/:id" element={<RequireModule subModule="qhse.audits"><QhseAuditDetail /></RequireModule>} />
+        <Route path="qhse/inspections" element={<RequireModule subModule="qhse.hygiene"><QhseInspections /></RequireModule>} />
+        <Route path="qhse/inspections/:id" element={<RequireModule subModule="qhse.hygiene"><QhseInspectionDetail /></RequireModule>} />
+        <Route path="qhse/sst/risques" element={<RequireModule subModule="qhse.sst_risks"><QhseSstRisks /></RequireModule>} />
+        <Route path="qhse/sst/accidents" element={<RequireModule subModule="qhse.sst_accidents"><QhseSstAccidents /></RequireModule>} />
+        <Route path="qhse/sst/accidents/:id" element={<RequireModule subModule="qhse.sst_accidents"><QhseSstAccidentDetail /></RequireModule>} />
+        <Route path="qhse/documents" element={<RequireModule subModule="qhse.documents"><QhseDocuments /></RequireModule>} />
+        <Route path="qhse/actions" element={<RequireModule subModule="qhse.actions"><QhseActions /></RequireModule>} />
         <Route path="referentials/:type" element={<ReferentialsIndex />} />
         <Route path="logistique/checklists" element={<ChecklistsPage />} />
         <Route path="logistique/documents" element={<LogistiqueDocuments />} />

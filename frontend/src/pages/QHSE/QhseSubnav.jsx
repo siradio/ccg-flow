@@ -12,6 +12,15 @@ const TABS = [
   { to: '/qhse/expeditions', sub: 'qhse.expeditions', key: 'qhse.nav.expeditions' },
   { to: '/qhse/non-conformites', sub: 'qhse.nc', key: 'qhse.nav.nc' },
   { to: '/qhse/liberation', sub: 'qhse.liberation', key: 'qhse.nav.liberation' },
+  { to: '/qhse/reclamations', sub: 'qhse.complaints', key: 'qhse.nav.complaints' },
+  { to: '/qhse/fournisseurs', sub: 'qhse.supplier_eval', key: 'qhse.nav.supplierEval' },
+  { to: '/qhse/equipements', sub: 'qhse.equipment', key: 'qhse.nav.equipment' },
+  { to: '/qhse/audits', sub: 'qhse.audits', key: 'qhse.nav.audits' },
+  { to: '/qhse/inspections', sub: 'qhse.hygiene', key: 'qhse.nav.hygiene' },
+  { to: '/qhse/sst/risques', sub: 'qhse.sst_risks', key: 'qhse.nav.sstRisks' },
+  { to: '/qhse/sst/accidents', sub: 'qhse.sst_accidents', key: 'qhse.nav.sstAccidents' },
+  { to: '/qhse/documents', sub: 'qhse.documents', key: 'qhse.nav.documents' },
+  { to: '/qhse/actions', sub: 'qhse.actions', key: 'qhse.nav.actions' },
   { to: '/qhse/referentiels', sub: 'qhse.referentiels', key: 'qhse.nav.referentiels' },
 ];
 

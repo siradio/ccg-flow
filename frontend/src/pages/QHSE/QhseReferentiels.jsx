@@ -31,6 +31,7 @@ export default function QhseReferentiels() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [qhseFormats, setQhseFormats] = useState([]);
+  const [inspectionTypes, setInspectionTypes] = useState([]);
 
   // Catalogues chargés une fois : servent de fkSelect (types d'analyses, et pour les Spécifications
   // les paramètres / produits / catégories / formats).
@@ -40,10 +41,11 @@ export default function QhseReferentiels() {
     client.get('/qhse/referentials/formats').then(r => setQhseFormats(r.data.map(x => ({ id: x.id, nom: x.libelle })))).catch(() => {});
     client.get('/products').then(r => setProducts(r.data.map(x => ({ id: x.id, nom: x.designation })))).catch(() => {});
     client.get('/product-categories').then(r => setCategories(r.data.map(x => ({ id: x.id, nom: x.nom })))).catch(() => {});
+    client.get('/qhse/referentials/inspection-types').then(r => setInspectionTypes(r.data.map(x => ({ id: x.id, nom: x.libelle })))).catch(() => {});
   }, []);
 
-  const lists = useMemo(() => ({ analysisTypes, parameters, products, categories, qhseFormats }),
-    [analysisTypes, parameters, products, categories, qhseFormats]);
+  const lists = useMemo(() => ({ analysisTypes, parameters, products, categories, qhseFormats, inspectionTypes }),
+    [analysisTypes, parameters, products, categories, qhseFormats, inspectionTypes]);
 
   const TABS = useMemo(() => ({
     analysisTypes: {
@@ -139,6 +141,22 @@ export default function QhseReferentiels() {
         boolActif,
       ],
     },
+    // Volet Hygiène — types d'inspection + critères (check-list paramétrable).
+    inspectionTypes: { title: 'Types d’inspection (Hygiène)', endpoint: '/qhse/referentials/inspection-types', fields: lookupFields },
+    inspectionCriteria: {
+      title: 'Critères d’inspection (Hygiène)', endpoint: '/qhse/referentials/inspection-criteria',
+      fields: [
+        { key: 'inspection_type_id', label: 'Type d’inspection', type: 'fkSelect', listKey: 'inspectionTypes', required: true },
+        { key: 'libelle', label: 'Libellé', required: true },
+        { key: 'code', label: 'Code' },
+        { key: 'type_critere', label: 'Type', type: 'select', options: ['booleen', 'numerique'], optionLabels: { booleen: 'Booléen (OUI/NON)', numerique: 'Numérique' }, default: 'booleen' },
+        { key: 'unite', label: 'Unité', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_min', label: 'Seuil min', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        { key: 'seuil_max', label: 'Seuil max', type: 'number', showIf: { field: 'type_critere', equals: 'numerique' } },
+        ordre,
+        boolActif,
+      ],
+    },
   }), []);
 
   if (!hasSubModuleLevel(user, 'qhse.referentiels')) return <Navigate to="/" replace />;
@@ -152,6 +170,7 @@ export default function QhseReferentiels() {
     ['specifications', 'Spécifications / seuils'],
     ['productionCriteria', 'Critères production'], ['samplingPlans', 'Plans d’échantillonnage'],
     ['shipmentCriteria', 'Critères expédition'],
+    ['inspectionTypes', 'Types d’inspection'], ['inspectionCriteria', 'Critères d’inspection'],
   ];
 
   return (

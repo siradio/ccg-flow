@@ -52,6 +52,65 @@ async function getDashboard() {
   // Lots sous statut qualité (répartition actuelle, lots statués uniquement).
   const lots = await countBy('stock_lots', 'statut_qualite');
 
+  // --- Nouveaux modules (extension QHSE : réclamations, audits, métrologie, SST, GED, plan d'actions).
+  // Lecture seule, simples comptages ; tables garanties par les migrations 132→140.
+  const scalar = async (sql, params) => (await one(sql, params)).n;
+
+  const complaints = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_complaints'),
+    ouvertes: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_complaints WHERE statut <> 'cloturee'`),
+  };
+  const audits = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_audits'),
+    planifies: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_audits WHERE statut = 'planifie'`),
+  };
+  const metrologie = {
+    total: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_equipment WHERE statut = 'en_service'`),
+    aVerifier: await scalar(
+      `SELECT COUNT(*)::int AS n FROM qhse_equipment
+        WHERE statut = 'en_service' AND prochaine_verif IS NOT NULL AND prochaine_verif < CURRENT_DATE`),
+  };
+  const sstRisks = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_sst_risks'),
+    eleveCritique: await scalar(
+      `SELECT COUNT(*)::int AS n FROM qhse_sst_risks WHERE statut = 'ouvert' AND niveau IN ('eleve', 'critique')`),
+    parNiveau: await countBy('qhse_sst_risks', 'niveau', `statut = 'ouvert'`),
+  };
+  const sstAccidents = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_sst_accidents'),
+    avecArret: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_sst_accidents WHERE type_evenement = 'accident_arret'`),
+    parType: await countBy('qhse_sst_accidents', 'type_evenement'),
+  };
+  // Indicateurs de sinistralité (TF/TG) de l'année en cours.
+  const sstIndicateurs = await require('./qhse.sst_accidents.service').indicators(new Date().getFullYear());
+  const documents = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_documents'),
+    aReviser: await scalar(
+      `SELECT COUNT(*)::int AS n FROM qhse_documents
+        WHERE statut = 'en_vigueur' AND date_revision IS NOT NULL AND date_revision < CURRENT_DATE`),
+  };
+  const actions = {
+    total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_actions'),
+    ouvertes: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_actions WHERE statut IN ('a_faire', 'en_cours')`),
+    enRetard: await scalar(
+      `SELECT COUNT(*)::int AS n FROM qhse_actions
+        WHERE statut IN ('a_faire', 'en_cours') AND echeance IS NOT NULL AND echeance < CURRENT_DATE`),
+  };
+  // Listes de suivi des nouveaux modules.
+  const equipementsAVerifier = await all(
+    `SELECT id, code, libelle, prochaine_verif FROM qhse_equipment
+      WHERE statut = 'en_service' AND prochaine_verif IS NOT NULL AND prochaine_verif < CURRENT_DATE
+      ORDER BY prochaine_verif LIMIT 20`);
+  const actionsRetard = await all(
+    `SELECT a.id, a.numero, a.description, a.responsable, a.echeance, a.origine, bu.nom AS bu_nom
+       FROM qhse_actions a LEFT JOIN business_units bu ON bu.id = a.business_unit_id
+      WHERE a.statut IN ('a_faire', 'en_cours') AND a.echeance IS NOT NULL AND a.echeance < CURRENT_DATE
+      ORDER BY a.echeance LIMIT 20`);
+  const documentsAReviser = await all(
+    `SELECT id, reference, titre, version, date_revision FROM qhse_documents
+      WHERE statut = 'en_vigueur' AND date_revision IS NOT NULL AND date_revision < CURRENT_DATE
+      ORDER BY date_revision LIMIT 20`);
+
   // Tendance sur 6 mois (mois vides inclus) : volume d'analyses, dont non conformes, et NC ouvertes.
   const tendance = await all(
     `SELECT to_char(m, 'YYYY-MM') AS mois,
@@ -69,7 +128,11 @@ async function getDashboard() {
                           date_trunc('month', CURRENT_DATE), interval '1 month') AS m
      ORDER BY m`);
 
-  return { analyses, production, expeditions, nc, capaRetard, ncOuvertes, lots, tendance };
+  return {
+    analyses, production, expeditions, nc, capaRetard, ncOuvertes, lots, tendance,
+    complaints, audits, metrologie, sstRisks, sstAccidents, sstIndicateurs, documents, actions,
+    equipementsAVerifier, actionsRetard, documentsAReviser,
+  };
 }
 
 module.exports = { getDashboard };

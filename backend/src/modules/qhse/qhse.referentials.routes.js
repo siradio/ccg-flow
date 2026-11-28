@@ -74,4 +74,14 @@ router.use('/shipment-criteria', simpleCrudRouter({
   subModuleKey: SUB,
 }));
 
+// Volet Hygiène (migration 136) — types d'inspection + critères (check-list paramétrable).
+router.use('/inspection-types', simpleCrudRouter({ table: 'qhse_inspection_types', columns: lookupCols, orderBy: 'ordre, libelle', subModuleKey: SUB }));
+router.use('/inspection-criteria', simpleCrudRouter({
+  table: 'qhse_inspection_criteria',
+  columns: ['inspection_type_id', 'code', 'libelle', 'type_critere', 'unite', 'seuil_min', 'seuil_max', 'ordre', 'actif'],
+  filterColumn: 'inspection_type_id',
+  orderBy: 'ordre, libelle',
+  subModuleKey: SUB,
+}));
+
 module.exports = router;

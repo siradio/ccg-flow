@@ -11,6 +11,7 @@ import { useI18n } from '../../i18n/I18nContext';
 // Couleurs de statut (cohérentes avec les badges de conformité QHSE).
 const CONF_COLORS = { conforme: '#15803d', non_conforme: '#b91c1c', en_attente: '#b45309', sans_spec: '#94a3b8' };
 const DEC_COLORS = { libere: '#15803d', bloque: '#b91c1c', rebut: '#7f1d1d', derogation: '#b45309' };
+const NIVEAU_COLORS = { faible: '#15803d', modere: '#2563eb', eleve: '#b45309', critique: '#b91c1c' };
 const PRIMARY = 'var(--color-primary, #2563eb)';
 
 // Taux de conformité = conformes / (conformes + non conformes) ; « en attente / sans spec » exclus.
@@ -71,6 +72,8 @@ export default function QhseDashboard() {
   const confData = toPie(d.analyses.parConformite, k => t('qhse.conf.' + k));
   const lotsData = toPie(d.lots, k => (t('qhse.dec.' + k).startsWith('qhse.') ? k : t('qhse.dec.' + k)));
   const graviteData = (d.nc.parGravite || []).map(x => ({ name: x.k, value: x.n }));
+  const niveauData = toPie(d.sstRisks?.parNiveau, k => t('qhse.sstniv.' + k));
+  const accTypeData = toPie(d.sstAccidents?.parType, k => t('qhse.ssttype.' + k));
 
   return (
     <div>
@@ -88,6 +91,19 @@ export default function QhseDashboard() {
           hint={tExp == null ? '—' : `${tExp}% ${t('qhse.dash.conformes')}`} tone={tExp == null ? null : tExp >= 90 ? 'good' : 'warn'} />
         <Tile label={t('qhse.dash.ncOuvertes')} value={d.nc.ouvertes} hint={`${d.nc.total} ${t('qhse.dash.total')}`} tone={d.nc.ouvertes > 0 ? 'warn' : 'good'} />
         <Tile label={t('qhse.dash.capaRetard')} value={d.capaRetard.length} tone={d.capaRetard.length > 0 ? 'bad' : 'good'} />
+      </div>
+
+      {/* KPIs — nouveaux modules */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        <Tile label={t('qhse.dash.reclamations')} value={d.complaints?.ouvertes ?? 0} hint={`${d.complaints?.total ?? 0} ${t('qhse.dash.total')}`} tone={(d.complaints?.ouvertes ?? 0) > 0 ? 'warn' : 'good'} />
+        <Tile label={t('qhse.dash.auditsPlanifies')} value={d.audits?.planifies ?? 0} hint={`${d.audits?.total ?? 0} ${t('qhse.dash.total')}`} />
+        <Tile label={t('qhse.dash.metroAVerifier')} value={d.metrologie?.aVerifier ?? 0} hint={`${d.metrologie?.total ?? 0} ${t('qhse.dash.enService')}`} tone={(d.metrologie?.aVerifier ?? 0) > 0 ? 'bad' : 'good'} />
+        <Tile label={t('qhse.dash.sstRisques')} value={d.sstRisks?.eleveCritique ?? 0} hint={t('qhse.dash.eleveCritique')} tone={(d.sstRisks?.eleveCritique ?? 0) > 0 ? 'warn' : 'good'} />
+        <Tile label={t('qhse.dash.accidents')} value={d.sstAccidents?.total ?? 0} hint={`${d.sstAccidents?.avecArret ?? 0} ${t('qhse.dash.avecArret')}`} tone={(d.sstAccidents?.avecArret ?? 0) > 0 ? 'bad' : null} />
+        <Tile label={t('qhse.dash.actionsRetard')} value={d.actions?.enRetard ?? 0} hint={`${d.actions?.ouvertes ?? 0} ${t('qhse.dash.ouvertes')}`} tone={(d.actions?.enRetard ?? 0) > 0 ? 'bad' : 'good'} />
+        <Tile label={t('qhse.dash.docsAReviser')} value={d.documents?.aReviser ?? 0} hint={`${d.documents?.total ?? 0} ${t('qhse.dash.total')}`} tone={(d.documents?.aReviser ?? 0) > 0 ? 'warn' : 'good'} />
+        <Tile label={t('qhse.dash.tf')} value={d.sstIndicateurs?.tf ?? '—'} hint={`TF ${d.sstIndicateurs?.annee ?? ''}`} tone={(d.sstIndicateurs?.tf ?? 0) > 20 ? 'bad' : null} />
+        <Tile label={t('qhse.dash.tg')} value={d.sstIndicateurs?.tg ?? '—'} hint={`TG ${d.sstIndicateurs?.annee ?? ''}`} tone={(d.sstIndicateurs?.tg ?? 0) > 1 ? 'bad' : null} />
       </div>
 
       {/* Graphiques */}
@@ -128,6 +144,24 @@ export default function QhseDashboard() {
         </ChartCard>
       </div>
 
+      {/* Graphiques — SST */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+        <ChartCard title={t('qhse.dash.sstParNiveau')}>
+          <Donut data={niveauData} colors={NIVEAU_COLORS} labeler={n => n} />
+        </ChartCard>
+        <ChartCard title={t('qhse.dash.accParType')}>
+          {accTypeData.length
+            ? <BarChart data={accTypeData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="value" name={t('qhse.dash.accidents')} fill="#b91c1c" radius={[0, 4, 4, 0]} barSize={18} />
+              </BarChart>
+            : <EmptyChart />}
+        </ChartCard>
+      </div>
+
       {/* Listes de suivi */}
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 380px' }}>
@@ -158,6 +192,55 @@ export default function QhseDashboard() {
               </tr>
             ))}
             {d.capaRetard.length === 0 && <tr><td colSpan={4} className="empty-row">{t('qhse.dash.rien')}</td></tr>}
+          </tbody></table></div>
+        </div>
+      </div>
+
+      {/* Listes de suivi — nouveaux modules */}
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 18 }}>
+        <div style={{ flex: '1 1 380px' }}>
+          <h3>{t('qhse.dash.actionsRetard')}</h3>
+          <div className="table-wrap"><table><thead><tr>
+            <th>N°</th><th>{t('qhse.act.origine')}</th><th>{t('qhse.nc.responsable')}</th><th>{t('qhse.nc.echeance')}</th>
+          </tr></thead><tbody>
+            {(d.actionsRetard || []).map(a => (
+              <tr key={a.id}>
+                <td><Link to="/qhse/actions">{a.numero}</Link></td>
+                <td>{t('qhse.actorig.' + a.origine)}</td><td>{a.responsable || '—'}</td>
+                <td style={{ color: '#b91c1c' }}>{a.echeance}</td>
+              </tr>
+            ))}
+            {(d.actionsRetard || []).length === 0 && <tr><td colSpan={4} className="empty-row">{t('qhse.dash.rien')}</td></tr>}
+          </tbody></table></div>
+        </div>
+
+        <div style={{ flex: '1 1 380px' }}>
+          <h3>{t('qhse.dash.metroAVerifier')}</h3>
+          <div className="table-wrap"><table><thead><tr>
+            <th>{t('qhse.eq.code')}</th><th>{t('qhse.eq.libelle')}</th><th>{t('qhse.eq.prochaine')}</th>
+          </tr></thead><tbody>
+            {(d.equipementsAVerifier || []).map(e => (
+              <tr key={e.id}>
+                <td><Link to="/qhse/equipements">{e.code || '—'}</Link></td>
+                <td>{e.libelle || '—'}</td><td style={{ color: '#b91c1c' }}>{e.prochaine_verif}</td>
+              </tr>
+            ))}
+            {(d.equipementsAVerifier || []).length === 0 && <tr><td colSpan={3} className="empty-row">{t('qhse.dash.rien')}</td></tr>}
+          </tbody></table></div>
+        </div>
+
+        <div style={{ flex: '1 1 380px' }}>
+          <h3>{t('qhse.dash.docsAReviser')}</h3>
+          <div className="table-wrap"><table><thead><tr>
+            <th>{t('qhse.doc.reference')}</th><th>{t('qhse.doc.titre')}</th><th>{t('qhse.doc.version')}</th><th>{t('qhse.doc.dateRevision')}</th>
+          </tr></thead><tbody>
+            {(d.documentsAReviser || []).map(doc => (
+              <tr key={doc.id}>
+                <td><Link to="/qhse/documents">{doc.reference || '—'}</Link></td>
+                <td>{doc.titre}</td><td>{doc.version}</td><td style={{ color: '#b45309' }}>{doc.date_revision}</td>
+              </tr>
+            ))}
+            {(d.documentsAReviser || []).length === 0 && <tr><td colSpan={4} className="empty-row">{t('qhse.dash.rien')}</td></tr>}
           </tbody></table></div>
         </div>
       </div>
