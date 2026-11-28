@@ -81,6 +81,8 @@ async function getDashboard() {
     avecArret: await scalar(`SELECT COUNT(*)::int AS n FROM qhse_sst_accidents WHERE type_evenement = 'accident_arret'`),
     parType: await countBy('qhse_sst_accidents', 'type_evenement'),
   };
+  // Indicateurs de sinistralité (TF/TG) de l'année en cours.
+  const sstIndicateurs = await require('./qhse.sst_accidents.service').indicators(new Date().getFullYear());
   const documents = {
     total: await scalar('SELECT COUNT(*)::int AS n FROM qhse_documents'),
     aReviser: await scalar(
@@ -128,7 +130,7 @@ async function getDashboard() {
 
   return {
     analyses, production, expeditions, nc, capaRetard, ncOuvertes, lots, tendance,
-    complaints, audits, metrologie, sstRisks, sstAccidents, documents, actions,
+    complaints, audits, metrologie, sstRisks, sstAccidents, sstIndicateurs, documents, actions,
     equipementsAVerifier, actionsRetard, documentsAReviser,
   };
 }

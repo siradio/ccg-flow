@@ -74,4 +74,51 @@ async function closeAccident(user, id) {
   return getAccidentDetail(id);
 }
 
-module.exports = { listAccidents, createAccident, getAccidentDetail, updateAccident, saveActions, closeAccident };
+// --- Heures travaillées (saisie mensuelle par BU) + indicateurs TF / TG -----------------------
+async function listHours(annee) {
+  const y = Number(annee) || new Date().getFullYear();
+  const bus = await all('SELECT id, nom FROM business_units ORDER BY nom');
+  const rows = await all('SELECT business_unit_id, mois, heures FROM qhse_sst_hours WHERE annee = $1', [y]);
+  const map = {};
+  for (const r of rows) map[`${r.business_unit_id}-${r.mois}`] = Number(r.heures);
+  // Grille BU × 12 mois (valeurs existantes ou 0).
+  return bus.map(bu => ({
+    business_unit_id: bu.id, bu_nom: bu.nom,
+    mois: Array.from({ length: 12 }, (_, i) => map[`${bu.id}-${i + 1}`] ?? 0),
+    total: Array.from({ length: 12 }, (_, i) => map[`${bu.id}-${i + 1}`] ?? 0).reduce((a, b) => a + b, 0),
+  }));
+}
+
+async function saveHours(user, annee, rows) {
+  const y = Number(annee) || new Date().getFullYear();
+  for (const r of rows || []) {
+    const buId = Number(r.business_unit_id);
+    const mois = Number(r.mois);
+    if (!buId || !(mois >= 1 && mois <= 12)) continue;
+    const heures = r.heures === '' || r.heures == null ? 0 : Number(r.heures);
+    await run(
+      `INSERT INTO qhse_sst_hours (business_unit_id, annee, mois, heures, created_by)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (business_unit_id, annee, mois)
+       DO UPDATE SET heures = EXCLUDED.heures, updated_at = now()`,
+      [buId, y, mois, heures, user.id]);
+  }
+  return indicators(y);
+}
+
+async function indicators(annee) {
+  const y = Number(annee) || new Date().getFullYear();
+  const heuresRow = await one('SELECT COALESCE(SUM(heures),0)::float AS h FROM qhse_sst_hours WHERE annee = $1', [y]);
+  const heures = heuresRow ? heuresRow.h : 0;
+  const accRow = await one(
+    `SELECT COUNT(*) FILTER (WHERE type_evenement = 'accident_arret')::int AS arret,
+            COALESCE(SUM(jours_perdus),0)::int AS jours
+       FROM qhse_sst_accidents WHERE date_evenement IS NOT NULL AND EXTRACT(YEAR FROM date_evenement) = $1`, [y]);
+  const nbAccidentsArret = accRow ? accRow.arret : 0;
+  const joursPerdus = accRow ? accRow.jours : 0;
+  const tf = heures > 0 ? Number(((nbAccidentsArret * 1e6) / heures).toFixed(2)) : null;
+  const tg = heures > 0 ? Number(((joursPerdus * 1e3) / heures).toFixed(2)) : null;
+  return { annee: y, heures, nbAccidentsArret, joursPerdus, tf, tg };
+}
+
+module.exports = { listAccidents, createAccident, getAccidentDetail, updateAccident, saveActions, closeAccident, listHours, saveHours, indicators };

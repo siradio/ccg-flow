@@ -35,4 +35,15 @@ router.post('/:id/close', requireEdit, async (req, res, next) => {
   try { res.json(await service.closeAccident(req.user, Number(req.params.id))); } catch (e) { next(e); }
 });
 
+// Heures travaillées (saisie mensuelle par BU) + indicateurs TF / TG.
+router.get('/hours/:annee', requireRead, async (req, res, next) => {
+  try { res.json(await service.listHours(req.params.annee)); } catch (e) { next(e); }
+});
+router.put('/hours/:annee', requireCreate, async (req, res, next) => {
+  try { res.json(await service.saveHours(req.user, req.params.annee, (req.body && req.body.rows) || [])); } catch (e) { next(e); }
+});
+router.get('/indicators/:annee', requireRead, async (req, res, next) => {
+  try { res.json(await service.indicators(req.params.annee)); } catch (e) { next(e); }
+});
+
 module.exports = router;

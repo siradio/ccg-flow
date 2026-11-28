@@ -102,6 +102,8 @@ export default function QhseDashboard() {
         <Tile label={t('qhse.dash.accidents')} value={d.sstAccidents?.total ?? 0} hint={`${d.sstAccidents?.avecArret ?? 0} ${t('qhse.dash.avecArret')}`} tone={(d.sstAccidents?.avecArret ?? 0) > 0 ? 'bad' : null} />
         <Tile label={t('qhse.dash.actionsRetard')} value={d.actions?.enRetard ?? 0} hint={`${d.actions?.ouvertes ?? 0} ${t('qhse.dash.ouvertes')}`} tone={(d.actions?.enRetard ?? 0) > 0 ? 'bad' : 'good'} />
         <Tile label={t('qhse.dash.docsAReviser')} value={d.documents?.aReviser ?? 0} hint={`${d.documents?.total ?? 0} ${t('qhse.dash.total')}`} tone={(d.documents?.aReviser ?? 0) > 0 ? 'warn' : 'good'} />
+        <Tile label={t('qhse.dash.tf')} value={d.sstIndicateurs?.tf ?? '—'} hint={`TF ${d.sstIndicateurs?.annee ?? ''}`} tone={(d.sstIndicateurs?.tf ?? 0) > 20 ? 'bad' : null} />
+        <Tile label={t('qhse.dash.tg')} value={d.sstIndicateurs?.tg ?? '—'} hint={`TG ${d.sstIndicateurs?.annee ?? ''}`} tone={(d.sstIndicateurs?.tg ?? 0) > 1 ? 'bad' : null} />
       </div>
 
       {/* Graphiques */}

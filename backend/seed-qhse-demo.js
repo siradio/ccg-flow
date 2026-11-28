@@ -264,7 +264,7 @@ async function seed() {
 }
 
 async function seedExtension({ userId, products, bus, formats, severities, buId }) {
-  const c = { complaints: 0, supplierEval: 0, equipment: 0, audits: 0, inspections: 0, sstRisks: 0, sstAccidents: 0, documents: 0, actions: 0 };
+  const c = { complaints: 0, supplierEval: 0, equipment: 0, audits: 0, inspections: 0, sstRisks: 0, sstAccidents: 0, hours: 0, documents: 0, actions: 0 };
   const sevId = () => (severities.length ? pick(severities).id : null);
   const prodId = () => pick(products).id;
   const fmtId = () => (formats.length ? pick(formats).id : null);
@@ -480,6 +480,19 @@ async function seedExtension({ userId, products, bus, formats, severities, buId 
       }
     }
   }
+
+  // 7g-bis) Heures travaillées (année en cours) par BU → alimente les indicateurs TF/TG.
+  const yNow = new Date().getFullYear();
+  for (const bu of bus) {
+    for (let m = 1; m <= 12; m++) {
+      const h = Math.round(rnd(14000, 20000));
+      await run(
+        `INSERT INTO qhse_sst_hours (business_unit_id, annee, mois, heures, created_by)
+         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (business_unit_id, annee, mois) DO UPDATE SET heures = EXCLUDED.heures`,
+        [bu.id, yNow, m, h, userId]);
+    }
+  }
+  c.hours = bus.length * 12;
 
   // 7h) GED — documents (dont quelques-uns à réviser)
   const docs = [
